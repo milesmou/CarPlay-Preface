@@ -4,9 +4,11 @@
 
 本仓库基于 DiPlay，主要面向**吉利星瑞车型的 E02 芯片版本车机**进行 CarPlay 适配。
 
-本仓库应用版本：**0.1.0**；上游基线：[DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18)。后续同步上游时，更新上游基线版本，并递增本仓库应用版本。
+当前开发版本：**0.1.1（尚未发布）**；上游基线：[DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18)。后续同步上游时，更新上游基线版本，并递增本仓库应用版本。
 
 [0.1.0 预览版](https://github.com/milesmou/CarPlay-Preface/releases/tag/v0.1.0) · [发布说明](docs/RELEASE-NOTES-0.1.0.md)。附件为签名源码预览 APK，独立连接 iPhone 需另行配置 CarPlay 配件认证资源；实车验证及完整 CI 尚未全部通过。
+
+当前源码已导入上游官方 APK 的两项实验性配件认证资源，主应用构建默认打包，可用于独立连接测试。详见 [认证资源来源与构建方式](docs/CARPLAY_AUTH_RESOURCES.md)，实际 iPhone 和星瑞车机连接仍需验证。
 
 ## 相对上游的改动
 

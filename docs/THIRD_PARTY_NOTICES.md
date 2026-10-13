@@ -42,7 +42,9 @@ Concentus uses the Opus BSD-style license. The full copyright notices, redistrib
 
 ## Experimental authentication data
 
-The public preview APK includes an accessory certificate/key pair recovered from public Carlinkit C2Air Allwinner V821 firmware during the owner's local investigation. These data are not newly generated Apple-issued credentials for DiPlay and are not relicensed as project source code. They are bundled in the preview APK to reproduce the offline experiment; continued acceptance and suitability for general distribution are unresolved. The source archive does not contain the private key, and the separate Android APK-signing key is never distributed.
+Current main-app builds include the accessory certificate/key pair imported from the official DiPlay v0.2.18 public preview APK. Upstream describes its recovery from public Carlinkit C2Air Allwinner V821 firmware during the owner's local investigation. These data are not newly generated Apple-issued credentials for DiPlay and are not relicensed as project source code. They reproduce the offline experiment; continued acceptance and suitability for general distribution are unresolved.
+
+At the user's explicit request, this branch includes the two reviewed binary resources in `runtime-assets/offline-mfi/`, with source and file SHA-256 values in [the provenance record](runtime-authentication-provenance.json). They are distinct from the Android APK-signing key, which remains outside Git. The already-published CarPlay-Preface v0.1.0 source-preview APK and source archive do not contain this pair.
 
 ## Download website
 

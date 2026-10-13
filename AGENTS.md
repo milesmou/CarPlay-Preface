@@ -30,6 +30,8 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 构建环境与设备安装
 
+主应用默认打包 `runtime-assets/offline-mfi/identity.pk8` 和 `certificate.p7b`。这是用户明确要求导入的上游 v0.2.18 公共预览 APK 的实验性配件认证资料；来源和 SHA-256 见 `docs/runtime-authentication-provenance.json`。仅允许这两个固定路径及已记录内容，其他私钥、令牌和 APK 签名密钥仍不得入库。`scripts/check_public_tree.py` 校验此例外；不要扩大凭证白名单。设置 `DIPLAY_AUTH_ASSETS_DIR` 可为本地构建替换认证目录，替换资料不得入库。
+
 ### 环境准备与本地缓存
 
 1. 构建前先读取 `agent_docs/build-environment.local.json`（如果存在），并检查记录的工具路径是否仍然可用；结合 `local.properties` 和当前环境变量复用已配置的环境。

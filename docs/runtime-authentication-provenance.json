@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sourceRelease": "https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18",
+  "sourceApk": "DiPlay-0.2.18.apk",
+  "sourceApkSha256": "e241457b36b21fe75b06b5682b4dcfc4fbc25cf75b1855c7a4d055129635ce8e",
+  "importedAt": "2026-10-13",
+  "purpose": "Upstream public experimental CarPlay accessory identity; not APK release signing material",
+  "files": {
+    "runtime-assets/offline-mfi/identity.pk8": {
+      "bytes": 67,
+      "sha256": "bd50eda2d8dd95a8464440f1aebca7068dcab46a2461ecaf826c7f98f5621a75"
+    },
+    "runtime-assets/offline-mfi/certificate.p7b": {
+      "bytes": 607,
+      "sha256": "634a93dd6c4338080524025411752597ecb828591839cd062a8292fd7e9e844e"
+    }
+  }
+}

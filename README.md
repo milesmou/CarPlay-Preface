@@ -4,9 +4,11 @@
 
 This repository is based on DiPlay and primarily targets **the Geely Preface (Xingrui) with the E02 head-unit chip**.
 
-App version: **0.1.0**. Upstream baseline: [DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18). When syncing upstream, update the upstream baseline and increment this repository's app version.
+Development version: **0.1.1 (unreleased)**. Upstream baseline: [DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18). When syncing upstream, update the upstream baseline and increment this repository's app version.
 
 [0.1.0 preview](https://github.com/milesmou/CarPlay-Preface/releases/tag/v0.1.0) · [Release notes](docs/RELEASE-NOTES-0.1.0.md). The signed source-preview APK requires separately provisioned CarPlay authentication assets for standalone iPhone connections. Vehicle validation and the full CI suite remain incomplete.
+
+Current source imports the upstream official APK's two experimental accessory authentication assets and bundles them in main-app builds by default for standalone connection testing. See [resource provenance and building](docs/CARPLAY_AUTH_RESOURCES.md); iPhone and vehicle acceptance remain unverified.
 
 ## Differences from upstream
 

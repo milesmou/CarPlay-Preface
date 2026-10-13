@@ -7,7 +7,7 @@ import com.shilapi.xcertplay.orchestration.MfiTarget
 import java.io.File
 import java.security.MessageDigest
 
-/** Installs the private beta's experimental identity. It has no remote fallback. */
+/** Installs the bundled experimental identity. It has no remote fallback. */
 internal object DiPlayBootstrap {
     @Volatile private var ready = false
 
