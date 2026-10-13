@@ -18,6 +18,6 @@
 
 一般 `:mobile:assembleDebug` 也会带上这两项。已有 `DIPLAY_AUTH_ASSETS_DIR` 可指定其他本地目录，替换默认输入；替换资料不适用仓库白名单，不应提交。
 
-`.gitignore` 和 `scripts/check_public_tree.py` 只允许以上两个固定路径及确认过的内容；其他私钥、令牌和 APK 签名密钥继续排除。资源的上游说明和用途边界见 [第三方声明](THIRD_PARTY_NOTICES.md#experimental-authentication-data)。
+`.gitignore` 和 `scripts/check_public_tree.py` 只允许已确认的这两项认证资源以及用户要求公开的 [APK 签名材料](../signing/README.md)；其他私钥、令牌和本地配置继续排除。资源的上游说明和用途边界见 [第三方声明](THIRD_PARTY_NOTICES.md#experimental-authentication-data)。
 
 上游将这对数据用于实验性配件认证。打包成功及签名自检只能证明文件存在、密钥与证书匹配，不能证明当前 iOS 接受该身份或星瑞实车已经完成连接验证。已经发布的 `0.1.0` APK 不含它们；当前开发版本为 `0.1.1`，重新构建后才会包含，GitHub 发布附件不会因源码改动自动更新。

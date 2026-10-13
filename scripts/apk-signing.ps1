@@ -16,6 +16,8 @@ $configurationPath = Join-Path $privateDirectory 'signing.local.json'
 $keystorePath = Join-Path $privateDirectory 'carplay-release.p12'
 $backupPath = Join-Path $repositoryRoot 'signing/carplay-release.p12.enc'
 $certificatePath = Join-Path $repositoryRoot 'signing/carplay-release.cer'
+$publicConfigurationPath = Join-Path $repositoryRoot 'signing/signing.json'
+$publicKeystorePath = Join-Path $repositoryRoot 'signing/carplay-release.p12'
 $environmentPath = Join-Path $repositoryRoot 'agent_docs/build-environment.local.json'
 $associatedData = [Text.Encoding]::UTF8.GetBytes('CarPlay-Preface APK signing backup v1')
 
@@ -69,7 +71,8 @@ function Invoke-Keytool([string[]]$Arguments, [string]$Password) {
 switch ($Action) {
     'Generate' {
         if ((Test-Path -LiteralPath $keystorePath) -or (Test-Path -LiteralPath $configurationPath) -or
-            (Test-Path -LiteralPath $backupPath) -or (Test-Path -LiteralPath $certificatePath)) {
+            (Test-Path -LiteralPath $backupPath) -or (Test-Path -LiteralPath $certificatePath) -or
+            (Test-Path -LiteralPath $publicKeystorePath) -or (Test-Path -LiteralPath $publicConfigurationPath)) {
             throw 'Signing material already exists. Restore or reuse it; do not replace a released signing key.'
         }
         New-PrivateDirectory
@@ -141,10 +144,17 @@ switch ($Action) {
         Write-Output 'Signing backup restored to the local private directory.'
     }
     'BuildRelease' {
-        $configuration = Get-Content -LiteralPath $configurationPath -Raw | ConvertFrom-Json
+        if (Test-Path -LiteralPath $publicConfigurationPath) {
+            $configuration = Get-Content -LiteralPath $publicConfigurationPath -Raw | ConvertFrom-Json
+            $selectedKeystore = Join-Path (Split-Path -Parent $publicConfigurationPath) $configuration.keystoreFile
+        } else {
+            $configuration = Get-Content -LiteralPath $configurationPath -Raw | ConvertFrom-Json
+            $selectedKeystore = $configuration.keystorePath
+        }
         $variables = @{
-            ANDROID_KEYSTORE_PATH = $configuration.keystorePath; ANDROID_KEYSTORE_PASSWORD = $configuration.storePassword
+            ANDROID_KEYSTORE_PATH = $selectedKeystore; ANDROID_KEYSTORE_PASSWORD = $configuration.storePassword
             ANDROID_KEY_ALIAS = $configuration.keyAlias; ANDROID_KEY_PASSWORD = $configuration.keyPassword
+            ANDROID_KEYSTORE_TYPE = $configuration.keystoreType
         }
         if (Test-Path -LiteralPath $environmentPath) {
             $buildEnvironment = Get-Content -LiteralPath $environmentPath -Raw | ConvertFrom-Json
@@ -162,7 +172,13 @@ switch ($Action) {
             & $(if ($IsWindows) { '.\gradlew.bat' } else { './gradlew' }) :mobile:assembleRelease
             if ($LASTEXITCODE -ne 0) { throw 'Release APK build failed.' }
         } finally {
-            foreach ($name in $previous.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }
+            foreach ($name in $previous.Keys) {
+                if ($null -eq $previous[$name]) {
+                    Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+                } else {
+                    [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process')
+                }
+            }
             Pop-Location
         }
     }

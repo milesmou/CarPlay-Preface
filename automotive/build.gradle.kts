@@ -3,6 +3,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val repositorySigning = groovy.json.JsonSlurper().parseText(
+    providers.fileContents(rootProject.layout.projectDirectory.file("signing/signing.json")).asText.get(),
+) as Map<*, *>
+val repositoryKeystore = rootProject.file("signing/${repositorySigning["keystoreFile"]}").canonicalFile
+
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
@@ -22,11 +27,16 @@ android {
         create("release") {
             storeFile = file(
                 providers.environmentVariable("ANDROID_KEYSTORE_PATH")
-                    .getOrElse("missing-release-keystore.jks"),
+                    .filter { it.isNotBlank() }.getOrElse(repositoryKeystore.absolutePath),
             )
-            storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").getOrElse("")
-            keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").getOrElse("")
-            keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").getOrElse("")
+            storeType = providers.environmentVariable("ANDROID_KEYSTORE_TYPE")
+                .filter { it.isNotBlank() }.getOrElse(repositorySigning["keystoreType"] as String)
+            storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
+                .filter { it.isNotBlank() }.getOrElse(repositorySigning["storePassword"] as String)
+            keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
+                .filter { it.isNotBlank() }.getOrElse(repositorySigning["keyAlias"] as String)
+            keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
+                .filter { it.isNotBlank() }.getOrElse(repositorySigning["keyPassword"] as String)
         }
     }
 

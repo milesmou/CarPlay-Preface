@@ -43,3 +43,6 @@ release-signing.properties
 # Reviewed experimental pair from the upstream public APK; all other credential rules still apply.
 !/runtime-assets/offline-mfi/identity.pk8
 !/runtime-assets/offline-mfi/certificate.p7b
+
+# Owner-authorized public APK signing material.
+!/signing/carplay-release.p12

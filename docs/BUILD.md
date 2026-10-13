@@ -141,17 +141,18 @@ To use a different locally provisioned pair, set `DIPLAY_AUTH_ASSETS_DIR` to an 
 
 ## Build a release APK
 
-The reviewed runtime assets are selected by default. Set the signing environment variables locally:
+The reviewed runtime assets and the owner-authorized public signing material in `signing/` are selected by default. No private signing configuration is required. These environment variables optionally override the Gradle defaults:
 
 | Variable | Value |
 | --- | --- |
 | `DIPLAY_AUTH_ASSETS_DIR` | Optional external runtime assets directory; defaults to repository `runtime-assets/` |
-| `ANDROID_KEYSTORE_PATH` | Path to your Android signing keystore |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
-| `ANDROID_KEY_ALIAS` | Signing key alias |
-| `ANDROID_KEY_PASSWORD` | Signing key password |
+| `ANDROID_KEYSTORE_PATH` | Optional alternative signing keystore path |
+| `ANDROID_KEYSTORE_TYPE` | Optional alternative keystore type |
+| `ANDROID_KEYSTORE_PASSWORD` | Optional alternative keystore password |
+| `ANDROID_KEY_ALIAS` | Optional alternative signing key alias |
+| `ANDROID_KEY_PASSWORD` | Optional alternative signing key password |
 
-Keep the keystore and passwords outside Git.
+The repository's existing keystore and signing passwords are intentionally public at the owner's request; see [signing documentation](../signing/README.md). Keep other signing material and local overrides outside Git. The APK itself does not bundle the signing keystore or configuration.
 Run the release checks and build:
 
 ```sh
@@ -165,7 +166,7 @@ The APK excludes the Android signing key.
 See [the project notices](THIRD_PARTY_NOTICES.md) for the experimental identity used in public releases.
 
 The public source archive matches the release tag.
-For this branch it includes the two reviewed experimental runtime assets and their provenance. It excludes APK signing keys, other credentials, local configuration, and build output. The already-published v0.1.0 source-preview tag predates this import.
+For this branch it includes the two reviewed experimental runtime assets, the owner-authorized public APK signing material, and their provenance/checksums. It excludes other credentials, local configuration, and build output. The already-published v0.1.0 source-preview tag predates these imports.
 The retired `build-beta.py` helper is no longer part of the build procedure.
 
 ## Correct build problems

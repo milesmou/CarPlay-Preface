@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "keystoreFile": "carplay-release.p12",
+  "keystoreType": "PKCS12",
+  "keyAlias": "carplay-release",
+  "storePassword": "aNmSVvJywUkJbtiKGIdh489Uz1RpgcAwKYBCEiZNUuo=",
+  "keyPassword": "aNmSVvJywUkJbtiKGIdh489Uz1RpgcAwKYBCEiZNUuo="
+}

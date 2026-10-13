@@ -10,6 +10,8 @@ Development version: **0.1.1 (unreleased)**. Upstream baseline: [DiPlay v0.2.18]
 
 Current source imports the upstream official APK's two experimental accessory authentication assets and bundles them in main-app builds by default for standalone connection testing. See [resource provenance and building](docs/CARPLAY_AUTH_RESOURCES.md); iPhone and vehicle acceptance remain unverified.
 
+At the owner's request, the existing [APK signing key and signing passwords](signing/README.md) are also public, allowing release builds with the same certificate after cloning.
+
 ## Differences from upstream
 
 - **Adaptation target:** This branch primarily targets the Xingrui E02 head unit.
