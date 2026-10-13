@@ -1,4 +1,4 @@
-# APK 发布签名
+# APK 构建签名
 
 按仓库所有者要求，本目录公开 CarPlay-Preface 现有的 APK 签名密钥和签名密码，供克隆仓库后使用同一证书构建 APK。
 
@@ -15,6 +15,14 @@
 ```sh
 ./gradlew :mobile:assembleRelease
 ```
+
+CarPlay 测试包也使用同一签名：`mobile` 和 `automotive` 的 Debug／Release 共用本目录的签名配置，主应用 `assembleStandaloneDebug` 同样适用。
+
+```sh
+./gradlew :mobile:assembleDebug
+```
+
+主应用测试包仍使用 `com.shihab.diplay.hudtest` 包名。旧测试包若使用 Android 默认 Debug 密钥，首次覆盖安装会因签名不同而失败；构建流程只报告错误，不自动卸载或清除原数据。
 
 也可在 PowerShell 7.4+ 中运行：
 

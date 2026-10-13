@@ -1,11 +1,13 @@
 # CarPlay on your launcher's home screen
 
+本分支面向星瑞 E02。本文描述通用 Android 地图接口，不表示原车桌面已验证；`home`／`maphost` 的实时嵌入示例要求 API 30，提供的 API 28 固件不能运行这些示例。应用内地图不受此限制。
+
 DiPlay can put CarPlay information on a launcher's home screen in three ways:
 
 | | What it shows | Works with | Needs |
 |---|---|---|---|
 | [Navigation widget](#1-navigation-widget) | Next turn arrow, distance, road, arrival, song | Any launcher that hosts standard Android widgets | Nothing extra |
-| [Map card](#2-map-card) | The live CarPlay map, as a card on the home screen | Any launcher, including BYD home and map home | Two permissions (see below) |
+| [Map card](#2-map-card) | The live CarPlay map, as a card on the home screen | Any launcher, including OEM home and map home | Two permissions (see below) |
 | [Embedded map](#3-embedded-live-map-for-launcher-developers) | The live CarPlay map inside the launcher's own layout | Launchers that add support for it | Launcher code, Android 11+ |
 
 The live map is CarPlay's instrument-cluster map: the map the iPhone draws for the dashboard. The map card and the embedded map need **CarPlay map on instrument cluster** turned on in DiPlay. Without it, the iPhone does not send that map.
@@ -23,13 +25,13 @@ Add **CarPlay navigation** from your launcher's widget list (it is a 4×2 widget
 
 Tap the widget to open CarPlay, or DiPlay when CarPlay is not connected. The widget updates at most once a second.
 
-BYD's own home (Launcher3) accepts only the widgets on its built-in list, so the widget cannot be added there. Use the map card on BYD home.
+OEM's own home (Launcher3) accepts only the widgets on its built-in list, so the widget cannot be added there. Use the map card on OEM home.
 
 ## 2. Map card
 
 While DiPlay is in the background, a card with the live map shows on the home screen:
 
-- on BYD home, BYD map home and MyCar;
+- on OEM home, OEM map home and MyCar;
 - on whichever launcher is set as the default home, for example a third-party car launcher.
 
 Use the card:
@@ -152,13 +154,13 @@ The map is 8:3. If your view has another shape, DiPlay fills it and crops the ed
 
 [`samples/home`](../samples/home/src/main/java/com/diplay/home/HomeActivity.kt) is a small launcher built on the public APIs above. It shows:
 
-- the embedded live map, with a clock above it and buttons for Apps, CarPlay and BYD home below;
+- the embedded live map, with a clock above it and buttons for Apps, CarPlay and OEM home below;
 - a column of any Android widgets, including **CarPlay navigation**;
 - a full app list.
 
-It runs without system privileges. BYD's home stays installed, and the **BYD home** button opens it.
+It runs without system privileges. OEM's home stays installed, and the **OEM home** button opens it.
 
-- **Widgets.** A launcher needs the owner's consent to bind widgets. BYD head units have no consent screen, so allow it once over ADB:
+- **Widgets.** A launcher needs the owner's consent to bind widgets. OEM head units have no consent screen, so allow it once over ADB:
 
   ```bash
   adb shell appwidget grantbind --package com.diplay.home --user 0
@@ -170,13 +172,13 @@ It runs without system privileges. BYD's home stays installed, and the **BYD hom
   adb shell cmd package set-home-activity com.diplay.home/.HomeActivity
   ```
 
-- **Going back to BYD's home:**
+- **Going back to OEM's home:**
 
   ```bash
   adb shell cmd package set-home-activity com.android.launcher3/.home.MainActivity
   ```
 
-  BYD's map-mode button also returns to BYD's home, because BYD's own home list contains only BYD launchers.
+  OEM's map-mode button also returns to OEM's home, because OEM's own home list contains only OEM launchers.
 
 ## Troubleshooting
 
@@ -184,7 +186,7 @@ It runs without system privileges. BYD's home stays installed, and the **BYD hom
 |---|---|
 | No card | Card switch on; "Draw over other apps" allowed; CarPlay connected; dashboard map on; you are on a home screen. |
 | Card shows over every app | Usage Access is not allowed for DiPlay. |
-| Card on BYD home but not on another launcher | Make that launcher the default home; DiPlay reads the default home when the card starts. |
+| Card on OEM home but not on another launcher | Make that launcher the default home; DiPlay reads the default home when the card starts. |
 | Embedded map says `disabled` | Turn on "Share the live map with other launchers" in DiPlay. |
 | Embedded map stays on "waiting" | CarPlay is not connected, or "CarPlay map on instrument cluster" is off. |
 | Widget says "CarPlay is not connected" while CarPlay works | Open DiPlay once after installing it; the widget follows the running session. |

@@ -179,8 +179,6 @@ class CarPlayHostActivity : ComponentActivity() {
             hardwareVersion = "1.0",
             carPlayUsbInterfaceNumber = 3,
             locationInformationEnabled = locationReportingEnabled,
-            vehicleStatusEnabled = false,
-            chargingConnectors = com.shilapi.xcertplay.transport.EvChargingConnectors.CCS2_TYPE2,
             vehicleSpeedEnabled = locationReportingEnabled && false,
         ),
         label = "CarPlay",
@@ -189,14 +187,11 @@ class CarPlayHostActivity : ComponentActivity() {
         wirelessBluetoothDeviceAddress = DiPlayPreferences.phoneAddress(this),
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
         wirelessHotspotMode = wirelessHotspotMode,
-        wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
         manualHotspotSsid = manualHotspotSsid,
         manualHotspotPassphrase = manualHotspotPassphrase,
         manualHotspotBand = manualHotspotBand,
         manualHotspotChannel = manualHotspotChannel,
         manualHotspotSecurity = manualHotspotSecurity,
-        existingWifiSsid = existingWifiSsid,
-        existingWifiPassphrase = existingWifiPassphrase,
         locationReportingEnabled = locationReportingEnabled,
         availableCurrentMilliAmps = AirPlayPersistence.loadUsbChargingCurrent(this).milliAmps,
     )
@@ -319,8 +314,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var resolutionPreviewView: TextView? = null
     private var hotspotStatusView: TextView? = null
     private var manualHotspotFields: View? = null
-    private var existingWifiFields: View? = null
-    private var existingWifiErrorView: TextView? = null
     private var manualHotspotErrorView: TextView? = null
     private var iconPreviewView: ImageView? = null
     private var iconStatusView: TextView? = null
@@ -366,7 +359,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var hevcSoftwareDecoderEnabled = false
     private var advancedAudioChannelMappingSupported = false
     private var advancedAudioChannelMapping = false
-    private var navigationStreamType = 14
+    private var navigationStreamType = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
     private var debugLogsEnabled = false
     private var autoStartOnBoot = false
     private var manufacturer = AirPlayPersistence.DEFAULT_MANUFACTURER
@@ -385,8 +378,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var sessionDock: CarPlayDock? = null
     private var hideTopBar = true
     private var hideBottomBar = true
-    private var harmanFullscreenEnabled = false
-    private var harmanFullscreenApplied = false
     private var safeAreaDrawOutside = true
     private var mainDisplayDisableSafeArea = false
     private var locationReportingEnabled = false
@@ -399,10 +390,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var remoteMfiServer = ""
     private var remoteMfiToken = ""
     private var wirelessPermissionsReady = false
-    private var wirelessHotspotMode = WirelessHotspotMode.WIFI_P2P
+    private var wirelessHotspotMode = WirelessHotspotMode.MANUAL
     private var manualHotspotSsid = ""
-    private var existingWifiSsid = ""
-    private var existingWifiPassphrase = ""
     private var manualHotspotPassphrase = ""
     private var manualHotspotBand = ManualHotspotBand.AUTO
     private var manualHotspotChannel = 0
@@ -708,7 +697,6 @@ class CarPlayHostActivity : ComponentActivity() {
         rightHandDrive = AirPlayPersistence.loadRightHandDrive(this)
         hideTopBar = AirPlayPersistence.loadHideTopBar(this)
         hideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
-        harmanFullscreenEnabled = AirPlayPersistence.loadHarmanFullscreen(this)
         safeAreaDrawOutside = AirPlayPersistence.loadSafeAreaDrawOutside(this)
         mainDisplayDisableSafeArea = AirPlayPersistence.loadMainDisplayDisableSafeArea(this)
         locationPermissionAvailable = hasFineLocationPermission()
@@ -730,8 +718,6 @@ class CarPlayHostActivity : ComponentActivity() {
         remoteMfiToken = AirPlayPersistence.loadRemoteMfiToken(this)
         locationReportingEnabled = AirPlayPersistence.loadLocationReportingEnabled(this)
         wirelessHotspotMode = AirPlayPersistence.loadWirelessHotspotMode(this)
-        existingWifiSsid = AirPlayPersistence.loadExistingWifiSsid(this)
-        existingWifiPassphrase = AirPlayPersistence.loadExistingWifiPassphrase(this)
         manualHotspotSsid = AirPlayPersistence.loadManualHotspotSsid(this)
         manualHotspotPassphrase = AirPlayPersistence.loadManualHotspotPassphrase(this)
         manualHotspotBand = AirPlayPersistence.loadManualHotspotBand(this)
@@ -943,13 +929,10 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!menuOpen) {
             val savedHideTopBar = AirPlayPersistence.loadHideTopBar(this)
             val savedHideBottomBar = AirPlayPersistence.loadHideBottomBar(this)
-            val savedHarmanFullscreen = AirPlayPersistence.loadHarmanFullscreen(this)
             systemBarsChanged = hideTopBar != savedHideTopBar ||
-                hideBottomBar != savedHideBottomBar ||
-                harmanFullscreenEnabled != savedHarmanFullscreen
+                hideBottomBar != savedHideBottomBar
             hideTopBar = savedHideTopBar
             hideBottomBar = savedHideBottomBar
-            harmanFullscreenEnabled = savedHarmanFullscreen
         }
         maybeStartCarPlay()
         applyFullscreenMode()
@@ -971,7 +954,6 @@ class CarPlayHostActivity : ComponentActivity() {
             heightPixels = 720,
             scalePercent = 100,
             content = AirPlayPersistence.loadClusterContent(this),
-            baseSafeArea = CarPlayClusterDisplay.VIRTUAL_SAFE_AREA_PERCENT,
         )
     }
 
@@ -2521,7 +2503,6 @@ class CarPlayHostActivity : ComponentActivity() {
         AirPlayPersistence.saveRemoteMfiServer(this, remoteMfiServer)
         AirPlayPersistence.saveRemoteMfiToken(this, remoteMfiToken)
         AirPlayPersistence.saveWirelessHotspotMode(this, wirelessHotspotMode)
-        AirPlayPersistence.saveExistingWifiCredentials(this, existingWifiSsid, existingWifiPassphrase)
         AirPlayPersistence.saveManualHotspotSsid(this, manualHotspotSsid)
         AirPlayPersistence.saveManualHotspotPassphrase(this, manualHotspotPassphrase)
         AirPlayPersistence.saveManualHotspotBand(this, manualHotspotBand)
@@ -2552,7 +2533,7 @@ class CarPlayHostActivity : ComponentActivity() {
     /** Mirrors [persistMenuSettings]: a field staged there belongs here too. */
     private fun menuSettingsSignature(): Int = listOf(
         gestureFingerCount, wirelessEnabled, mfiTarget, mfiI2cPath, remoteMfiServer, remoteMfiToken,
-        wirelessHotspotMode, existingWifiSsid, existingWifiPassphrase, manualHotspotSsid,
+        wirelessHotspotMode, manualHotspotSsid,
         manualHotspotPassphrase, manualHotspotBand, manualHotspotChannel, manualHotspotSecurity,
         locationReportingEnabled, autoStartOnBoot, advancedAudioChannelMapping, displayScaleTenths,
         displayScalePercent, fps, widthPhysicalMm, physicalSizeBasis, hevcEnabled,
@@ -3416,13 +3397,7 @@ class CarPlayHostActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(8), 0, 0)
         }
-        val modes = buildList {
-            add(WirelessHotspotMode.MANUAL to getString(R.string.settings_built_in_car_hotspot_recommended))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(WirelessHotspotMode.WIFI_P2P to getString(R.string.wi_fi_p2p_5_ghz))
-            }
-            add(WirelessHotspotMode.EXISTING_WIFI to getString(R.string.existing_wifi_title))
-        }
+        val modes = ConnectionSettingsSection.hotspotModeOptions(this)
         var selectedId = View.NO_ID
         for ((mode, label) in modes) {
             val button = RadioButton(this).apply {
@@ -3572,29 +3547,12 @@ class CarPlayHostActivity : ComponentActivity() {
         )
         manualHotspotFields = manualFields
         manualHotspotErrorView = error
-        val existingFields = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(menuText(getString(R.string.existing_wifi_instructions), 14f, MENU_SECONDARY))
-            addView(settingsInputRow(getString(R.string.existing_wifi_ssid), existingWifiSsid) {
-                existingWifiSsid = it
-                existingWifiErrorView?.visibility = View.GONE
-            })
-            addView(settingsInputRow(getString(R.string.existing_wifi_password), existingWifiPassphrase, password = true) {
-                existingWifiPassphrase = it
-                existingWifiErrorView?.visibility = View.GONE
-            })
-        }
-        existingWifiErrorView = menuText("", 14f, MENU_DANGER).apply { visibility = View.GONE }
-        existingFields.addView(existingWifiErrorView)
-        section.addView(existingFields)
-        existingWifiFields = existingFields
+        section.addView(menuText(getString(R.string.settings_temporary_hotspot_description), 14f, MENU_SECONDARY))
         updateManualHotspotFields()
         return section
     }
 
     private fun updateManualHotspotFields() {
-        existingWifiFields?.visibility = if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI) View.VISIBLE else View.GONE
-        existingWifiErrorView?.visibility = View.GONE
         val visible = wirelessHotspotMode == WirelessHotspotMode.MANUAL
         manualHotspotFields?.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) manualHotspotErrorView?.visibility = View.GONE
@@ -3623,12 +3581,6 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun validateManualHotspotSettings(): Boolean {
-        if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI) {
-            val error = com.shilapi.xcertplay.orchestration.ManualHotspotValidation.error(existingWifiSsid, existingWifiPassphrase)
-            existingWifiErrorView?.text = error?.let { getString(it.messageResource()) }.orEmpty()
-            existingWifiErrorView?.visibility = if (error == null) View.GONE else View.VISIBLE
-            return error == null
-        }
         if (wirelessHotspotMode != WirelessHotspotMode.MANUAL) return true
         val error = when {
             manualHotspotSsid.isBlank() -> getString(R.string.hotspot_ssid_is_required)
@@ -3654,10 +3606,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun hotspotModeLabel(mode: WirelessHotspotMode): String = when (mode) {
-        WirelessHotspotMode.WIFI_P2P -> getString(R.string.wi_fi_p2p_5_ghz)
-        WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.localonlyhotspot)
+        WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.settings_temporary_hotspot)
         WirelessHotspotMode.MANUAL -> getString(R.string.manual_hotspot)
-        WirelessHotspotMode.EXISTING_WIFI -> getString(R.string.existing_wifi_title)
     }
 
     private fun menuText(
@@ -4515,7 +4465,6 @@ class CarPlayHostActivity : ComponentActivity() {
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
             locationProvider = locationProvider,
-            vehicleStatusProvider = null,
         )
         controller = next
         resetSidePanel() // a new session starts without the side panel
@@ -5334,8 +5283,6 @@ class CarPlayHostActivity : ComponentActivity() {
         englishMessage.contains("Turn on Wi-Fi", true) -> getString(R.string.turn_on_wi_fi_in_the_head_unit_s_settings_to_connect)
         englishMessage.contains("Allow precise Location", true) -> getString(R.string.allow_precise_location_for_diplay_in_the_head_unit_s_app_p)
         englishMessage.contains("Allow Nearby devices", true) -> getString(R.string.allow_nearby_devices_for_diplay_in_the_head_unit_s_app_per)
-        englishMessage.contains("createGroup failed", true) -> getString(R.string.the_head_unit_couldn_t_start_carplay_wi_fi_check_wi_fi_and)
-        englishMessage.contains("needs a reset", true) -> getString(R.string.a_previous_wi_fi_direct_connection_is_still_running_reset)
         englishMessage.contains(BluetoothLinkCheck.UNREAL_MARK, true) -> getString(R.string.bluetooth_connections_not_real)
         englishMessage.contains("socket", true) || englishMessage.contains("RFCOMM", true) -> getString(R.string.your_iphone_isn_t_available_unlock_it_and_check_bluetooth)
         englishMessage.contains("unsupported", true) || englishMessage.contains("not supported", true) -> getString(R.string.this_head_unit_may_not_support_wireless_carplay_try_a_usb)
@@ -5398,17 +5345,6 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun applyFullscreenMode() {
         val multiWindow = isMultiWindowActive()
-        if (harmanFullscreenEnabled) {
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            // The OEM-specific bit must be written last: the standard insets controller does not preserve it.
-            HarmanFullscreenCompat.apply(window)
-            harmanFullscreenApplied = true
-            return
-        }
-        if (harmanFullscreenApplied) {
-            HarmanFullscreenCompat.clear(window)
-            harmanFullscreenApplied = false
-        }
         val hideTop = hideTopBar && !multiWindow
         val hideBottom = hideBottomBar && !multiWindow
         WindowCompat.setDecorFitsSystemWindows(window, !(hideTop && hideBottom))
@@ -5434,12 +5370,9 @@ class CarPlayHostActivity : ComponentActivity() {
         CarPlayStatus.WaitingForMfi -> res.getString(R.string.waiting_for_mfi_coprocessor)
         CarPlayStatus.RequestingMfiPermission -> res.getString(R.string.requesting_mfi_usb_permission)
         CarPlayStatus.MfiReady -> res.getString(R.string.mfi_authentication_ready)
-        CarPlayStatus.StartingHotspot -> res.getString(if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI)
-            R.string.existing_wifi_attaching else R.string.starting_wireless_hotspot)
-        is CarPlayStatus.HotspotReady ->
-            if (wirelessHotspotMode == WirelessHotspotMode.EXISTING_WIFI) {
-                res.getString(R.string.existing_wifi_ready, ssid, band, channel, address)
-            } else res.getString(R.string.status_hotspot_ready, backend, ssid, band, if (channel == 0) res.getString(R.string.auto_value) else channel.toString())
+        CarPlayStatus.StartingHotspot -> res.getString(R.string.starting_wireless_hotspot)
+        is CarPlayStatus.HotspotReady -> res.getString(R.string.status_hotspot_ready,
+            backend, ssid, band, if (channel == 0) res.getString(R.string.auto_value) else channel.toString())
         CarPlayStatus.WaitingForPairedIphone -> res.getString(R.string.waiting_for_paired_iphone)
         CarPlayStatus.ConnectingBluetooth -> res.getString(R.string.connecting_bluetooth)
         CarPlayStatus.RunningWireless -> res.getString(R.string.wireless_carplay_control_running)

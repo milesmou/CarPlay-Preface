@@ -1,5 +1,7 @@
 # Android 9 Wi-Fi Direct
 
+> 历史上游参考：本分支已移除此连接方式，当前仅提供车载热点与 LocalOnlyHotspot 临时热点，见 [安装与连接](INSTALL.md)。
+
 Android 9 uses the public two-argument `WifiP2pManager.createGroup` overload and reads the
 system-generated credentials from `requestGroupInfo`. Unlike the Android 10 configuration
 overload, Android 9 asks the framework to create or reuse a persistent group-owner profile.

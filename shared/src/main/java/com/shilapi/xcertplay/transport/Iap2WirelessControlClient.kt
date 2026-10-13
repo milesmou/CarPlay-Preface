@@ -25,7 +25,6 @@ class Iap2WirelessControlClient(
         endpoint: Iap2WirelessCarPlayEndpoint,
         timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
         locationProvider: Iap2LocationProvider? = null,
-        vehicleStatusProvider: VehicleStatusProvider? = null,
         onReady: () -> Unit = {},
         beforeStartSession: () -> Unit = {},
         onStartSessionSent: (Iap2StartSessionSent) -> Unit = {},
@@ -43,11 +42,7 @@ class Iap2WirelessControlClient(
         }
 
         val deadline = WirelessControlDeadline(timeoutMillis)
-        val identified = identification.withVehicleStatusFrom(vehicleStatusProvider)
-        if (identified.vehicleStatusEnabled != identification.vehicleStatusEnabled) {
-            onProgress("iap2 no battery reading: not declaring an electric vehicle")
-        }
-        Iap2IdentificationClient(session).identify(identified, deadline.requireRemaining(), onProgress)
+        Iap2IdentificationClient(session).identify(identification, deadline.requireRemaining(), onProgress)
         onProgress("iap2 identification accepted")
         var stage = Iap2WirelessControlStage.IDENTIFIED
 
@@ -75,7 +70,6 @@ class Iap2WirelessControlClient(
         var transportNotificationSeen = false
         var wirelessCarPlayAvailableSeen = false
         val location = Iap2LocationReporter(locationProvider, onProgress)
-        val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
         try {
             while (true) {
                 val remaining = deadline.remainingMillis(keepAliveAfterDeadline)
@@ -92,8 +86,7 @@ class Iap2WirelessControlClient(
                     )
                 }
                 location.tick(::sendControl)
-                vehicleStatus.tick(::sendControl)
-                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val pollTimeout = location.pollTimeout(remaining)
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -207,10 +200,6 @@ class Iap2WirelessControlClient(
                                 "iap2 tx=0x5703 post-transport accessory-wifi-configuration",
                             )
                         }
-                    }
-
-                    Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES, Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> {
-                        vehicleStatus.handle(incoming, ::sendControl)
                     }
 
                     Iap2LocationMessages.START_LOCATION_INFORMATION,

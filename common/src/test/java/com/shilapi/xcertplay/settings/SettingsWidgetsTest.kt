@@ -139,22 +139,22 @@ class SettingsWidgetsTest {
         )
     }
 
-    @Test @Config(sdk = [28]) fun android9HotspotChoiceDoesNotExposeUnavailableWifiDirect() {
+    @Test @Config(sdk = [28]) fun android9OffersCarAndTemporaryHotspots() {
         val row = ConnectionSettingsSection.createHotspotModeChoice(context, WirelessHotspotMode.MANUAL,
             onSelected = {})
         val options = views(row.container).filterIsInstance<RadioButton>().toList()
-        assertEquals(listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.EXISTING_WIFI), options.map { it.tag })
+        assertEquals(listOf(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.MANUAL), options.map { it.tag })
         assertEquals(WirelessHotspotMode.MANUAL, options.first { it.isChecked }.tag)
     }
 
-    @Test fun carHotspotIsTheFirstAndRecommendedHotspotChoice() {
-        val row = ConnectionSettingsSection.createHotspotModeChoice(context, WirelessHotspotMode.WIFI_P2P,
+    @Test fun temporaryHotspotIsTheFirstAndRecommendedHotspotChoice() {
+        val row = ConnectionSettingsSection.createHotspotModeChoice(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT,
             onSelected = {})
         val options = views(row.container).filterIsInstance<RadioButton>().toList()
-        assertEquals(listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI),
+        assertEquals(listOf(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.MANUAL),
             options.map { it.tag })
-        assertEquals(context.getString(com.shilapi.xcertplay.host.R.string.settings_built_in_car_hotspot_recommended), options.first().text.toString())
-        assertEquals(WirelessHotspotMode.WIFI_P2P, options.first { it.isChecked }.tag)
+        assertEquals(context.getString(com.shilapi.xcertplay.host.R.string.settings_temporary_hotspot), options.first().text.toString())
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, options.first { it.isChecked }.tag)
     }
 
     private fun views(view: View): Sequence<View> = sequence {

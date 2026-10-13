@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_overview">概览</string>
-    <string name="settings_overview_subtitle">舒适、可靠驾驶的基本设置。</string>
-    <string name="settings_your_setup">你的设置</string>
     <string name="settings_quick_settings">快捷设置</string>
     <string name="settings_display">显示</string>
     <string name="settings_navigation">导航</string>
@@ -23,12 +21,10 @@
     <string name="settings_wheel_keys">方向盘按键</string>
     <string name="settings_experimental_display">显示（实验性）</string>
     <string name="settings_diagnostics_summary">排查连接问题时保存本地报告</string>
-    <string name="settings_full_screen_description">在 CarPlay 与 CarPlay 中隐藏状态栏及导航栏。</string>
     <string name="settings_vehicle_description">实验性功能已集中到实验性菜单中，启用前请查看适用条件。</string>
     <string name="settings_open_advanced">打开实验性设置</string>
     <string name="settings_reconnect_pending">已保存。部分更改将在 CarPlay 重新连接后生效。</string>
     <string name="settings_reconnect_now">立即重新连接</string>
-    <string name="settings_byd_navigation_unavailable">此车机不支持比亚迪仪表盘和 HUD 导航提示。</string>
     <string name="settings_search_hint">搜索设置</string>
     <string name="settings_search_empty">没有匹配的设置。请换个词试试。</string>
     <string name="settings_ready_wireless">无线 CarPlay 将连接到 %1$s。</string>

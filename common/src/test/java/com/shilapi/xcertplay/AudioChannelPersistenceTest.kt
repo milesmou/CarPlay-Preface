@@ -19,9 +19,10 @@ class AudioChannelPersistenceTest {
         prefs.edit().clear().apply()
     }
 
-    @Test fun freshInstallUsesAutomaticRouting() {
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
+    @Test fun freshInstallUsesPrefaceDefaults() {
+        assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(12, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(12, AirPlayPersistence.loadNavigationStreamType(context))
         org.junit.Assert.assertTrue(AirPlayPersistence.loadAudioFocusAutoYield(context))
     }
 
@@ -35,19 +36,21 @@ class AudioChannelPersistenceTest {
     @Test fun legacyNavigationChannelIsInheritedWithoutChangingMedia() {
         AirPlayPersistence.saveNavigationStreamType(context, 15)
         assertEquals(15, AirPlayPersistence.loadNavigationAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
+        assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
     }
 
     @Test fun explicitNavigationChannelTakesPrecedenceOverLegacySetting() {
         AirPlayPersistence.saveNavigationStreamType(context, 14)
         AirPlayPersistence.saveNavigationAudioChannel(context, 15)
         assertEquals(15, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(15, AirPlayPersistence.loadNavigationStreamType(context))
     }
 
     @Test fun explicitAutomaticRoutingTakesPrecedenceOverLegacySetting() {
         AirPlayPersistence.saveNavigationStreamType(context, 15)
         AirPlayPersistence.saveNavigationAudioChannel(context, 0)
         assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(0, AirPlayPersistence.loadNavigationStreamType(context))
     }
 
     @Test fun extendedChannelsCanBeSavedForMediaAndNavigation() {

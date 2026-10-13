@@ -17,7 +17,6 @@ import com.shilapi.xcertplay.orchestration.ManualHotspotBand
 import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
 import com.shilapi.xcertplay.orchestration.MfiTarget
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
-import com.shilapi.xcertplay.network.WifiP2pChannels
 import com.shilapi.xcertplay.transport.LockdownPairRecord
 import java.io.File
 
@@ -52,7 +51,6 @@ object AirPlayPersistence {
     private const val KEY_NAVIGATION_STREAM_TYPE = "navigation_stream_type"
     private const val KEY_WIRELESS_ENABLED = "wireless_enabled"
     private const val KEY_WIRELESS_HOTSPOT_MODE = "wireless_hotspot_mode"
-    private const val KEY_WIFI_P2P_PREFERRED_CHANNEL = "wifi_p2p_preferred_channel"
     private const val KEY_MANUAL_HOTSPOT_SSID = "manual_hotspot_ssid"
     private const val KEY_MANUAL_HOTSPOT_PASSPHRASE = "manual_hotspot_passphrase"
     private const val KEY_MANUAL_HOTSPOT_BAND = "manual_hotspot_band"
@@ -103,7 +101,6 @@ object AirPlayPersistence {
     private const val KEY_RIGHT_HAND_DRIVE = "right_hand_drive"
     private const val KEY_HIDE_TOP_BAR = "hide_top_bar"
     private const val KEY_HIDE_BOTTOM_BAR = "hide_bottom_bar"
-    private const val KEY_HARMAN_FULLSCREEN = "harman_fullscreen"
     private const val KEY_SAFE_AREA_DRAW_OUTSIDE = "safe_area_draw_outside"
     private const val KEY_MAIN_DISPLAY_DISABLE_SAFE_AREA = "main_display_disable_safe_area"
     private const val KEY_ADAPT_PIP_RESOLUTION = "adapt_pip_resolution"
@@ -214,8 +211,7 @@ object AirPlayPersistence {
     }
 
     fun loadNavigationStreamType(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_NAVIGATION_STREAM_TYPE, 14)
+        loadNavigationAudioChannel(context)
 
     fun saveNavigationStreamType(context: Context, streamType: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -256,8 +252,7 @@ object AirPlayPersistence {
 
     fun loadMediaAudioChannel(context: Context): Int =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_AUDIO_CHANNEL, if (com.shilapi.xcertplay.network.PrefaceE02HeadUnit.detected)
-                com.shilapi.xcertplay.network.PrefaceE02HeadUnit.MEDIA_STREAM else 0)
+            .getInt(KEY_MEDIA_AUDIO_CHANNEL, com.shilapi.xcertplay.network.PrefaceE02HeadUnit.MEDIA_STREAM)
             .takeIf { it in AUDIO_CHANNELS } ?: 0
 
     fun saveMediaAudioChannel(context: Context, channel: Int) {
@@ -268,9 +263,8 @@ object AirPlayPersistence {
 
     fun loadNavigationAudioChannel(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        // Inherit the legacy value only when the new key is absent; preserve fresh-install and explicit 0 defaults.
-        val default = if (com.shilapi.xcertplay.network.PrefaceE02HeadUnit.detected)
-            com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM else 0
+        // Inherit the legacy value only when the new key is absent; explicit automatic/custom routes win.
+        val default = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
         return prefs.getInt(KEY_NAVIGATION_AUDIO_CHANNEL, prefs.getInt(KEY_NAVIGATION_STREAM_TYPE, default))
             .takeIf { it in AUDIO_CHANNELS } ?: 0
     }
@@ -341,43 +335,18 @@ object AirPlayPersistence {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val stored = prefs.getString(KEY_WIRELESS_HOTSPOT_MODE, null)
         val mode = WirelessHotspotMode.entries.firstOrNull { it.name == stored }
-            ?: WirelessHotspotMode.MANUAL
-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
+            ?: if (stored in setOf("WIFI_P2P", "EXISTING_WIFI")) WirelessHotspotMode.LOCAL_ONLY_HOTSPOT
+            else WirelessHotspotMode.MANUAL
+        val supported = if (android.os.Build.VERSION.SDK_INT < 26) WirelessHotspotMode.MANUAL else mode
         if (stored != supported.name) saveWirelessHotspotMode(context, supported)
         return supported
     }
 
     fun saveWirelessHotspotMode(context: Context, mode: WirelessHotspotMode) {
-        val supported = if (mode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) WirelessHotspotMode.MANUAL else mode
+        val supported = if (android.os.Build.VERSION.SDK_INT < 26) WirelessHotspotMode.MANUAL else mode
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY_WIRELESS_HOTSPOT_MODE, supported.name)
             .apply()
-    }
-
-    fun loadWifiP2pPreferredChannel(context: Context): Int = runCatching {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_WIFI_P2P_PREFERRED_CHANNEL, WifiP2pChannels.AUTO)
-            .takeIf(WifiP2pChannels::isValid) ?: WifiP2pChannels.AUTO
-    }.getOrDefault(WifiP2pChannels.AUTO)
-
-    fun saveWifiP2pPreferredChannel(context: Context, channel: Int) {
-        require(WifiP2pChannels.isValid(channel))
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_WIFI_P2P_PREFERRED_CHANNEL, channel).apply()
-    }
-
-    fun loadExistingWifiSsid(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString("existing_wifi_ssid", "").orEmpty()
-
-    fun loadExistingWifiPassphrase(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString("existing_wifi_passphrase", "").orEmpty()
-
-    fun saveExistingWifiCredentials(context: Context, ssid: String, passphrase: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString("existing_wifi_ssid", ssid)
-            .putString("existing_wifi_passphrase", passphrase).apply()
     }
 
     fun loadManualHotspotSsid(context: Context): String =
@@ -1200,16 +1169,6 @@ object AirPlayPersistence {
     fun saveHideBottomBar(context: Context, hide: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_HIDE_BOTTOM_BAR, hide)
-            .apply()
-    }
-
-    fun loadHarmanFullscreen(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_HARMAN_FULLSCREEN, false)
-
-    fun saveHarmanFullscreen(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_HARMAN_FULLSCREEN, enabled)
             .apply()
     }
 

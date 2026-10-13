@@ -28,17 +28,8 @@ object CarPlayClusterDisplay {
     fun usesOfficialTurnCard(content: Content): Boolean =
         content == Content.TURN_CARD || content == Content.INSTRUMENTS
 
-    /**
-     * Where the car marker goes, as percent of the panel (left, top, right, bottom). Measured on a
-     * DiLink 5.0 cluster with a calibration grid. In "Full screen navi" BYD draws a status row,
-     * turn/ADAS icons, the ADAS lane view (from x 68 %), speed and power readouts and a bottom band
-     * over the map; "Small screen navi" crops the panel to a centre window of about x 31–68 %,
-     * y 16–89 %. This centre area is clear in both modes, so no per-mode setting is needed.
-     */
-    val SAFE_AREA_PERCENT = AirPlayInsets(top = 16, bottom = 25, left = 35, right = 36)
-
-    /** Balanced margins for virtual full-screen/16:9 streams (e.g. desktop cards/widgets). */
-    val VIRTUAL_SAFE_AREA_PERCENT = AirPlayInsets(top = 8, bottom = 8, left = 8, right = 8)
+    /** Balanced margins for the app's virtual map panel; independent of an OEM instrument layout. */
+    val SAFE_AREA_PERCENT = AirPlayInsets(top = 8, bottom = 8, left = 8, right = 8)
 
     /** The driver can move the marker from that centre, in steps of 10 % of the panel. */
     const val MARKER_STEP_PERCENT = 10
@@ -64,16 +55,16 @@ object CarPlayClusterDisplay {
 
     /**
      * Stream size in percent of the panel. The cluster scales the stream up, so a smaller stream
-     * gives a larger map: 83 % is clearly larger and still sharp.
+     * gives a larger map. The default keeps the virtual panel's native size.
      *
      * Values above 100 ask for a larger stream than the panel: the iPhone renders more map
      * area and the cluster scales it down, so features are smaller and finer — "smaller"
      * in the settings means more content, not a magnified view.
      */
-    const val STREAM_SCALE_PERCENT = 83
-    val scalePresets = listOf(100, STREAM_SCALE_PERCENT, 67, 125)
+    const val STREAM_SCALE_PERCENT = 100
+    val scalePresets = listOf(100, 83, 67, 125)
 
-    private const val WIDTH_PHYSICAL_MM = 292 // a 12.3-inch 8:3 cluster panel; Apple Maps ignores it here
+    private const val WIDTH_PHYSICAL_MM = AirPlayDisplaySettings.DEFAULT_WIDTH_PHYSICAL_MM
     private const val FPS = 30
 
     fun config(

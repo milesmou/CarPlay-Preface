@@ -26,7 +26,6 @@ class Iap2WiredControlClient(
         availableCurrentMilliAmps: Int,
         timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
         locationProvider: Iap2LocationProvider? = null,
-        vehicleStatusProvider: VehicleStatusProvider? = null,
         onIncoming: (Iap2Frame) -> Unit = {},
         onProgress: (String) -> Unit = {},
     ): Iap2WiredControlResult {
@@ -38,11 +37,7 @@ class Iap2WiredControlClient(
         }
 
         val deadlineNanos = Iap2ControlDeadline(timeoutMillis)
-        val identified = identification.withVehicleStatusFrom(vehicleStatusProvider)
-        if (identified.vehicleStatusEnabled != identification.vehicleStatusEnabled) {
-            onProgress("iap2 no battery reading: not declaring an electric vehicle")
-        }
-        Iap2IdentificationClient(session).identify(identified, requireRemaining(deadlineNanos), onProgress)
+        Iap2IdentificationClient(session).identify(identification, requireRemaining(deadlineNanos), onProgress)
         onProgress("iap2 identification accepted")
         var stage = Iap2WiredControlStage.IDENTIFIED
         mfi.run(session, requireRemaining(deadlineNanos), onProgress)
@@ -59,7 +54,6 @@ class Iap2WiredControlClient(
         val rxLog = Iap2RxLog()
         var carPlayStartSessions = 0
         val location = Iap2LocationReporter(locationProvider, onProgress)
-        val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
         try {
             while (true) {
                 val remaining = remainingMillis(deadlineNanos)
@@ -67,8 +61,7 @@ class Iap2WiredControlClient(
                     return Iap2WiredControlResult(Iap2WiredControlTerminal.TIMED_OUT, stage, forwardedFrames, carPlayStartSessions)
                 }
                 location.tick { send(it, deadlineNanos) }
-                vehicleStatus.tick { send(it, deadlineNanos) }
-                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                val pollTimeout = location.pollTimeout(remaining)
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -104,10 +97,6 @@ class Iap2WiredControlClient(
 
                     Iap2LocationMessages.START_LOCATION_INFORMATION, Iap2LocationMessages.STOP_LOCATION_INFORMATION -> {
                         location.handle(incoming) { send(it, deadlineNanos) }
-                    }
-
-                    Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES, Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> {
-                        vehicleStatus.handle(incoming) { send(it, deadlineNanos) }
                     }
 
                     else -> {

@@ -78,14 +78,8 @@ internal class MicrophoneUplink(
         val source = when {
             config.audioType == "telephony" && speakerphoneCall -> MediaRecorder.AudioSource.MIC
             config.audioType == "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
-            // The Geely/Lynk head unit only opens the microphone for the voice-communication
-            // source; its voice-recognition source records silence, so Siri never hears.
-            config.audioType == "speechrecognition" ->
-                if (com.shilapi.xcertplay.network.GeelyHeadUnit.detected) {
-                    MediaRecorder.AudioSource.VOICE_COMMUNICATION
-                } else {
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION
-                }
+            // Prefer the voice-communication input for this car-focused build, without model detection.
+            config.audioType == "speechrecognition" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
             else -> MediaRecorder.AudioSource.MIC
         }
         val nextEncoder = if (config.codec == AudioCodecKind.OPUS) {
@@ -106,11 +100,11 @@ internal class MicrophoneUplink(
             runCatching { onDiagnostic(message) }
         }
         val bufferSize = maxOf(minBuffer * 2, config.frameBytes * 4)
-        // Some head units throw on VOICE_RECOGNITION at build(); VOICE_COMMUNICATION works there.
+        // Siri can fall back when the preferred source cannot create an initialized recorder.
         val nextRecorder = createRecorder(source, channelMask, bufferSize)
-            ?: if (source == MediaRecorder.AudioSource.VOICE_RECOGNITION) {
-                stats.useVoiceCommunicationSource()
-                createRecorder(MediaRecorder.AudioSource.VOICE_COMMUNICATION, channelMask, bufferSize)
+            ?: if (config.audioType == "speechrecognition") {
+                stats.useVoiceRecognitionSource()
+                createRecorder(MediaRecorder.AudioSource.VOICE_RECOGNITION, channelMask, bufferSize)
             } else {
                 null
             }

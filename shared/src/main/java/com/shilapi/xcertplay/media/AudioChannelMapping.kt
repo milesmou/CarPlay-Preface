@@ -35,7 +35,7 @@ internal data class AudioChannelSelection(
  */
 internal object AudioChannelMapper {
     const val STREAM_TYPE_MAIN_HIGH_AUDIO = 102
-    const val DEFAULT_NAVIGATION_STREAM_TYPE = 14
+    const val DEFAULT_NAVIGATION_STREAM_TYPE = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
 
     fun map(
         audioType: String,

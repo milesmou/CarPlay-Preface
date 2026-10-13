@@ -48,7 +48,6 @@ class CarPlayHostDisplaySizeTest {
     @Before fun setUp() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         AirPlayPersistence.saveAdaptPipResolution(activity, false)
-        AirPlayPersistence.saveHarmanFullscreen(activity, false)
         // Source-only tests have no provisioned local authentication identity.
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
         // Exercise host startup without launching vendor-service workers or real transports.
@@ -235,7 +234,6 @@ class CarPlayHostDisplaySizeTest {
     @Test fun fullscreenApplicationSupportsAllFourBarCombinations() {
         for (hideTop in listOf(false, true)) {
             for (hideBottom in listOf(false, true)) {
-                setField("harmanFullscreenEnabled", false)
                 setField("hideTopBar", hideTop)
                 setField("hideBottomBar", hideBottom)
 
@@ -246,30 +244,7 @@ class CarPlayHostDisplaySizeTest {
         }
     }
 
-    @Suppress("DEPRECATION")
-    @Test fun harmanFullscreenUsesTheVerifiedLegacyFlags() {
-        setField("harmanFullscreenEnabled", true)
-        setField("hideTopBar", false)
-        setField("hideBottomBar", false)
 
-        invoke("applyFullscreenMode")
-
-        assertEquals(0x080e, activity.window.decorView.systemUiVisibility)
-    }
-
-    @Suppress("DEPRECATION")
-    @Test fun disablingHarmanFullscreenRestoresStandardBars() {
-        setField("harmanFullscreenEnabled", true)
-        invoke("applyFullscreenMode")
-        setField("harmanFullscreenEnabled", false)
-        setField("hideTopBar", false)
-        setField("hideBottomBar", false)
-
-        invoke("applyFullscreenMode")
-
-        assertEquals(0, activity.window.decorView.systemUiVisibility and HarmanFullscreenCompat.OEM_FULLSCREEN_BIT)
-        assertWindowBars(false, false)
-    }
 
     @Test fun menuBarChangesPreviewWithoutSavingAndCancelRestoresTheSavedValues() {
         invoke("loadPersistedSettings")
@@ -291,7 +266,7 @@ class CarPlayHostDisplaySizeTest {
     }
 
     @Test fun savingMenuBarsPreservesAnIndependentCombination() {
-        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         invoke("loadPersistedSettings")
         setField("menuOpen", true)
         val controls = invoke("buildFullscreenSection") as ViewGroup

@@ -111,11 +111,11 @@ class MicrophoneCaptureStatsTest {
         val reports = mutableListOf<String>()
         val stats = MicrophoneCaptureStats(config.copy(audioType = "speechrecognition"), reports::add) { 0 }
         stats.failure(MicrophoneFailureStage.RECORDER_CREATION, UnsupportedOperationException())
-        stats.useVoiceCommunicationSource()
+        stats.useVoiceRecognitionSource()
         stats.started(15)
         stats.flush(ended = true)
-        assertTrue(reports[0].contains("type=speechrecognition source=VOICE_RECOGNITION"))
-        assertTrue(reports.drop(1).all { it.contains("type=speechrecognition source=VOICE_COMMUNICATION") })
+        assertTrue(reports[0].contains("type=speechrecognition source=VOICE_COMMUNICATION"))
+        assertTrue(reports.drop(1).all { it.contains("type=speechrecognition source=VOICE_RECOGNITION") })
     }
 
     @Test fun outputContainsOnlyAllowlistedMetadataAndNeverExceptionMessagesOrEndpoints() {

@@ -1,21 +1,15 @@
 package com.shilapi.xcertplay.hud
 
-import android.content.Context
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 
-/** Vendor-independent navigation overlays and the optional FCE output. */
+/** CarPlay navigation overlays and call state for the head-unit screen. */
 object NavigationOutputs {
     private val lock = Any()
     private val overlayRoute = CarPlayRouteState(staleRouteNs = 120_000_000_000L, emptyListHideNs = 8_000_000_000L, keepAcrossNoRoute = true)
     private val calls = CarPlayCallState()
-    private val fce = NavigationOutputWorker("diplay-fce-cluster-output", FceClusterBridge::clear)
     @Volatile private var listener: ((ClusterTurnGuidance?) -> Unit)? = null
     private var published: ClusterTurnGuidance? = null
-
-    fun start(context: Context) {
-        if (FceClusterBridge.available()) fce.start { FceClusterBridge.initialize(context.applicationContext) }
-    }
 
     fun onFrame(frame: Iap2Frame) {
         if (frame.messageId == CarPlayCallState.CALL_STATE_UPDATE) {
@@ -24,7 +18,6 @@ object NavigationOutputs {
         }
         synchronized(lock) { overlayRoute.accept(frame.messageId, frame.payload) }
         refreshTurnOverlay()
-        fce.submit { FceClusterBridge.onFrame(frame) }
     }
 
     fun setTurnOverlayListener(value: ((ClusterTurnGuidance?) -> Unit)?) {
@@ -56,7 +49,6 @@ object NavigationOutputs {
     fun carPlayCall(): CarPlayCallCard? = synchronized(lock) { calls.current() }
 
     fun endNow(preserveTurnOverlay: Boolean = false) {
-        fce.clear()
         synchronized(lock) {
             calls.clear()
             if (preserveTurnOverlay) overlayRoute.holdAcrossDrop() else overlayRoute.clear()

@@ -450,7 +450,7 @@ class AdaptiveSettingsUiTest {
     @Test
     @Config(shadows = [HotspotSearchProbe::class])
     fun hotspotSearchIndexesItsAsyncCardWithoutStartingAnAdbProbe() {
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.EXISTING_WIFI)
+        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         HotspotSearchProbe.workers.clear()
         HotspotSearchProbe.entered = CountDownLatch(1)
         val screen = openSettings()
@@ -483,7 +483,7 @@ class AdaptiveSettingsUiTest {
     @Test
     @Config(shadows = [HotspotSearchProbe::class])
     fun hotspotSearchKeepsTheCarHotspotAudienceGate() {
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.EXISTING_WIFI)
+        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         HotspotSearchProbe.workers.clear()
         HotspotSearchProbe.entered = CountDownLatch(1)
         val screen = openSettings()
@@ -717,6 +717,31 @@ class AdaptiveSettingsUiTest {
             texts(screen).filter { it.text.toString().endsWith("（实验性）") }.forEach { title ->
                 assertEquals(title.text.toString(), SettingsCategory.EXPERIMENTAL, category)
             }
+        }
+    }
+
+    @Test @Config(sdk = [28, 33])
+    fun temporaryHotspotChoiceIsSavedWithoutDroppingTheActiveSession() {
+        val screen = openConnectionSetupFromSettings()
+        val session = mock(CarPlayController::class.java)
+        var stops = 0
+        CarPlayBackgroundSession.store(session, mock(AndroidMediaSink::class.java), 800, 480, Any(),
+            CarPlaySessionDisplay(800, 480, Surface.ROTATION_0, false, false, 800, 480)) { stops++ }
+        CarPlayBackgroundSession.active = true
+        try {
+            PendingReconnect.clear()
+            val choice = texts(screen).single { it.text.toString() == screen.getString(R.string.settings_temporary_hotspot) }
+            choice.performClick()
+            assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, AirPlayPersistence.loadWirelessHotspotMode(context))
+            assertTrue(PendingReconnect.isPending(session))
+            assertEquals(0, stops)
+            assertSame(session, CarPlayBackgroundSession.snapshot()?.controller)
+            assertTrue(texts(screen).any { it.text.toString() == "✓  " + screen.getString(R.string.settings_temporary_hotspot) })
+            assertFalse(texts(screen).any { it.text.contains("Wi-Fi Direct") || it.text.contains("同一局域网") })
+            assertFalse(texts(screen).any { it.text.toString() == screen.getString(R.string.open_car_hotspot_settings) })
+        } finally {
+            CarPlayBackgroundSession.clear()
+            PendingReconnect.clear()
         }
     }
 

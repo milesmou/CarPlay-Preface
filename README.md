@@ -1,36 +1,38 @@
 # CarPlay-Preface
 
-[中文说明](README.zh-CN.md) · [Upstream DiPlay](https://github.com/shihabal3amri/DiPlay)
+[上游 DiPlay](https://github.com/shihabal3amri/DiPlay)
 
-This repository is based on DiPlay and primarily targets **the Geely Preface (Xingrui) with the E02 head-unit chip**.
+本仓库基于 DiPlay，主要面向**吉利星瑞车型的 E02 芯片版本车机**进行 CarPlay 适配。
 
-Development version: **0.1.1 (unreleased)**. Upstream baseline: [DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18). When syncing upstream, update the upstream baseline and increment this repository's app version.
+当前开发版本：**0.1.1（尚未发布）**；上游基线：[DiPlay v0.2.18](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.18)。后续同步上游时，更新上游基线版本，并递增本仓库应用版本。
 
-[0.1.0 preview](https://github.com/milesmou/CarPlay-Preface/releases/tag/v0.1.0) · [Release notes](docs/RELEASE-NOTES-0.1.0.md). The signed source-preview APK requires separately provisioned CarPlay authentication assets for standalone iPhone connections. Vehicle validation and the full CI suite remain incomplete.
+[0.1.0 预览版](https://github.com/milesmou/CarPlay-Preface/releases/tag/v0.1.0) · [发布说明](docs/RELEASE-NOTES-0.1.0.md)。附件为签名源码预览 APK，独立连接 iPhone 需另行配置 CarPlay 配件认证资源；实车验证及完整 CI 尚未全部通过。
 
-Current source imports the upstream official APK's two experimental accessory authentication assets and bundles them in main-app builds by default for standalone connection testing. See [resource provenance and building](docs/CARPLAY_AUTH_RESOURCES.md); iPhone and vehicle acceptance remain unverified.
+当前源码已导入上游官方 APK 的两项实验性配件认证资源，主应用构建默认打包，可用于独立连接测试。详见 [认证资源来源与构建方式](docs/CARPLAY_AUTH_RESOURCES.md)，实际 iPhone 和星瑞车机连接仍需验证。
 
-At the owner's request, the existing [APK signing key and signing passwords](signing/README.md) are also public, allowing release builds with the same certificate after cloning.
+按所有者要求，[APK 签名密钥与签名密码](signing/README.md) 也在仓库公开，克隆后可使用同一证书构建 Release APK。
 
-## Differences from upstream
+## 相对上游的改动
 
-- **Adaptation target:** This branch primarily targets the Xingrui E02 head unit.
-- **Firmware 327 integration:** Stock media-button broadcasts on IHU519G/FS11A1 control previous/next tracks and play/pause. Broadcasts, MediaSession and foreground keys share deduplication; background track control works while CarPlay owns media focus. Native media stream 3/navigation stream 12 are routing defaults, preserving saved routes and stock volume-key handling. See [firmware analysis](docs/PREFACE_FIRMWARE_327.md); vehicle validation remains pending.
-- **Direct settings navigation:** Overview is removed. Settings opens on Connection, with a rail on wide windows and horizontally scrolling destinations on compact windows.
-- **Wheel keys and independent volume:** Standard play/pause and track keys are handled in the CarPlay window, with Bluetooth audio avoiding duplicate forwarding. Media and guidance have independent output gain controls. During guidance, standard volume keys can adjust guidance alone; generic background key handling needs the accessibility service. Other E02 firmware interfaces still need separate confirmation; vehicle validation remains pending.
-- **Experimental menu and branding:** Experimental controls are grouped under Experimental. The app is named CarPlay and the default vehicle button uses a generated Xingrui icon and the name 星瑞.
-- **Chinese-only interface:** Settings and the in-CarPlay language picker are removed; the app always uses Simplified Chinese.
-- **Four-step setup:** Connection method → iPhone → automatic connection and location sharing → finish. The vehicle/DiLink generation selection has been removed.
-- **BYD-specific integrations removed:** HUD and cluster navigation, DiLink cluster display/task routing, battery/speed/gear/tyre readers, ambient lighting, proprietary call cards and key codes, Bluetooth suspension, Wi-Fi scan pausing and boot-start repair.
-- **Shared functionality retained:** Wired/wireless CarPlay, Android location sharing, media/Siri, learned wheel keys, Geely input-service integration, launcher/centre-card maps and optional FCE navigation output. This does not establish real-vehicle compatibility with the Xingrui E02 version.
+- **适配目标与默认配置**：专门面向星瑞 E02，直接默认使用媒体流 3、导航流 12，导航与媒体输出比例初始均为 50%，并接入方控媒体广播，无需识别车机型号或固件号。Siri 优先使用语音通信麦克风源，失败时尝试语音识别源；用户已保存的设置继续优先，实车效果仍待验证。
+- **固件 327 方控接入**：根据星瑞 IHU519G／FS11A1 固件分析，接收原厂媒体按键广播，实现上／下一曲及播放／暂停；广播、MediaSession 和前台窗口共用去重处理，支持拥有媒体焦点时后台切歌。该固件默认使用媒体流 3、导航流 12，保留用户路由设置与原车音量键处理。详见 [固件分析](docs/PREFACE_FIRMWARE_327.md)，仍待实车验证。
+- **设置入口精简**：移除“概览”，默认进入“连接”；宽屏左侧分类、窄屏横向分类直接切换设置。
+- **方控与独立音量**：CarPlay 前台处理标准播放／暂停、上／下一曲，车载蓝牙音频模式避免重复转发；支持媒体和导航输出比例独立调节。导航播报期间标准音量键可仅调节导航输出，通用后台按键处理需要无障碍服务。其他 E02 固件接口仍需单独确认，尚未实车验证。
+- **实验性菜单与名称**：实验性功能集中到“实验性”菜单；应用名改为 CarPlay，车辆按钮默认使用生成的星瑞图标和“星瑞”名称。
+- **仅保留中文界面**：移除设置页和 CarPlay 内的语言入口，应用固定使用简体中文，不再跟随系统或旧语言偏好。
+- **首次设置精简为四步**：连接方式 → iPhone → 自动连接与位置共享 → 完成，移除车型／DiLink 版本选择。
+- **无线连接方式**：首位推荐通过 Android `LocalOnlyHotspot` API 创建临时热点，保留车载热点作为另一选项；移除 Wi-Fi Direct 和现有 Wi-Fi／同一局域网模式。旧模式自动迁移到临时热点，名称与密码由系统生成，断开时释放本应用的热点预约。临时热点不提供互联网，星瑞 E02 实车连接仍待验证。
+- **移除比亚迪专属适配**：HUD 与仪表导航、DiLink 仪表显示及任务路由、电池／车速／挡位／胎压读取、氛围灯、专用通话卡片与按键码、蓝牙暂停、Wi-Fi 扫描暂停及开机启动修复。
+- **清理其他平台与旧代码**：移除 OneOS 吉利／领克方控 Binder、FCE 仪表导航、哈曼全屏模式、电动车电量与充电接口上报及未使用文案；地图使用通用窗口安全区和尺寸，不套用比亚迪仪表校准。
+- **保留通用功能**：有线／无线 CarPlay、Android 位置共享、媒体与 Siri、方向盘按键学习、桌面／中控地图。这些代码改动不代表已经完成星瑞 E02 实车兼容性验证。
 
-## Reference documentation
+## 参考文档
 
-- [Xingrui E02 firmware reference](docs/PREFACE_FIRMWARE_REFERENCE.md): reusable evidence for wheel keys, audio/microphone, connectivity, navigation, video, permissions and power, with vehicle checks still pending.
-- [Upstream features and releases](https://github.com/shihabal3amri/DiPlay)
-- [Installation and connection](docs/INSTALL.md)
-- [Build from source](docs/BUILD.md) — use the `mobile` module for the main app.
-- [Compatibility and troubleshooting](docs/COMPATIBILITY.md)
-- [Credits and licenses](docs/THIRD_PARTY_NOTICES.md)
+- [星瑞 E02 固件资料索引](docs/PREFACE_FIRMWARE_REFERENCE.md)：方控、音频与麦克风、USB／无线连接、定位／仪表、视频、权限和电源接口的证据及待验证项。
+- [上游功能与版本发布](https://github.com/shihabal3amri/DiPlay)
+- [安装与连接](docs/INSTALL.md)
+- [从源码构建](docs/BUILD.md)：主应用请选择 `mobile` 模块。
+- [兼容性与问题排查](docs/COMPATIBILITY.md)
+- [来源与许可证](docs/THIRD_PARTY_NOTICES.md)
 
-When reporting a problem, include the Xingrui model year, E02 head-unit firmware and Android version, iPhone/iOS version, connection method and reproduction steps.
+反馈问题时，请注明星瑞年款、E02 车机固件及 Android 版本、iPhone/iOS 版本、连接方式和复现步骤。

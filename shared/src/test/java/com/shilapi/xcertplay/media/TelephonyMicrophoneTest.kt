@@ -123,7 +123,7 @@ class TelephonyMicrophoneTest {
         sink.onMicrophoneStarted(speechRecognition, config("speechrecognition"))
         val record = awaitCapture()
         assertEquals(AudioManager.MODE_NORMAL, manager.mode)
-        assertEquals(MediaRecorder.AudioSource.VOICE_RECOGNITION, record.audioSource)
+        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, record.audioSource)
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
@@ -135,7 +135,7 @@ class TelephonyMicrophoneTest {
         awaitCapture()
         sink.onMicrophoneStopped(speechRecognition)
         val microphone = diagnostics.filter { it.startsWith("Microphone:") }
-        assertTrue(microphone.any { it.startsWith("Microphone: start type=speechrecognition source=VOICE_RECOGNITION codec=LPCM") })
+        assertTrue(microphone.any { it.startsWith("Microphone: start type=speechrecognition source=VOICE_COMMUNICATION codec=LPCM") })
         assertTrue(microphone.any { it.contains("Microphone: stats") && it.endsWith("ended=true") })
         assertFalse(microphone.joinToString("\n").contains("port="))
         assertFalse(microphone.joinToString("\n").contains("head="))
@@ -147,7 +147,7 @@ class TelephonyMicrophoneTest {
         sink.onMicrophoneStarted(speechRecognition, config("speechrecognition"))
         val record = awaitCapture()
         assertEquals(AudioRecord.RECORDSTATE_RECORDING, record.recordingState)
-        assertEquals(MediaRecorder.AudioSource.VOICE_RECOGNITION, record.audioSource)
+        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, record.audioSource)
         assertEquals(AudioManager.MODE_NORMAL, manager.mode)
         sink.onMicrophoneStopped(speechRecognition)
         assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)

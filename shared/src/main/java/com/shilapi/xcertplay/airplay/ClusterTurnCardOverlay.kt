@@ -3,9 +3,7 @@ package com.shilapi.xcertplay.airplay
 /**
  * Where DiPlay draws the instruction card on top of the dashboard map.
  *
- * Placement is a percent of the full 1920×720 panel so Left/Right can reach the
- * cluster edges. Size still follows the measured centre navi window so Large
- * does not cover half the cluster.
+ * Placement and size follow the available panel, without a factory instrument calibration.
  */
 object ClusterTurnCardOverlay {
     data class CardRect(val left: Int, val top: Int, val width: Int, val height: Int)
@@ -28,6 +26,7 @@ object ClusterTurnCardOverlay {
     val smallWindowYPercents = (15..70 step 1).toList()
 
     const val DEFAULT_SIZE_PERCENT = 55
+    private const val MAX_PANEL_WIDTH_PERCENT = 45
 
     fun card(
         panelWidth: Int,
@@ -40,7 +39,8 @@ object ClusterTurnCardOverlay {
         val window = visibleWindow(panelWidth, panelHeight)
         val size = snap(sizePercent, sizePercents)
         // The card keeps its ~2.6:1 banner aspect at any size.
-        val width = (window.width * size / 100).coerceAtLeast(150).coerceAtMost(panelWidth)
+        val width = (panelWidth * MAX_PANEL_WIDTH_PERCENT / 100 * size / 100)
+            .coerceAtLeast(150).coerceAtMost(panelWidth)
         val height = (width / 2.64f).toInt().coerceAtLeast(58).coerceAtMost((window.height * 0.55f).toInt())
         val x = snap(xPercent, xPercents)
         val y = snap(yPercent, yPercents)

@@ -45,13 +45,3 @@ Concentus uses the Opus BSD-style license. The full copyright notices, redistrib
 Current main-app builds include the accessory certificate/key pair imported from the official DiPlay v0.2.18 public preview APK. Upstream describes its recovery from public Carlinkit C2Air Allwinner V821 firmware during the owner's local investigation. These data are not newly generated Apple-issued credentials for DiPlay and are not relicensed as project source code. They reproduce the offline experiment; continued acceptance and suitability for general distribution are unresolved.
 
 At the user's explicit request, this branch includes the two reviewed binary resources in `runtime-assets/offline-mfi/`, with source and file SHA-256 values in [the provenance record](runtime-authentication-provenance.json). They are distinct from the Android APK-signing key. The owner also explicitly publishes that existing signing key and its signing passwords in `signing/` for reproducible community builds; these are not bundled as APK assets. The already-published CarPlay-Preface v0.1.0 source-preview APK and source archive do not contain the imported accessory pair.
-
-## Download website
-
-The static site layout, CSS and generator adapt DiAuto (AGPL-3.0). The AGPL license text is included with the source.
-
-## BYD HUD maneuver icons
-
-Required Notice: Copyright AndyShaman (https://github.com/AndyShaman/BYDMate)
-
-The maneuver PNGs under `shared/src/main/assets/byd-hud-icons` were imported from BYDMate. Its PolyForm Noncommercial 1.0.0 terms and required notice are included alongside the assets. These files are separate from the project code license; upstream describes them as donor assets and their original provenance is not independently established. The validated DiLink5.1 windshield path uses factory turn codes rather than these images.

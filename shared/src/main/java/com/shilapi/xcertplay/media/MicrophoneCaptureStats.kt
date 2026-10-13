@@ -38,7 +38,7 @@ internal class MicrophoneCaptureStats(
     }
 
     /** Call before the capture thread starts; [metadata] is not volatile. */
-    fun useVoiceCommunicationSource() { metadata = "type=$type source=VOICE_COMMUNICATION $format" }
+    fun useVoiceRecognitionSource() { metadata = "type=$type source=VOICE_RECOGNITION $format" }
 
     fun reading() { readStart = nowNs() }
 
@@ -119,7 +119,7 @@ internal class MicrophoneCaptureStats(
 
         private fun typeAndSource(audioType: String): Pair<String, String> = when (audioType) {
             "telephony" -> "telephony" to "VOICE_COMMUNICATION"
-            "speechrecognition" -> "speechrecognition" to "VOICE_RECOGNITION"
+            "speechrecognition" -> "speechrecognition" to "VOICE_COMMUNICATION"
             else -> "other" to "MIC"
         }
 

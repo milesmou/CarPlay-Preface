@@ -1,5 +1,7 @@
 # Existing Wi-Fi / Same LAN
 
+> 历史上游参考：本分支已移除此连接方式，当前仅提供车载热点与 LocalOnlyHotspot 临时热点，见 [安装与连接](INSTALL.md)。
+
 Connect the Android receiver and iPhone to the same third-party router or portable
 Wi-Fi in system settings. In DiPlay → Connection setup → Wireless, select
 **Existing Wi-Fi / Same LAN**, enter the exact SSID and WPA2 password, and save.

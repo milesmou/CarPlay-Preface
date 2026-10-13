@@ -57,4 +57,17 @@ class ClusterTurnCardOverlayTest {
         assertEquals(76, ClusterTurnCardOverlay.snap(76, ClusterTurnCardOverlay.xPercents))
         assertEquals(1, ClusterTurnCardOverlay.STEP_PERCENT)
     }
+
+    @Test
+    fun compactAndDensePanelsKeepCardsInsideTheAvailableWindow() {
+        for ((width, height) in listOf(320 to 180, 1280 to 720, 2560 to 1440)) {
+            for (size in ClusterTurnCardOverlay.sizePercents) {
+                val card = ClusterTurnCardOverlay.card(width, height, 76, 30, size)
+                assertTrue(card.width > 0 && card.height > 0)
+                assertTrue(card.left >= 0 && card.top >= 0)
+                assertTrue(card.left + card.width <= width)
+                assertTrue(card.top + card.height <= height)
+            }
+        }
+    }
 }

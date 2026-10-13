@@ -1,0 +1,6 @@
+<resources>
+    <string name="settings_temporary_hotspot_reconnect">End this CarPlay connection and reconnect. The app releases its temporary hotspot reservation and creates a new one when temporary-hotspot mode is selected. Other apps’ connections and the car’s saved hotspot settings are unchanged.</string>
+    <string name="settings_temporary_hotspot">Temporary hotspot (recommended)</string>
+    <string name="settings_temporary_hotspot_description">CarPlay creates a temporary Wi-Fi hotspot with an Android-generated name and password. No saved hotspot details are needed. It provides local communication without Internet access. Android chooses the band; disconnecting releases this app’s hotspot reservation. Changes apply at the next connection.</string>
+    <string name="settings_temporary_hotspot_hint">Keep iPhone Bluetooth and Wi-Fi on. Allow location or Nearby devices access; Android 9 also needs location services on. Connect to create the temporary hotspot and send its details to the iPhone over Bluetooth. If the car hotspot is already on, turn it off before using this mode.</string>
+</resources>

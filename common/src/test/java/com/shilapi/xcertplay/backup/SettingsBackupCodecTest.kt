@@ -19,6 +19,28 @@ class SettingsBackupCodecTest {
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
     @Test
+    fun importingAnOlderBackupSkipsRemovedVehicleAdaptersAndKeepsAudioSettings() {
+        prefs("xcertplay_airplay").edit().clear()
+            .putInt("navigation_audio_channel", 12).apply()
+        prefs("diplay_fce_navigation").edit().clear().apply()
+        val document = """
+            {"format":"diplay-settings","version":1,"settings":{
+              "xcertplay_airplay":{"media_audio_channel":3,"harman_fullscreen":true,"hide_byd_call_popup":true},
+              "diplay_fce_navigation":{"enabled":true}
+            }}
+        """.trimIndent()
+        val outcome = SettingsBackupCodec.import(context, document.toByteArray())
+        assertFalse(outcome.invalid)
+        assertEquals(1, outcome.applied)
+        assertEquals(3, outcome.skipped)
+        assertEquals(3, prefs("xcertplay_airplay").getInt("media_audio_channel", 0))
+        assertEquals(12, prefs("xcertplay_airplay").getInt("navigation_audio_channel", 0))
+        assertFalse(prefs("xcertplay_airplay").contains("harman_fullscreen"))
+        assertFalse(prefs("xcertplay_airplay").contains("hide_byd_call_popup"))
+        assertFalse(prefs("diplay_fce_navigation").contains("enabled"))
+    }
+
+    @Test
     fun exportOmitsSensitiveAndNavigationKeys() {
         prefs("xcertplay_airplay").edit()
             .putInt("display_fps", 60)

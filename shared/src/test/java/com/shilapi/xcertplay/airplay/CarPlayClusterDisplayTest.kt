@@ -22,24 +22,24 @@ class CarPlayClusterDisplayTest {
         assertEquals(2, displays.size)
         val alt = displays[1] as Map<*, *>
         assertEquals(111, alt["type"])
-        // 83 % of the 1920x720 panel, same 8:3 aspect.
-        assertEquals(1600, alt["widthPixels"])
-        assertEquals(600, alt["heightPixels"])
+        // Keep the virtual panel's native resolution and aspect.
+        assertEquals(1920, alt["widthPixels"])
+        assertEquals(720, alt["heightPixels"])
         assertEquals(0, alt["features"])
         assertEquals(0, alt["primaryInputDevice"])
         assertEquals("maps:/car/instrumentcluster/map", alt["initialURL"])
-        assertEquals(292, alt["widthPhysical"])
-        assertEquals(110, alt["heightPhysical"])
+        assertEquals(200, alt["widthPhysical"])
+        assertEquals(75, alt["heightPhysical"])
 
         val view = (alt["viewAreas"] as List<*>).single() as Map<*, *>
-        assertEquals(1600, view["widthPixels"])
-        assertEquals(600, view["heightPixels"])
+        assertEquals(1920, view["widthPixels"])
+        assertEquals(720, view["heightPixels"])
         val safe = view["safeArea"] as Map<*, *>
-        // The centre area clear in both cluster navi modes: left 35 %, right 36 %, top 16 %, bottom 25 %.
-        assertEquals(560, safe["originXPixels"])
-        assertEquals(96, safe["originYPixels"])
-        assertEquals(464, safe["widthPixels"])
-        assertEquals(354, safe["heightPixels"])
+        // Balanced 8 % margins, independent of a factory cluster's overlays.
+        assertEquals(153, safe["originXPixels"])
+        assertEquals(57, safe["originYPixels"])
+        assertEquals(1614, safe["widthPixels"])
+        assertEquals(606, safe["heightPixels"])
         assertEquals(true, safe["drawUIOutsideSafeArea"])
 
         // The main screen keeps its touch and knob features.
@@ -79,11 +79,11 @@ class CarPlayClusterDisplayTest {
         val centre = CarPlayClusterDisplay.config(1920, 720, scalePercent = 100).safeArea!!
         val farLeftHigher = CarPlayClusterDisplay.config(1920, 720, scalePercent = 100, horizontalStep = -2, verticalStep = -1).safeArea!!
 
-        // Two 10 % steps left (384 px) and one 10 % step up (72 px), same size as the centred area.
-        assertEquals(centre.left - 384, farLeftHigher.left)
-        assertEquals(centre.right + 384, farLeftHigher.right)
-        assertEquals(centre.top - 72, farLeftHigher.top)
-        assertEquals(centre.bottom + 72, farLeftHigher.bottom)
+        // Marker position moves while the safe area shrinks to fit the nearer edge.
+        val centreX = (centre.left + 1920 - centre.right) / 2.0
+        val centreY = (centre.top + 720 - centre.bottom) / 2.0
+        assertEquals(centreX - 384, (farLeftHigher.left + 1920 - farLeftHigher.right) / 2.0, 1.0)
+        assertEquals(centreY - 72, (farLeftHigher.top + 720 - farLeftHigher.bottom) / 2.0, 1.0)
     }
 
     @Test
@@ -98,10 +98,10 @@ class CarPlayClusterDisplayTest {
     fun nearAnEdgeTheSafeAreaShrinksAroundTheMarker() {
         val top = CarPlayClusterDisplay.config(1000, 1000, scalePercent = 100, verticalStep = -3).safeArea!!
 
-        // Marker at 15.5 % from the top: the area reaches the top edge and stays centred on it.
+        // Marker at 20 % from the top: the area reaches the top edge and stays centred on it.
         assertEquals(0, top.top)
-        assertEquals(310, 1000 - top.top - top.bottom)
-        assertEquals(15.5, CarPlayClusterDisplay.markerPercent(0, -3).second, 0.001)
+        assertEquals(400, 1000 - top.top - top.bottom)
+        assertEquals(20.0, CarPlayClusterDisplay.markerPercent(0, -3).second, 0.001)
     }
 
     @Test
@@ -118,7 +118,6 @@ class CarPlayClusterDisplayTest {
             widthPixels = 1280,
             heightPixels = 720,
             scalePercent = 100,
-            baseSafeArea = CarPlayClusterDisplay.VIRTUAL_SAFE_AREA_PERCENT,
         )
         assertEquals(1280, config.widthPixels)
         assertEquals(720, config.heightPixels)

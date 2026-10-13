@@ -45,10 +45,8 @@ import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlayVpnService
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
 import com.shilapi.xcertplay.network.ManualHotspotManager
-import com.shilapi.xcertplay.network.ExistingWifiManager
 import com.shilapi.xcertplay.network.HotspotAddressPolicy
 import com.shilapi.xcertplay.network.HotspotAddressRecovery
-import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessHotspotManager
@@ -165,13 +163,11 @@ class CarPlayController(
     private val savePairRecord: (LockdownPairRecord) -> Unit = {},
     private val clearPairRecord: () -> Unit = {},
     private val locationProvider: Iap2LocationProvider? = null,
-    private val vehicleStatusProvider: com.shilapi.xcertplay.transport.VehicleStatusProvider? = null,
 ) : Closeable {
     init {
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
         }
-        NavigationOutputs.start(context.applicationContext)
     }
 
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
@@ -305,7 +301,6 @@ class CarPlayController(
         override fun onSessionActive(session: AirPlaySession) {
             val replacement = activeSession !== session
             if (replacement) {
-                NavigationOutputs.start(appContext)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                 // The gear may have changed since /info.
                 if (videoListener != null) {
@@ -1460,7 +1455,7 @@ class CarPlayController(
             onStatus(CarPlayStatus.RunningWireless)
             debugLog(
                 "wireless Bluetooth iAP2 bootstrap starting " +
-                    "location=false vehicleStatus=false",
+                    "location=false",
             )
             startedHotspot?.validateReady()
             val result = Iap2WirelessControlClient(
@@ -1556,8 +1551,7 @@ class CarPlayController(
         val generation = wirelessGeneration.get()
         debugLog(
             "wireless iAP2 runtime tunnel control starting " +
-                "location=${identification.locationInformationEnabled} " +
-                "vehicleStatus=${identification.vehicleStatusEnabled}",
+                "location=${identification.locationInformationEnabled}",
         )
         return try {
             tunnelExecutor.execute {
@@ -1570,7 +1564,6 @@ class CarPlayController(
                         endpoint = endpoint,
                         timeoutMillis = Iap2WirelessControlClient.NO_TIMEOUT_MILLIS,
                         locationProvider = locationProvider,
-                        vehicleStatusProvider = vehicleStatusProvider,
                         onReady = {
                             onWirelessTunnelReady(generation)
                         },
@@ -2129,8 +2122,7 @@ class CarPlayController(
             onStatus(CarPlayStatus.RunningControl)
             debugLog(
                 "wired iAP2 runtime control starting " +
-                    "location=${config.identification.locationInformationEnabled} " +
-                    "vehicleStatus=${config.identification.vehicleStatusEnabled}",
+                    "location=${config.identification.locationInformationEnabled}",
             )
             val result = Iap2WiredControlClient(csm, Iap2MfiAuthenticationClient(mfi)).run(
                 identification = config.identification,
@@ -2138,7 +2130,6 @@ class CarPlayController(
                 availableCurrentMilliAmps = config.availableCurrentMilliAmps,
                 timeoutMillis = controlLoopTimeoutMillis(),
                 locationProvider = locationProvider,
-                vehicleStatusProvider = vehicleStatusProvider,
                 onIncoming = ::onRouteFrame,
                 onProgress = { message -> debugLog("wired $message") },
             )
@@ -2213,18 +2204,12 @@ class CarPlayController(
                 "The car hotspot is off. Turn it on in the car settings and connect again.")
         }
         val manager: WirelessHotspotManager = when (hotspotMode) {
-            WirelessHotspotMode.WIFI_P2P -> WifiP2pGroupManager(appContext, ::debugLog,
-                preferredChannel = config.wifiP2pPreferredChannel)
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 LocalOnlyHotspotManager(appContext, ::debugLog)
             } else {
                 throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose Car hotspot or Wi-Fi Direct.")
+                    "Android ${Build.VERSION.RELEASE} has no local-only hotspot. Choose the car hotspot.")
             }
-            WirelessHotspotMode.EXISTING_WIFI -> ExistingWifiManager(
-                appContext, config.existingWifiSsid, config.existingWifiPassphrase, ::debugLog,
-                onNetworkChanged = { if (!isStaleWirelessRun(generation)) restartWireless() },
-            )
             WirelessHotspotMode.MANUAL -> ManualHotspotManager(
                 context = appContext,
                 ssid = config.manualHotspotSsid
@@ -2244,9 +2229,7 @@ class CarPlayController(
             }
             hotspot = manager
         }
-        val timeoutMillis = if (hotspotMode == WirelessHotspotMode.WIFI_P2P) {
-            WIFI_P2P_START_TIMEOUT_MILLIS
-        } else if (hotspotMode == WirelessHotspotMode.MANUAL) {
+        val timeoutMillis = if (hotspotMode == WirelessHotspotMode.MANUAL) {
             ((readyDeadline - System.nanoTime()) / 1_000_000).coerceAtLeast(1)
         } else {
             HOTSPOT_START_TIMEOUT_MILLIS
@@ -2754,7 +2737,7 @@ class CarPlayController(
             }
             val causes = generateSequence(error) { it.cause }.toList()
             onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName,
-                causes.any { it is com.shilapi.xcertplay.network.P2pResetRequiredException },
+                false,
                 causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason),
                 if (wireless) wirelessGeneration.get() else null)
         }
@@ -2891,7 +2874,6 @@ class CarPlayController(
         private const val PROFILE_A2DP_SINK = 11
         private const val PROFILE_HEADSET_CLIENT = 16
         private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L
-        private const val WIFI_P2P_START_TIMEOUT_MILLIS = 20_000L
         private const val PAIR_TIMEOUT_MILLIS = 5 * 60_000L
         private const val VPN_CONNECT_TIMEOUT_MILLIS = 10_000L
         private const val WIRELESS_PREFS = "diplay_wireless"

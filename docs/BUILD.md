@@ -134,6 +134,7 @@ Check both files in the APK against the selected input directory:
 - `assets/offline-mfi/certificate.p7b`.
 
 Use this APK for a standalone connection test.
+Mobile and Automotive Debug APKs use the same repository `signing/` keystore and configuration as Release, including `assembleStandaloneDebug`; they no longer use the default Android debug certificate. See [signing documentation](../signing/README.md). Unless explicitly choosing another signature, leave the signing override environment variables unset.
 Update the existing test app with the same signing key to keep its settings.
 Different signing keys cannot update the same installed application.
 

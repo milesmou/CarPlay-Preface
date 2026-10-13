@@ -1,3 +1,5 @@
+> 上游历史资料：本分支已移除比亚迪专属适配，以下指南保留作为上游版本记录。星瑞 E02 的当前接入见 [固件分析](PREFACE_FIRMWARE_327.md) 和 [兼容性说明](COMPATIBILITY.md)。
+
 # BYD navigation displays and vehicle data
 
 Phone navigation arrows, next-turn distance and street names can appear on supported BYD displays. Ordinary operation requires no ADB, root, laptop or helper process. The map app must provide structured navigation metadata; compatibility is not guaranteed for every map app or version.

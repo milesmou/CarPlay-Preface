@@ -11,13 +11,12 @@ class Iap2WirelessLinkRoleTest {
     private val full = Iap2IdentificationConfig(
         name = "DiPlay",
         modelIdentifier = "DiPlay",
-        manufacturer = "BYD",
+        manufacturer = "Geely Xingrui",
         serialNumber = "test",
         firmwareVersion = "1",
         hardwareVersion = "1",
         carPlayUsbInterfaceNumber = 3,
         locationInformationEnabled = true,
-        vehicleStatusEnabled = true,
         vehicleSpeedEnabled = true,
     )
 
@@ -30,14 +29,13 @@ class Iap2WirelessLinkRoleTest {
 
         assertFalse(bootstrap.locationInformationEnabled)
         assertFalse(bootstrap.vehicleSpeedEnabled)
-        assertFalse(bootstrap.vehicleStatusEnabled)
         assertNull(parameters.first(20))
         assertNull(parameters.first(21))
         assertNull(parameters.first(22))
         assertFalse(Iap2LocationMessages.LOCATION_INFORMATION in sent)
         assertFalse(Iap2LocationMessages.START_LOCATION_INFORMATION in received)
-        assertFalse(Iap2VehicleStatus.VEHICLE_STATUS_UPDATE in sent)
-        assertFalse(Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES in received)
+        assertFalse(0xA101 in sent)
+        assertFalse(0xA100 in received)
         assertTrue(0x5703 in sent) // Wi-Fi bootstrap remains advertised.
     }
 
@@ -50,14 +48,13 @@ class Iap2WirelessLinkRoleTest {
 
         assertTrue(runtime.locationInformationEnabled)
         assertTrue(runtime.vehicleSpeedEnabled)
-        assertTrue(runtime.vehicleStatusEnabled)
-        assertTrue(parameters.first(20) != null)
-        assertTrue(parameters.first(21) != null)
+        assertNull(parameters.first(20))
+        assertNull(parameters.first(21))
         assertTrue(parameters.first(22) != null)
         assertTrue(Iap2LocationMessages.LOCATION_INFORMATION in sent)
         assertTrue(Iap2LocationMessages.START_LOCATION_INFORMATION in received)
-        assertTrue(Iap2VehicleStatus.VEHICLE_STATUS_UPDATE in sent)
-        assertTrue(Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES in received)
+        assertFalse(0xA101 in sent)
+        assertFalse(0xA100 in received)
     }
 
     private fun identificationParameters(config: Iap2IdentificationConfig) =

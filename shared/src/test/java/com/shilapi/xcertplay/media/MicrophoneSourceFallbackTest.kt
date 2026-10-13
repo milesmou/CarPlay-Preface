@@ -66,26 +66,26 @@ class MicrophoneSourceFallbackTest {
         ShadowAudioRecord.clearSource()
     }
 
-    @Test fun siriCreationFailureRetriesCommunicationOnceWithoutCallEffectsOrModeChanges() {
-        RecorderBuilder.rejectSources = setOf(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+    @Test fun siriCreationFailureRetriesRecognitionOnceWithoutCallEffectsOrModeChanges() {
+        RecorderBuilder.rejectSources = setOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
 
         sink.onMicrophoneStarted(id, config("speechrecognition"))
 
         assertTrue(captureStarted.await(5, TimeUnit.SECONDS))
         val recorder = requireNotNull(captured.get())
-        assertEquals(listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.VOICE_COMMUNICATION), RecorderBuilder.attempts)
-        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, recorder.audioSource)
+        assertEquals(listOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION, MediaRecorder.AudioSource.VOICE_RECOGNITION), RecorderBuilder.attempts)
+        assertEquals(MediaRecorder.AudioSource.VOICE_RECOGNITION, recorder.audioSource)
         assertEquals(AudioManager.MODE_RINGTONE, context.getSystemService(AudioManager::class.java).mode)
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
-        assertTrue(diagnostics.any { it.contains("failure type=speechrecognition source=VOICE_RECOGNITION") && it.contains("stage=RECORDER_CREATION") })
-        assertTrue(diagnostics.any { it.startsWith("Microphone: start type=speechrecognition source=VOICE_COMMUNICATION") })
+        assertTrue(diagnostics.any { it.contains("failure type=speechrecognition source=VOICE_COMMUNICATION") && it.contains("stage=RECORDER_CREATION") })
+        assertTrue(diagnostics.any { it.startsWith("Microphone: start type=speechrecognition source=VOICE_RECOGNITION") })
         sink.onMicrophoneStopped(id)
         assertEquals(AudioRecord.STATE_UNINITIALIZED, recorder.state)
-        assertTrue(diagnostics.any { it.contains("stats type=speechrecognition source=VOICE_COMMUNICATION") && it.endsWith("ended=true") })
+        assertTrue(diagnostics.any { it.contains("stats type=speechrecognition source=VOICE_RECOGNITION") && it.endsWith("ended=true") })
     }
 
     @Test fun siriInitializationFailureReleasesRejectedRecorderBeforeFallbackCapture() {
-        RecorderBuilder.uninitializedSources = setOf(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+        RecorderBuilder.uninitializedSources = setOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
 
         sink.onMicrophoneStarted(id, config("speechrecognition"))
 
@@ -93,13 +93,13 @@ class MicrophoneSourceFallbackTest {
         assertEquals(2, RecorderBuilder.built.size)
         assertTrue((RecorderBuilder.built.first() as RejectedRecorder).released)
         assertEquals(AudioRecord.RECORDSTATE_RECORDING, RecorderBuilder.built.last().recordingState)
-        assertTrue(diagnostics.any { it.contains("source=VOICE_RECOGNITION") && it.contains("stage=RECORDER_INITIALIZATION") })
+        assertTrue(diagnostics.any { it.contains("source=VOICE_COMMUNICATION") && it.contains("stage=RECORDER_INITIALIZATION") })
     }
 
     @Test fun bothUnsupportedSourcesFailOnceAndALaterStreamCanStart() {
-        RecorderBuilder.rejectSources = setOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+        RecorderBuilder.rejectSources = setOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION, MediaRecorder.AudioSource.VOICE_RECOGNITION)
         sink.onMicrophoneStarted(id, config("speechrecognition"))
-        assertEquals(listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.VOICE_COMMUNICATION), RecorderBuilder.attempts)
+        assertEquals(listOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION, MediaRecorder.AudioSource.VOICE_RECOGNITION), RecorderBuilder.attempts)
         assertNull(captured.get())
         assertEquals(2, diagnostics.count { it.contains("stage=RECORDER_CREATION") })
         assertTrue(diagnostics.none { it.startsWith("Microphone: start") })
@@ -107,7 +107,7 @@ class MicrophoneSourceFallbackTest {
         RecorderBuilder.rejectSources = emptySet()
         sink.onMicrophoneStarted(id, config("speechrecognition"))
         assertTrue(captureStarted.await(5, TimeUnit.SECONDS))
-        assertEquals(MediaRecorder.AudioSource.VOICE_RECOGNITION, requireNotNull(captured.get()).audioSource)
+        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, requireNotNull(captured.get()).audioSource)
     }
 
     @Test fun telephonyCreationFailureDoesNotRetryOrLeaveTheCallModeActive() {

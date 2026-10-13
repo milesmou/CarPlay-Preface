@@ -1,7 +1,6 @@
 package com.shilapi.xcertplay
 
 import android.net.wifi.WifiManager
-import android.net.wifi.SoftApConfiguration
 import android.os.Handler
 import android.os.Looper
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
@@ -19,7 +18,6 @@ import org.robolectric.shadows.ShadowWifiManager
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.Executor
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [32], manifest = Config.NONE,
@@ -28,26 +26,91 @@ class LocalOnlyHotspotManagerTest {
     @Test fun cancelledStartupStillClosesALateSystemReservation() = lateReservation(cancel = true)
     @Test fun timedOutStartupStillClosesALateSystemReservation() = lateReservation(cancel = false)
 
-    @Test @Config(sdk = [33])
-    fun android13RequestsFiveGhzAndClosesLateCustomReservation() {
+    @Test @Config(sdk = [28])
+    fun android9UsesThePublicHotspotApi() {
         val radio = shadowOf(RuntimeEnvironment.getApplication().getSystemService(WifiManager::class.java)) as Radio
         lateReservation(cancel = true)
-        assertEquals(1, radio.customRequests)
-        assertEquals(0, radio.standardRequests)
-        assertEquals(SoftApConfiguration.BAND_5GHZ,
-            radio.configuration!!.javaClass.getMethod("getBand").invoke(radio.configuration))
-        assertEquals(36, radio.configuration!!.javaClass.getMethod("getChannel").invoke(radio.configuration))
-        assertEquals(SoftApConfiguration.SECURITY_TYPE_WPA2_PSK, radio.configuration!!.securityType)
-        assertEquals(20, radio.configuration!!.passphrase!!.length)
+        assertEquals(1, radio.standardRequests)
     }
 
     @Test @Config(sdk = [33])
-    fun firmwarePermissionDenialFallsBackWithoutRequestingPrivilege() {
+    fun android13AlsoUsesThePublicApiWithoutCustomConfiguration() {
         val radio = shadowOf(RuntimeEnvironment.getApplication().getSystemService(WifiManager::class.java)) as Radio
-        radio.denyCustom = true
         lateReservation(cancel = true)
-        assertEquals(1, radio.customRequests)
         assertEquals(1, radio.standardRequests)
+    }
+
+    @Test @Config(sdk = [28])
+    fun generatedTwoPointFourHotspotHasKnownChannelAndClosesExactlyOnce() = activeHotspot(6)
+
+    @Test @Config(sdk = [28])
+    fun unknownChannelIsNotReplacedWithAnInventedFiveGhzChannel() = activeHotspot(0)
+
+    @Test @Config(sdk = [28])
+    fun systemStopInvalidatesReadinessAndReservationStillClosesOnce() = activeHotspot(6, stop = true)
+
+    @Test @Config(sdk = [28])
+    fun incompatibleHotspotModeFailsWithoutWaitingForTheStartupTimeout() {
+        val context = RuntimeEnvironment.getApplication()
+        val radio = shadowOf(context.getSystemService(WifiManager::class.java)) as Radio
+        val manager = LocalOnlyHotspotManager(context)
+        val worker = Executors.newSingleThreadExecutor()
+        try {
+            val result = worker.submit<Throwable?> { runCatching { manager.start(5000) }.exceptionOrNull() }
+            assertTrue(radio.requested.await(2, TimeUnit.SECONDS))
+            radio.handler.post { radio.callback.onFailed(WifiManager.LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE) }
+            shadowOf(Looper.getMainLooper()).idle()
+            val failure = result.get(2, TimeUnit.SECONDS)
+            assertTrue(failure is java.io.IOException)
+            assertTrue(failure!!.message!!.contains("incompatible Wi-Fi mode"))
+            assertThrows(java.io.IOException::class.java) { manager.validateReady() }
+        } finally { manager.close(); worker.shutdownNow() }
+    }
+
+    private fun activeHotspot(channel: Int, stop: Boolean = false) {
+        val context = RuntimeEnvironment.getApplication()
+        val radio = shadowOf(context.getSystemService(WifiManager::class.java)) as Radio
+        val ap = org.mockito.Mockito.mock(java.net.NetworkInterface::class.java)
+        val address = java.net.InetAddress.getByName("192.168.43.1")
+        org.mockito.Mockito.`when`(ap.name).thenReturn("ap0")
+        org.mockito.Mockito.`when`(ap.isUp).thenReturn(true)
+        org.mockito.Mockito.`when`(ap.isLoopback).thenReturn(false)
+        org.mockito.Mockito.`when`(ap.hardwareAddress).thenReturn(byteArrayOf(2, 1, 2, 3, 4, 5))
+        org.mockito.Mockito.`when`(ap.inetAddresses).thenAnswer { java.util.Collections.enumeration(listOf(address)) }
+        val appeared = java.util.concurrent.atomic.AtomicBoolean(false)
+        val manager = LocalOnlyHotspotManager(context, interfaceProvider = { if (appeared.get()) listOf(ap) else emptyList() })
+        val worker = Executors.newSingleThreadExecutor()
+        val reservation = Shadow.newInstanceOf(WifiManager.LocalOnlyHotspotReservation::class.java)
+        val state = Shadow.extract<Reservation>(reservation)
+        state.configuration = android.net.wifi.WifiConfiguration().apply {
+            SSID = "Temporary-test"; preSharedKey = "test-password"
+            allowedKeyManagement.set(android.net.wifi.WifiConfiguration.KeyMgmt.WPA_PSK)
+            javaClass.getField("apChannel").setInt(this, channel)
+            javaClass.getField("apBand").setInt(this, 0)
+        }
+        try {
+            val result = worker.submit<com.shilapi.xcertplay.network.WirelessHotspotInfo> { manager.start(5000) }
+            assertTrue(radio.requested.await(2, TimeUnit.SECONDS))
+            appeared.set(true)
+            radio.handler.post { radio.callback.onStarted(reservation) }
+            shadowOf(Looper.getMainLooper()).idle()
+            val info = result.get(3, TimeUnit.SECONDS)
+            assertEquals("Temporary-test", info.ssid)
+            assertEquals("test-password", info.passphrase)
+            assertEquals("2.4 GHz", info.bandLabel)
+            assertEquals(channel, info.channel)
+            assertEquals(address, info.hostAddress)
+            manager.validateReady()
+            assertEquals(0, state.closes)
+            if (stop) {
+                radio.handler.post { radio.callback.onStopped() }
+                shadowOf(Looper.getMainLooper()).idle()
+            } else appeared.set(false)
+            assertThrows(java.io.IOException::class.java) { manager.validateReady() }
+            manager.close(); manager.close()
+            assertEquals(1, state.closes)
+            assertThrows(java.io.IOException::class.java) { manager.validateReady() }
+        } finally { manager.close(); worker.shutdownNow() }
     }
 
     private fun lateReservation(cancel: Boolean) {
@@ -76,25 +139,19 @@ class LocalOnlyHotspotManagerTest {
         val requested = CountDownLatch(1)
         lateinit var callback: WifiManager.LocalOnlyHotspotCallback
         lateinit var handler: Handler
-        var customRequests = 0
         var standardRequests = 0
-        var denyCustom = false
-        var configuration: SoftApConfiguration? = null
         @Implementation fun startLocalOnlyHotspot(value: WifiManager.LocalOnlyHotspotCallback, delivery: Handler) {
             standardRequests++
             callback = value; handler = delivery; requested.countDown()
         }
-        @Implementation fun startLocalOnlyHotspot(config: SoftApConfiguration, delivery: Executor, value: WifiManager.LocalOnlyHotspotCallback) {
-            customRequests++
-            if (denyCustom) throw SecurityException("test firmware rejects custom config")
-            configuration = config
-            callback = value; handler = Handler(Looper.getMainLooper()); requested.countDown()
-        }
+
     }
 
     @Implements(WifiManager.LocalOnlyHotspotReservation::class)
     class Reservation {
         var closes = 0
+        var configuration: android.net.wifi.WifiConfiguration? = null
+        @Implementation fun getWifiConfiguration(): android.net.wifi.WifiConfiguration? = configuration
         @Implementation fun close() { closes++ }
     }
 }

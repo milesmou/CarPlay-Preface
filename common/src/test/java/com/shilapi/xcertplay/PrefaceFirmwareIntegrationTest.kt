@@ -7,7 +7,6 @@ import android.media.AudioManager
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
-import com.shilapi.xcertplay.network.PrefaceE02HeadUnit
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import org.junit.After
@@ -23,7 +22,7 @@ import org.robolectric.util.ReflectionHelpers
 import org.mockito.Mockito.*
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28], manifest = Config.NONE)
+@Config(sdk = [28, 33], manifest = Config.NONE)
 class PrefaceFirmwareIntegrationTest {
     private val context get() = RuntimeEnvironment.getApplication()
     private lateinit var product: String
@@ -33,9 +32,9 @@ class PrefaceFirmwareIntegrationTest {
 
     @Before fun setup() {
         product = Build.PRODUCT; model = Build.MODEL; incremental = Build.VERSION.INCREMENTAL
-        ReflectionHelpers.setStaticField(Build::class.java, "PRODUCT", "IHU519G")
-        ReflectionHelpers.setStaticField(Build::class.java, "MODEL", "FS11A1")
-        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "INCREMENTAL", "327")
+        ReflectionHelpers.setStaticField(Build::class.java, "PRODUCT", "test-product")
+        ReflectionHelpers.setStaticField(Build::class.java, "MODEL", "test-model")
+        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "INCREMENTAL", "test-build")
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
     }
     @After fun cleanup() {
@@ -48,20 +47,16 @@ class PrefaceFirmwareIntegrationTest {
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
     }
 
-    @Test fun identifiedFirmwareUsesItsNativeAudioStreams() {
-        assertTrue(PrefaceE02HeadUnit.detected)
+    @Test fun unidentifiedDeviceUsesPrefaceAudioDefaults() {
         assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
         assertEquals(12, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(12, AirPlayPersistence.loadNavigationStreamType(context))
     }
 
-    @Test fun otherHardwareOrFirmwareRetainsAutomaticRouting() {
+    @Test fun changingFirmwareDoesNotChangePrefaceDefaults() {
         ReflectionHelpers.setStaticField(Build.VERSION::class.java, "INCREMENTAL", "328")
-        assertFalse(PrefaceE02HeadUnit.detected)
-        assertEquals(0, AirPlayPersistence.loadNavigationAudioChannel(context))
-        assertEquals(0, AirPlayPersistence.loadMediaAudioChannel(context))
-        assertFalse(PrefaceE02HeadUnit.matches("IHU519G", "OtherModel", 28, "327"))
-        assertFalse(PrefaceE02HeadUnit.matches("OtherProduct", "FS11A1", 28, "327"))
-        assertFalse(PrefaceE02HeadUnit.matches("IHU519G", "FS11A1", 29, "327"))
+        assertEquals(12, AirPlayPersistence.loadNavigationAudioChannel(context))
+        assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
     }
 
     @Test fun savedAutomaticAndCustomRoutesTakePrecedence() {

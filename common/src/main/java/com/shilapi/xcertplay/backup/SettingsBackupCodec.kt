@@ -23,7 +23,7 @@ object SettingsBackupCodec {
         "display_scale_tenths", "ui_scale_percent", "hevc_enabled", "hevc_software_decoder",
         "advanced_audio_channel_mapping", "audio_focus_enabled", "audio_focus_auto_yield",
         "disable_media_key_audio_focus", "media_audio_channel", "navigation_audio_channel",
-        "navigation_stream_type", "wireless_enabled", "wireless_hotspot_mode", "wifi_p2p_preferred_channel",
+        "navigation_stream_type", "wireless_enabled", "wireless_hotspot_mode",
         "manual_hotspot_band", "manual_hotspot_channel", "manual_hotspot_security", "app_appearance",
         "ambient_lux_threshold", "display_fps", "media_buffer_ms", "main_buffered_audio",
         "speech_without_8_16_khz", "car_bluetooth_audio", "call_echo_cancellation", "call_voice_filter",
@@ -31,8 +31,8 @@ object SettingsBackupCodec {
         "center_map_overlay", "center_map_auto_hide",
         "center_map_follows_dashboard", "settings_gesture_fingers", "display_width_physical_mm",
         "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
-        "harman_fullscreen", "safe_area_draw_outside", "main_display_disable_safe_area",
-        "adapt_pip_resolution", "auto_start_on_boot", "hide_byd_call_popup",
+        "safe_area_draw_outside", "main_display_disable_safe_area",
+        "adapt_pip_resolution", "auto_start_on_boot",
         "location_reporting_enabled", "external_controller", "usb_charging_current",
     )
 
@@ -53,7 +53,6 @@ object SettingsBackupCodec {
         "carplay_picture" to Policy.All,
         "diplay_car_hotspot" to Policy.All,
         "diplay_phone_audio" to Policy.All,
-        "diplay_fce_navigation" to Policy.All,
     )
 
     private sealed interface Policy {

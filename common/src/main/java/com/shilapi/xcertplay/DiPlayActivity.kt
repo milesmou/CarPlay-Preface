@@ -52,15 +52,12 @@ import com.shilapi.xcertplay.backup.SettingsBackupCodec
 import com.shilapi.xcertplay.backup.SettingsBackupEndpoint
 import com.shilapi.xcertplay.backup.SettingsBackupServer
 import com.shilapi.xcertplay.backup.SettingsQrCode
-import com.shilapi.xcertplay.compat.closeCompat
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 import com.shilapi.xcertplay.telecom.PhoneAudioSettings
-import com.shilapi.xcertplay.hud.FceNavigationSettings
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.MtkDecoderTuning
 import com.shilapi.xcertplay.network.CarHotspotSettings
 import com.shilapi.xcertplay.network.CarHotspotTethering
-import com.shilapi.xcertplay.network.WifiP2pChannels
 import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.settings.SettingsTheme
@@ -102,7 +99,6 @@ internal enum class SettingsSection {
     NAVIGATION_WHEEL,
     LOCATION,
     CLUSTER_MAP,
-    FCE_NAVIGATION,
     EXTERNAL_CONTROLLER,
     HOTSPOT_JOIN,
     PERMISSIONS_AND_HELP,
@@ -132,7 +128,6 @@ internal object SettingsInformationArchitecture {
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
-            SettingsSection.FCE_NAVIGATION,
             SettingsSection.EXTERNAL_CONTROLLER,
             SettingsSection.HOTSPOT_JOIN,
         ),
@@ -177,7 +172,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         UsbPermissionSetup.Operation(it.applicationContext)
     }
     internal var selectedMtkDecoderName: (String) -> String? = MtkDecoderTuning::selectedDecoderName
-    private var navigationStreamType = 14
+    private var navigationStreamType = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
     private var testToneTrack: AudioTrack? = null
     private var toneStop: Runnable? = null
     private var exportButton: Button? = null
@@ -830,10 +825,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         card.addView(connectButton, matchButton(height = if (compact) 54 else 68))
         val connectionHint = when (AirPlayPersistence.loadWirelessHotspotMode(this)) {
-            WirelessHotspotMode.EXISTING_WIFI -> getString(R.string.existing_wifi_hint)
             WirelessHotspotMode.MANUAL -> getString(R.string.hotspot_hint_manual)
-            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.hotspot_hint_local)
-            else -> getString(R.string.hotspot_hint_p2p)
+            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.settings_temporary_hotspot_hint)
         }
         if (!compact) card.addView(label(connectionHint, 15, MUTED).apply { setPadding(0, dp(14), 0, 0) })
         val startupProblem = hotspotStartupResult?.takeIf {
@@ -1680,11 +1673,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.EXPERIMENTAL_DISPLAY,
             getString(R.string.settings_experimental_display), R.drawable.ic_dp_display) { card ->
-            toggle(card, getString(R.string.settings_harman_fullscreen_experimental),
-                getString(R.string.settings_harman_fullscreen_experimental_description),
-                AirPlayPersistence.loadHarmanFullscreen(this)) { enabled ->
-                AirPlayPersistence.saveHarmanFullscreen(this, enabled)
-            }
             toggle(card, getString(R.string.split_screen_areas), getString(R.string.split_screen_areas_description),
                 SplitScreenSettings.enabled(this)) {
                 SplitScreenSettings.setEnabled(this, it)
@@ -1869,12 +1857,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }
         }
-        if (FceNavigationSettings.available()) filteredSection(content, SettingsSection.FCE_NAVIGATION,
-            getString(R.string.settings_fce_cluster_guidance), R.drawable.ic_dp_navigation) { card ->
-            toggle(card, getString(R.string.settings_fce_cluster_guidance),
-                getString(R.string.settings_fce_cluster_guidance_description),
-                FceNavigationSettings.enabled(this)) { FceNavigationSettings.setEnabled(this, it) }
-        }
         filteredSection(content, SettingsSection.EXTERNAL_CONTROLLER,
             getString(R.string.settings_external_controller), R.drawable.ic_dp_controls) { card ->
             toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
@@ -1926,9 +1908,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun backup(content: LinearLayout) {
         val preferredPrefix = when (AirPlayPersistence.loadWirelessHotspotMode(this)) {
-            WirelessHotspotMode.WIFI_P2P -> "p2p"
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> "ap"
-            WirelessHotspotMode.MANUAL, WirelessHotspotMode.EXISTING_WIFI -> "wlan"
+            WirelessHotspotMode.MANUAL -> "wlan"
         }
         val addresses = SettingsBackupServer.addressCandidates(preferredPrefix)
         content.addView(label(getString(R.string.backup_title), 40, TEXT, true))
@@ -2508,37 +2489,29 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun wirelessLinkControls(parent: LinearLayout) {
         val mode = if (pendingCarHotspotSetup) WirelessHotspotMode.MANUAL else AirPlayPersistence.loadWirelessHotspotMode(this)
-        val modes = listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI)
-        val titles = listOf(getString(R.string.settings_built_in_car_hotspot_recommended), getString(R.string.wifi_direct), getString(R.string.existing_wifi_title))
-        val descriptions = listOf(
-            getString(R.string.hotspot_mode_manual_desc),
-            getString(R.string.hotspot_mode_p2p_desc),
-            getString(R.string.existing_wifi_description)
-        )
+        val options = com.shilapi.xcertplay.settings.ConnectionSettingsSection.hotspotModeOptions(this)
         val wide = resources.configuration.screenWidthDp >= 850
         val choices = if (wide) row().apply { gravity = Gravity.TOP } else column()
         parent.addView(choices)
-        modes.forEachIndexed { index, candidate ->
+        options.forEachIndexed { index, (candidate, title) ->
             val option = column()
             choices.addView(option, if (wide) LinearLayout.LayoutParams(0, -2, 1f).apply {
-                if (index > 0) marginStart = dp(16)
+                if (index > 0) marginStart = dp(SETTINGS_BLOCK_GAP_DP)
             } else LinearLayout.LayoutParams(-1, -2))
-            option.addView(button("${if (mode == candidate) "✓  " else ""}${titles[index]}", mode == candidate) {
+            option.addView(button("${if (mode == candidate) "✓  " else ""}${title}", mode == candidate) {
                 if (candidate == WirelessHotspotMode.MANUAL) {
                     pendingCarHotspotSetup = true
                     render()
-                } else if (candidate == WirelessHotspotMode.EXISTING_WIFI) {
-                    askHotspotCredentials(existingWifi = true) { ssid, password, _ ->
-                        AirPlayPersistence.saveExistingWifiCredentials(this, ssid, password)
-                        pendingCarHotspotSetup = false
-                        applyWirelessLink(candidate)
-                    }
                 } else {
                     pendingCarHotspotSetup = false
                     applyWirelessLink(candidate)
                 }
             }, matchButton(12, 60))
-            option.addView(label(descriptions[index], 15, MUTED).apply { setPadding(0, dp(6), 0, dp(12)) })
+            val description = getString(when (candidate) {
+                WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> R.string.settings_temporary_hotspot_description
+                WirelessHotspotMode.MANUAL -> R.string.hotspot_mode_manual_desc
+            })
+            option.addView(label(description, 15, MUTED).apply { setPadding(0, dp(6), 0, dp(12)) })
         }
         if (mode == WirelessHotspotMode.MANUAL) {
             parent.addView(label(getString(R.string.hotspot_setup), 22, TEXT, true))
@@ -2552,61 +2525,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }, matchButton(12, 60))
             parent.addView(label(if (pendingCarHotspotSetup) getString(R.string.finish_setup_save_your_hotspot_details_to_use_this_mode) else if (carHotspotOff()) getString(R.string.hotspot_details_off) else getString(R.string.hotspot_details_saved), 15, if (carHotspotOff()) WARNING else MUTED).apply { setPadding(0, dp(12), 0, 0) })
-        } else if (mode == WirelessHotspotMode.EXISTING_WIFI) {
-            parent.addView(label(getString(R.string.existing_wifi_instructions), 16, MUTED))
-            parent.addView(button(getString(R.string.open_car_wi_fi_settings), false) { openCarClientWifiSettings() }, matchButton(12, 60))
-            parent.addView(button(getString(R.string.existing_wifi_details), false) {
-                askHotspotCredentials(existingWifi = true) { ssid, password, _ ->
-                    AirPlayPersistence.saveExistingWifiCredentials(this, ssid, password)
-                    toast(getString(R.string.saved_for_your_next_connection))
-                }
-            }, matchButton(12, 60))
         } else {
-            parent.addView(label(getString(R.string.turn_the_car_s_wi_fi_switch_on_allow_location_nearby_devic), 16, MUTED))
-            wifiDirectChannelControl(parent)
-            parent.addView(button(getString(R.string.open_car_wi_fi_settings), false) { openCarClientWifiSettings() }, matchButton(12, 60))
+            parent.addView(label(getString(R.string.settings_temporary_hotspot_hint), 16, MUTED))
         }
-    }
-
-    private fun wifiDirectChannelLabel(channel: Int): String = if (channel == WifiP2pChannels.AUTO) {
-        getString(R.string.auto)
-    } else if (channel == WifiP2pChannels.AUTO_5_GHZ || channel == WifiP2pChannels.AUTO_2_4_GHZ) {
-        getString(R.string.settings_wifi_direct_auto_band,
-            getString(if (channel == WifiP2pChannels.AUTO_5_GHZ) R.string.s_5_ghz else R.string.s_2_4_ghz))
-    } else {
-        getString(R.string.wifi_direct_channel_choice, channel,
-            getString(if (channel < 36) R.string.s_2_4_ghz else R.string.s_5_ghz))
-    }
-
-    private fun wifiDirectChannelControl(parent: LinearLayout) {
-        val summary: (Int) -> String = {
-            getString(R.string.wifi_direct_channel_summary, wifiDirectChannelLabel(it))
-        }
-        val control = button(summary(AirPlayPersistence.loadWifiP2pPreferredChannel(this)), false) {}
-        control.setOnClickListener {
-            val choices = listOf(WifiP2pChannels.AUTO) + WifiP2pChannels.bandChoices + WifiP2pChannels.channels
-            val current = AirPlayPersistence.loadWifiP2pPreferredChannel(this)
-            var selection = current
-            appDialogBuilder().setTitle(R.string.wifi_direct_channel_title)
-                .setSingleChoiceItems(choices.map(::wifiDirectChannelLabel).toTypedArray(),
-                    choices.indexOf(current)) { _, which -> selection = choices[which] }
-                .setPositiveButton(R.string.save) { _, _ ->
-                    if (selection != current) {
-                        AirPlayPersistence.saveWifiP2pPreferredChannel(this, selection)
-                        control.text = summary(selection)
-                        toast(getString(R.string.saved_for_your_next_connection))
-                    }
-                }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
-        }
-        parent.addView(control, matchButton(12, 60))
-        parent.addView(label(getString(R.string.wifi_direct_channel_description), 15, MUTED).apply {
-            setPadding(0, dp(6), 0, dp(6))
-        })
-        parent.addView(label(getString(R.string.settings_wifi_direct_band_note), 15, MUTED).apply {
-            setPadding(0, 0, 0, dp(12))
-        })
     }
 
     private fun playbackVolumeControl(parent: LinearLayout, navigation: Boolean) {
@@ -2729,18 +2650,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         markReconnectNeeded()
     }
 
-    private fun askHotspotCredentials(existingWifi: Boolean = false, done: (String, String, ManualHotspotSecurity) -> Unit) {
+    private fun askHotspotCredentials(done: (String, String, ManualHotspotSecurity) -> Unit) {
         val dialogContext = appDialogContext()
         val fields = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
-        fields.addView(label(getString(if (existingWifi) R.string.existing_wifi_instructions else R.string.copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av), 16, MUTED))
+        fields.addView(label(getString(R.string.copy_these_from_the_car_s_hotspot_settings_use_5_ghz_if_av), 16, MUTED))
         val ssid = EditText(dialogContext).apply {
-            hint = getString(if (existingWifi) R.string.existing_wifi_ssid else R.string.hotspot_name)
-            setText(if (existingWifi) AirPlayPersistence.loadExistingWifiSsid(this@DiPlayActivity) else storedSsid())
+            hint = getString(R.string.hotspot_name)
+            setText(storedSsid())
             setSingleLine()
         }
         val password = EditText(dialogContext).apply {
-            hint = getString(if (existingWifi) R.string.existing_wifi_password else R.string.hotspot_password)
-            setText(if (existingWifi) AirPlayPersistence.loadExistingWifiPassphrase(this@DiPlayActivity) else storedPassword())
+            hint = getString(R.string.hotspot_password)
+            setText(storedPassword())
             setSingleLine()
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
@@ -2760,8 +2681,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         val nameWarning = label(getString(R.string.settings_hotspot_name_non_english), 14, WARNING)
         fun updateNameWarning() {
-            nameWarning.visibility = if (!existingWifi &&
-                com.shilapi.xcertplay.orchestration.ManualHotspotValidation.nameMayNotReachIphone(ssid.text.toString())
+            nameWarning.visibility = if (com.shilapi.xcertplay.orchestration.ManualHotspotValidation.nameMayNotReachIphone(ssid.text.toString())
             ) View.VISIBLE else View.GONE
         }
         updateNameWarning()
@@ -2782,7 +2702,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val securityTitles = listOf(getString(R.string.wpa2), getString(R.string.wpa3_transition), getString(R.string.wpa3))
         var protectedSecurity = AirPlayPersistence.loadManualHotspotSecurity(this)
             .takeIf { it in securityModes } ?: ManualHotspotSecurity.WPA2
-        if (!existingWifi) {
+        run {
             lateinit var securityControl: Button
             fun updateSecurityControl() {
                 val hasPassword = password.text.isNotEmpty()
@@ -2813,7 +2733,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val error = label("", 14, WARNING)
         error.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         fields.addView(error)
-        val dialog = appDialogBuilder().setTitle(getString(if (existingWifi) R.string.existing_wifi_details else R.string.car_hotspot_details))
+        val dialog = appDialogBuilder().setTitle(getString(R.string.car_hotspot_details))
             .setView(ScrollView(dialogContext).apply { addView(fields) })
             .setPositiveButton(getString(R.string.save_details), null).setNegativeButton(getString(R.string.cancel)) { _, _ -> hideKeyboard() }
             .setNeutralButton(getString(R.string.hide_keyboard), null).create()
@@ -2821,7 +2741,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener { hideKeyboard() }
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = if (existingWifi) ssid.text.toString() else ssid.text.toString().trim()
+                val name = ssid.text.toString().trim()
                 val secret = password.text.toString()
                 val problem = hotspotError(name, secret)
                 if (problem != null) error.text = problem
@@ -3323,6 +3243,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun applyWirelessLink(mode: WirelessHotspotMode) {
         startupHotspotCancelled = true
         AirPlayPersistence.saveWirelessHotspotMode(this, mode)
+        markReconnectNeeded()
         render()
         toast(getString(R.string.saved_for_your_next_connection))
     }
@@ -3739,41 +3660,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun confirmWirelessReset() {
         appDialogBuilder().setTitle(getString(R.string.reset_carplay_wi_fi_2))
-            .setMessage(getString(R.string.this_ends_the_existing_wi_fi_direct_connection_including_o))
+            .setMessage(getString(R.string.settings_temporary_hotspot_reconnect))
             .setPositiveButton(getString(R.string.reset_and_connect)) { _, _ ->
                 CarPlayBackgroundSession.stop { runOnUiThread { resetWirelessGroup() } }
             }.setNegativeButton(getString(R.string.cancel), null).show()
     }
 
     private fun resetWirelessGroup() {
-        val manager = getSystemService(android.net.wifi.p2p.WifiP2pManager::class.java)
-        if (manager == null) { toast(getString(R.string.this_head_unit_does_not_support_wi_fi_direct)); return }
-        val channel = manager.initialize(this, mainLooper, null)
-        try {
-            manager.requestGroupInfo(channel) { group ->
-                if (group == null) { channel.closeCompat(); connect(true); return@requestGroupInfo }
-                manager.removeGroup(channel, object : android.net.wifi.p2p.WifiP2pManager.ActionListener {
-                    override fun onSuccess() {
-                        val deadline = android.os.SystemClock.elapsedRealtime() + 4000
-                        fun waitUntilRemoved() {
-                            manager.requestGroupInfo(channel) { remaining ->
-                                when {
-                                    remaining == null -> { channel.closeCompat(); if (!isFinishing && !isDestroyed) connect(true) }
-                                    android.os.SystemClock.elapsedRealtime() >= deadline -> {
-                                        channel.closeCompat(); toast(getString(R.string.wi_fi_direct_is_still_busy_close_the_other_projection_app))
-                                    }
-                                    else -> handler.postDelayed({ waitUntilRemoved() }, 200)
-                                }
-                            }
-                        }
-                        waitUntilRemoved()
-                    }
-                    override fun onFailure(reason: Int) { channel.closeCompat(); toast(getString(R.string.could_not_reset_wi_fi_direct_close_the_other_projection_ap)) }
-                })
-            }
-        } catch (_: SecurityException) {
-            channel.closeCompat(); permissionHelp(getString(R.string.wireless_permissions), getString(R.string.allow_nearby_devices_and_on_older_android_versions_locatio))
-        }
+        if (!isFinishing && !isDestroyed) connect(true)
     }
 
     private fun refreshStatus() {

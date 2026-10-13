@@ -56,7 +56,7 @@ class CarPlayHostSettingsTest {
         CarPlayBackgroundSession::class.java.getDeclaredField("owner").apply { isAccessible = true }
             .set(CarPlayBackgroundSession, activity)
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
-        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.WIFI_P2P)
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         invoke("loadPersistedSettings")
         invoke("buildContentView")
     }
@@ -305,7 +305,7 @@ class CarPlayHostSettingsTest {
         assertEquals("Draft hotspot", field("manualHotspotSsid"))
         assertEquals(MfiTarget.LOCAL, field("mfiTarget"))
         invoke("cancelSettingsEdits")
-        assertEquals(WirelessHotspotMode.WIFI_P2P, field("wirelessHotspotMode"))
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, field("wirelessHotspotMode"))
         assertEquals(MfiTarget.USB_CH341, field("mfiTarget"))
     }
 

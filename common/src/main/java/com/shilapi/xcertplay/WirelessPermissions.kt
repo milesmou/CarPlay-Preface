@@ -12,8 +12,6 @@ import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
  */
 internal object WirelessPermissions {
     fun required(hotspotMode: WirelessHotspotMode, sdkInt: Int): List<String> = when {
-        hotspotMode == WirelessHotspotMode.EXISTING_WIFI ->
-            if (sdkInt >= Build.VERSION_CODES.S) listOf(Manifest.permission.BLUETOOTH_CONNECT) else emptyList()
         sdkInt >= Build.VERSION_CODES.TIRAMISU -> listOf(
             Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.NEARBY_WIFI_DEVICES,

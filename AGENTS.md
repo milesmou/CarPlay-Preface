@@ -1,6 +1,14 @@
 # AGENTS.md
 
-Instructions for coding agents that work on DiPlay.
+Instructions for coding agents that work on CarPlay-Preface.
+
+## 适配范围与默认配置
+
+1. 本仓库专门服务吉利星瑞 E02，所有配置默认针对星瑞，不适配其他车型。新增功能、默认值、界面说明及验证场景均以星瑞 E02 为目标，不新增或维护其他车型的专属适配分支、车型选择或兼容开关。
+2. 星瑞配置直接默认启用，不以产品、型号、Android 版本或固件构建号识别作为启用门槛；媒体／导航默认流为 3／12，方控媒体广播默认接入。用户已保存的自动路由或自定义配置优先。
+3. 服务存在、权限、会话、焦点、通话及蓝牙音频检查仍需保留，它们是接口可用性和运行状态判断，不是车型适配门槛。通用 Android 能力用于实现星瑞功能，不据此扩展支持车型。
+4. 同步上游时，只引入星瑞所需或可用于星瑞的通用改动，不引入其他车型专属适配。固件静态证据和实车验证结果分别记录，不将默认启用描述为所有星瑞固件均已验证。
+5. 无线连接仅提供原车热点和 Android `LocalOnlyHotspot` 临时热点，不重新引入 Wi-Fi Direct 或现有 Wi-Fi／同一局域网模式。临时热点使用公共 API 与系统分配的名称、密码、频段；保留权限与接口状态检查，断开时释放本应用的预约，不猜测信道或关闭其他应用的热点。
 
 ## Checks
 
@@ -18,14 +26,14 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 1. 修改星瑞 E02 私有接口、方控、音频路由、连接或电源行为前，先读取 `docs/PREFACE_FIRMWARE_REFERENCE.md` 及 `docs/firmware/ihu519g-327.json`；方控接入细节见 `docs/PREFACE_FIRMWARE_327.md`。
 2. 本地原始证据与可搜索索引位于被 Git 忽略的 `agent_docs/firmware/ihu519g-327/`，目录及再生成命令见参考文档。优先复用缓存，记录证据文件、行号或校验值；缓存缺失时说明并请求原固件，不把无法复核的接口写成已确认。
-3. 静态声明与真车可用性分别记录。不要将构建 327 的常量推广到所有 E02，也不要把 SDK 中其他车型的分支、空实现、XML 注释模板或 exported 服务直接当作可用接口。
+3. 静态声明与真车可用性分别记录。不要将构建 327 的静态证据描述为所有 E02 固件已验证，也不要把 SDK 中其他车型的分支、空实现、XML 注释模板或 exported 服务直接当作可用接口。
 4. 新分析补充参考文档和事实索引，注明固件身份、来源 SHA-256、适用范围、证据和待验证项。完整固件、APK/JAR、反编译实现及包含设备隐私的诊断只留本地忽略目录。
 
 ## 版本与上游同步
 
-1. 当前上游基线为 **DiPlay v0.2.18**。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中英文 README 分别记录应用版本和上游基线。
-2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中英文 README 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的应用 `versionName` 和 `versionCode`。同步时不得直接覆盖为上游的应用版本号。
-3. 用户指定应用版本时采用指定版本；未指定时默认递增本仓库应用版本的补丁号（例如 `0.1.0` → `0.1.1`）。`versionCode` 必须大于上一版本，以支持覆盖升级；修改应用版本时同时更新中英文 README。
+1. 当前上游基线为 **DiPlay v0.2.18**。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
+2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的应用 `versionName` 和 `versionCode`。同步时不得直接覆盖为上游的应用版本号。
+3. 用户指定应用版本时采用指定版本；未指定时默认递增本仓库应用版本的补丁号（例如 `0.1.0` → `0.1.1`）。`versionCode` 必须大于上一版本，以支持覆盖升级；修改应用版本时同时更新中文 `README.md`。
 4. 如果同步的是尚未发布或零散的上游提交，记录实际同步的提交 SHA 和同步范围，不虚构上游发布版本，也不将部分提交描述为完整同步某个新版本。
 
 ## 构建环境与设备安装
@@ -33,6 +41,8 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 主应用默认打包 `runtime-assets/offline-mfi/identity.pk8` 和 `certificate.p7b`。这是用户明确要求导入的上游 v0.2.18 公共预览 APK 的实验性配件认证资料；来源和 SHA-256 见 `docs/runtime-authentication-provenance.json`。设置 `DIPLAY_AUTH_ASSETS_DIR` 可为本地构建替换认证目录，替换资料不得入库。
 
 用户明确要求公开现有 APK 签名密钥及签名密码，允许 `signing/carplay-release.p12` 和 `signing/signing.json` 入库。默认发布构建复用这组签名材料，证书指纹不得改变。`scripts/check_public_tree.py` 仅允许以上四个固定路径及已确认内容；其他私钥、令牌、签名密钥和本地配置继续排除，不扩大白名单。公开签名材料不得打包成应用资产。
+
+后续构建 CarPlay 测试 APK（`mobile`／`automotive` 的 Debug 变体，包括 `assembleStandaloneDebug`）也必须使用 `signing/` 中的现有密钥和密码，与 Release 使用同一证书；不要使用 Android 默认 Debug 密钥或另行生成测试密钥。除非用户明确指定其他签名，不设置 `ANDROID_KEYSTORE_*`／`ANDROID_KEY_*` 覆盖参数。构建后核对 APK 证书指纹；旧测试包若使用其他签名导致覆盖安装失败，报告错误，不卸载或清除数据。
 
 ### 环境准备与本地缓存
 
@@ -65,8 +75,8 @@ Ask which goal the driver has when they look for the setting. Use the first row 
 | Connection | how the iPhone connects and how DiPlay starts | connection setup, connect on open, start with the car, USB permissions, car hotspot automation, iPhone choice, Android permissions |
 | Display | how CarPlay looks on the head-unit screen | day/night mode, picture, size, resolution, frame rate, dock, system bars, multi-window resolution |
 | Audio | what the driver hears | media and navigation streams, music buffer |
-| Navigation | location and turn-by-turn guidance | location to iPhone, BYD HUD and cluster guidance |
-| Vehicle | how CarPlay fits this car and its driver | driving side, wheel keys (Siri, BYD joystick and map zoom), car button, gestures that conflict with the head unit |
+| Navigation | location and turn-by-turn guidance | location to iPhone, navigation output for Xingrui |
+| Vehicle | how CarPlay fits this car and its driver | driving side, Xingrui wheel keys (Siri and map zoom), car button, gestures that conflict with the head unit |
 | Diagnostics | troubleshooting evidence | diagnostic reports |
 | Advanced | experimental, firmware-specific or risky behavior | dashboard map, split screen, screen rotation, side panel, HEVC video, audio focus, audio channel mapping, buffered music, vehicle data |
 

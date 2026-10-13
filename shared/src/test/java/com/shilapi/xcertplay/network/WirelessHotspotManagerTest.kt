@@ -6,7 +6,7 @@ import org.junit.Test
 
 class WirelessHotspotManagerTest {
     @Test
-    fun convertsWifiP2pFrequencyToIap2Channel() {
+    fun convertsRadioFrequencyToIap2Channel() {
         assertEquals(1, wifiFrequencyMhzToChannel(2412))
         assertEquals(6, wifiFrequencyMhzToChannel(2437))
         assertEquals(14, wifiFrequencyMhzToChannel(2484))

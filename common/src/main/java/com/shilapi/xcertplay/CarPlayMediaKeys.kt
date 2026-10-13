@@ -25,7 +25,6 @@ import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.orchestration.CarPlayController
-import com.shilapi.xcertplay.network.PrefaceE02HeadUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.Executor
 import kotlin.math.roundToInt
@@ -80,7 +79,6 @@ internal object CarPlayMediaKeys {
         controller = next
         this.foreground = foreground
         registerPrefaceReceiver(context, next)
-        GeelyWheelKeys.start(context)
         next.playbackListener = { playing ->
             onIphonePlaying(next, playing)
         }
@@ -99,7 +97,6 @@ internal object CarPlayMediaKeys {
         expected.nowPlayingListener = null
         expected.artworkListener = null
         controller = null
-        GeelyWheelKeys.stop()
         releaseLocked()
     }
 
@@ -323,18 +320,9 @@ internal object CarPlayMediaKeys {
         return sent
     }
 
-    /** Null lets other head units retain the window's ordinary Android media-key handling. */
+    /** Null retains ordinary Android key handling when no CarPlay receiver owns the window. */
     internal fun onWindowMediaKey(event: KeyEvent): Boolean? =
         synchronized(this) { prefaceReceiver }?.handle(event)
-
-    /** A steering-wheel media key captured outside the Android key stream (Geely/Lynk). */
-    internal fun onExternalMediaKey(index: Int) = send(index, "geely-wheel")
-
-    /** The steering-wheel microphone key captured outside the Android key stream (Geely/Lynk). */
-    internal fun onExternalSiriKey(): Boolean {
-        val active = synchronized(this) { controller } ?: return false
-        return runCatching { active.requestSiri() }.getOrDefault(false)
-    }
 
     private val callback = CarPlayMediaCallback(
         send = ::send,
@@ -342,7 +330,7 @@ internal object CarPlayMediaKeys {
     )
 
     private fun registerPrefaceReceiver(context: Context, expected: CarPlayController) {
-        if (!PrefaceE02HeadUnit.detected || prefaceReceiver != null) return
+        if (prefaceReceiver != null) return
         val receiver = PrefaceMediaButtonReceiver(
             eligible = {
                 val ownsKeys = synchronized(this) {

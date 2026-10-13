@@ -55,6 +55,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".hudtest"
+            signingConfig = signingConfigs.getByName("release")
         }
         release {
             optimization {
