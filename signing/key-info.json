@@ -1,0 +1,10 @@
+{
+  "keyAlias": "carplay-release",
+  "keystoreType": "PKCS12",
+  "keyAlgorithm": "RSA",
+  "keySize": 4096,
+  "certificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
+  "subject": "CN=CarPlay-Preface, OU=Android, O=CarPlay-Preface",
+  "validFromUtc": "2026-10-13T02:56:00.0000000Z",
+  "validUntilUtc": "2054-02-28T02:56:00.0000000Z"
+}
