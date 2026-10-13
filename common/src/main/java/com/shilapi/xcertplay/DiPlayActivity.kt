@@ -47,28 +47,16 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
-import com.shilapi.xcertplay.airplay.ClusterSpeedometerOverlay
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 import com.shilapi.xcertplay.backup.SettingsBackupCodec
 import com.shilapi.xcertplay.backup.SettingsBackupEndpoint
 import com.shilapi.xcertplay.backup.SettingsBackupServer
 import com.shilapi.xcertplay.backup.SettingsQrCode
 import com.shilapi.xcertplay.compat.closeCompat
-import com.shilapi.xcertplay.hud.BydAdbAccess
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
-import com.shilapi.xcertplay.hud.BydFieldSource
-import com.shilapi.xcertplay.hud.BydOutputSettings
-import com.shilapi.xcertplay.hud.BydVehicleCapabilities
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
-import com.shilapi.xcertplay.hud.BydVehicleField
-import com.shilapi.xcertplay.hud.BydVehicleFieldStore
-import com.shilapi.xcertplay.hud.BydVehicleProbeOutcome
+import com.shilapi.xcertplay.telecom.PhoneAudioSettings
+import com.shilapi.xcertplay.hud.FceNavigationSettings
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.media.AmbientColorMode
-import com.shilapi.xcertplay.media.AmbientColorSpeed
-import com.shilapi.xcertplay.media.AmbientMusicController
-import com.shilapi.xcertplay.media.AmbientColorSource
-import com.shilapi.xcertplay.media.AmbientMusicSettings
 import com.shilapi.xcertplay.media.MtkDecoderTuning
 import com.shilapi.xcertplay.network.CarHotspotSettings
 import com.shilapi.xcertplay.network.CarHotspotTethering
@@ -77,9 +65,7 @@ import com.shilapi.xcertplay.orchestration.ManualHotspotSecurity
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.settings.SettingsTheme
 import com.shilapi.xcertplay.settings.SettingsWidgets
-import com.shilapi.xcertplay.setup.DiLinkGeneration
 import com.shilapi.xcertplay.setup.SetupGuide
-import com.shilapi.xcertplay.transport.EvChargingConnectors
 import com.shilapi.xcertplay.update.BackgroundUpdateScheduler
 import com.shilapi.xcertplay.update.UpdateApkExport
 import com.shilapi.xcertplay.update.UpdateAvailability
@@ -96,7 +82,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 internal enum class SettingsCategory {
-    OVERVIEW, CONNECTION, DISPLAY, AUDIO, NAVIGATION, VEHICLE, LANGUAGE, DIAGNOSTICS, ADVANCED, ABOUT,
+    CONNECTION, DISPLAY, AUDIO, NAVIGATION, VEHICLE, DIAGNOSTICS, EXPERIMENTAL, ABOUT,
 }
 
 /** A settings card. Every entry needs one category in [SettingsInformationArchitecture]; see AGENTS.md. */
@@ -107,48 +93,48 @@ internal enum class SettingsSection {
     DIAGNOSTICS,
     AUTOMATIC_CONNECTION,
     USB_CONNECTION,
-    BYD_ADB,
+    HOTSPOT_AUTOMATION,
     DISPLAY_AND_PERFORMANCE,
     EXPERIMENTAL_DISPLAY,
     ADVANCED_MEDIA,
-    AMBIENT_LIGHTING,
     CAR_BUTTON,
     AUDIO_ROUTING,
     NAVIGATION_WHEEL,
     LOCATION,
     CLUSTER_MAP,
-    BYD_NAVIGATION,
+    FCE_NAVIGATION,
+    EXTERNAL_CONTROLLER,
+    HOTSPOT_JOIN,
     PERMISSIONS_AND_HELP,
-    LANGUAGE,
 }
 
 internal object SettingsInformationArchitecture {
     val sectionsByCategory: Map<SettingsCategory, Set<SettingsSection>> = mapOf(
-        SettingsCategory.OVERVIEW to emptySet(),
-        SettingsCategory.LANGUAGE to setOf(SettingsSection.LANGUAGE),
         SettingsCategory.ABOUT to emptySet(),
         SettingsCategory.CONNECTION to setOf(
             SettingsSection.CONNECTION_SETUP,
             SettingsSection.AUTOMATIC_CONNECTION,
             SettingsSection.USB_CONNECTION,
-            SettingsSection.BYD_ADB,
+            SettingsSection.HOTSPOT_AUTOMATION,
             SettingsSection.PERMISSIONS_AND_HELP,
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
-        SettingsCategory.NAVIGATION to setOf(SettingsSection.LOCATION, SettingsSection.BYD_NAVIGATION),
+        SettingsCategory.NAVIGATION to setOf(SettingsSection.LOCATION),
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
             SettingsSection.WHEEL_KEYS,
             SettingsSection.CAR_BUTTON,
         ),
         SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
-        SettingsCategory.ADVANCED to setOf(
+        SettingsCategory.EXPERIMENTAL to setOf(
             SettingsSection.CLUSTER_MAP,
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
-            SettingsSection.AMBIENT_LIGHTING,
+            SettingsSection.FCE_NAVIGATION,
+            SettingsSection.EXTERNAL_CONTROLLER,
+            SettingsSection.HOTSPOT_JOIN,
         ),
     )
 }
@@ -167,10 +153,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val windowLearningPresses = WheelKeyPresses()
     private val endWindowLearning = Runnable { cancelKeyLearning() }
     private var page = "home"
-    internal var ambientSupportCheck: (Context) -> java.util.concurrent.CompletableFuture<Boolean> = AmbientMusicController::checkSupport
-    private var settingsCategory = SettingsCategory.OVERVIEW
+    private var settingsCategory = SettingsCategory.CONNECTION
     private var connectionSettingsReturnCategory: SettingsCategory? = null
-    private var setupStep = SetupGuide.STEP_CAR
+    private var setupStep = SetupGuide.STEP_CONNECTION
     private var setupFromSettings = false
     private var settingsSectionFilter: Set<SettingsSection>? = null
     private var clusterSafeAreaDialog: Dialog? = null
@@ -214,16 +199,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var pendingScrollY: Int? = null
     private var pendingRailScrollY: Int? = null
     private var pendingRailFocus = false
-    private var bydVehicleAdvancedExpanded = false
-    private var adbAccessState: BydAdbAccess.State? = null
-    private var adbCheckInProgress = false
-    private var adbCheckMayAsk = false
-    private var adbCheckFailed = false
-    private var vehicleProbeAuthorizationInProgress = false
-    private var vehicleProbeInProgress = false
-    private var vehicleProbeOutcome: BydVehicleProbeOutcome? = null
-    private var adbCheckGeneration = 0
-    private var adbStatus: TextView? = null
     private var availableUpdate: UpdateRelease? = null
     private var updateSavedPath: String? = null
     private var updateSavedUri: Uri? = null
@@ -239,45 +214,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var updateFile: File? = null
     private var updateMessage: String? = null
     private var carButtonCard: LinearLayout? = null
-    private var bydAdbControls: LinearLayout? = null
+    private var adbStatus: TextView? = null
+    private var hotspotAdbControls: LinearLayout? = null
     private var adbSwitchChangePending = false
     private var pausedForAdbSwitchChange = false
     private var updatingAdbSwitches = false
     private val adbSwitches = mutableMapOf<Int, Pair<Switch, () -> Boolean>>()
     private var hotspotStartupResult: CarHotspotTethering.Result? = null
     @Volatile private var startupHotspotCancelled = false
-    @Volatile private var vehicleProbeGeneration = 0
-    @Volatile private var vehicleValidationGeneration = 0
-    private val vehicleOperationLock = Any()
-    private var automaticVehicleValidationStarted = false
-    private var automaticVehicleValidationInProgress = false
-    private var automaticVehicleValidationPending = false
-    private var pendingVehicleReplacement: BydVehicleCapabilities? = null
-    // The saved snapshot [pendingVehicleReplacement] was compared with.
-    private var pendingVehicleReplacementExpected: BydVehicleCapabilities? = null
-    private var pendingVehicleLostFields: Set<BydVehicleField> = emptySet()
-    private var defaultVehicleStatus: BydAdbAccess.Status? = null
-    private var vehicleDataReconnectPending = false
-    private val automaticVehicleValidation = Runnable {
-        automaticVehicleValidationPending = false
-        validateSavedVehicleConfigurationAutomatically()
-    }
-    private data class VehicleProbeAttempt(
-        val outcome: BydVehicleProbeOutcome,
-        val heldCandidate: BydVehicleCapabilities? = null,
-        val lostFields: Set<BydVehicleField> = emptySet(),
-        val snapshotChanged: Boolean = false,
-        val allowedOnlyOnce: Boolean = false,
-    )
-
-    private data class VehicleValidationAttempt(
-        val status: BydAdbAccess.Status,
-        val outcome: BydVehicleProbeOutcome? = null,
-        val heldCandidate: BydVehicleCapabilities? = null,
-        val lostFields: Set<BydVehicleField> = emptySet(),
-        val snapshotChanged: Boolean = false,
-        val savedFieldsReadable: Boolean = false,
-    )
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         connect(notificationTransport)
     }
@@ -329,7 +273,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         exportDiagnostics()
     }
 
-    private var languagePreferenceAtCreate = AppLocale.SYSTEM
 
     private var interfaceOverride: Configuration? = null
     private var interfaceSystemDensityDpi = 0
@@ -363,8 +306,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         enforceInterfaceSize()
         refreshAppearance()
         rememberLaunchAppearance()
-        languagePreferenceAtCreate = AppLocale.preference(this)
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
         PhoneAudioRoute.attach(applicationContext)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= 28) {
@@ -378,19 +319,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.setup_error_auth)
         }
         pendingCarHotspotSetup = savedInstanceState?.getBoolean("pending_car_hotspot") ?: false
-        bydVehicleAdvancedExpanded = savedInstanceState?.getBoolean("byd_vehicle_advanced") ?: false
         settingsCategory = savedInstanceState?.getString("settings_category")
-            ?.let { runCatching { SettingsCategory.valueOf(it) }.getOrNull() }
-            ?: SettingsCategory.OVERVIEW
+            ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
+            ?: SettingsCategory.CONNECTION
         connectionSettingsReturnCategory = savedInstanceState?.getString("connection_settings_return_category")
-            ?.let { runCatching { SettingsCategory.valueOf(it) }.getOrNull() }
-        setupStep = savedInstanceState?.getInt("setup_step") ?: SetupGuide.STEP_CAR
+            ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
+        setupStep = savedInstanceState?.getInt("setup_step") ?: SetupGuide.STEP_CONNECTION
         setupFromSettings = savedInstanceState?.getBoolean("setup_from_settings") ?: false
         page = savedInstanceState?.getString("page") ?: intent.getStringExtra("page")
             ?: if (setupError == null && SetupGuide.shouldOpenOnLaunch(SetupGuide.seen(this),
                     DiPlayPreferences.phoneAddress(this) != null)) "setup" else "home"
         render()
-        scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
         if (consumeBluetoothAutoConnectIntent(intent)) {
             if (initialLaunch) {
@@ -416,8 +355,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             page = "home"; render(); openProjection(); return
         }
         page = intent.getStringExtra("page") ?: "home"; render()
-        automaticVehicleValidationStarted = false
-        scheduleAutomaticVehicleValidation()
         handleWirelessRecovery()
         if (consumeBluetoothAutoConnectIntent(intent)) {
             if (initialLaunch) {
@@ -439,7 +376,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         outState.putString("settings_category", settingsCategory.name)
         connectionSettingsReturnCategory?.let { outState.putString("connection_settings_return_category", it.name) }
         outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup)
-        outState.putBoolean("byd_vehicle_advanced", bydVehicleAdvancedExpanded)
         outState.putInt("setup_step", setupStep)
         outState.putBoolean("setup_from_settings", setupFromSettings)
         super.onSaveInstanceState(outState)
@@ -497,10 +433,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         applyFullscreenMode()
         // Returning from another activity can bring the head unit's own density back.
         if (enforceInterfaceSize()) render()
-        if (Build.VERSION.SDK_INT < 33 && AppLocale.preference(this) != languagePreferenceAtCreate) {
-            recreate()
-            return
-        }
+
         handler.removeCallbacks(tick); handler.post(tick)
         // Back from the car settings: refresh the car hotspot reminder on the home page.
         if (!initialLaunch && !adbSwitchChangePending && !pausedForAdbSwitchChange &&
@@ -536,16 +469,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         cancelUsbPermissionSetup()
         cancelKeyLearning()
         stopBackupServer()
-        handler.removeCallbacks(automaticVehicleValidation)
-        adbCheckGeneration++
-        synchronized(vehicleOperationLock) {
-            vehicleProbeGeneration++
-            vehicleValidationGeneration++
-        }
-        adbCheckInProgress = false
-        vehicleProbeAuthorizationInProgress = false
-        vehicleProbeInProgress = false
-        automaticVehicleValidationInProgress = false
         super.onDestroy()
     }
 
@@ -651,7 +574,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         reconnectBar = null
         readinessCard = null
         exportButton = null
-        bydAdbControls = null
+        hotspotAdbControls = null
         adbSwitches.clear()
         adbStatus = null
         val compact = isCompactLayout && when (page) {
@@ -682,7 +605,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             when (page) {
                 "connection" -> connectionSetup(content)
                 "setup" -> setupGuide(content)
-                "settings" -> settingsCategoryContent(content)
+                "settings" -> {
+                    settingsCategoryPicker(content)
+                    settingsCategoryContent(content)
+                }
                 "backup" -> backup(content)
                 else -> home(content)
             }
@@ -784,7 +710,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 page = "settings"
                 settingsCategory = SettingsCategory.ABOUT
             }
-            page == "setup" && setupStep > SetupGuide.STEP_CAR -> setupStep--
+            page == "setup" && setupStep > SetupGuide.STEP_CONNECTION -> setupStep--
             page == "setup" -> {
                 closeSetupGuide()
                 return
@@ -793,9 +719,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 page = "settings"
                 settingsCategory = returnCategory
                 connectionSettingsReturnCategory = null
-            }
-            page == "settings" && !isExpandedSettingsLayout && settingsCategory != SettingsCategory.OVERVIEW -> {
-                settingsCategory = SettingsCategory.OVERVIEW
             }
             else -> {
                 page = "home"
@@ -1086,105 +1009,39 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun settingsCategoryIcon(category: SettingsCategory): Int = when (category) {
-        SettingsCategory.OVERVIEW -> R.drawable.ic_dp_overview
         SettingsCategory.CONNECTION -> R.drawable.ic_dp_connection
         SettingsCategory.DISPLAY -> R.drawable.ic_dp_display
         SettingsCategory.AUDIO -> R.drawable.ic_dp_audio
         SettingsCategory.NAVIGATION -> R.drawable.ic_dp_navigation
         SettingsCategory.VEHICLE -> R.drawable.ic_dp_car
         SettingsCategory.DIAGNOSTICS -> R.drawable.ic_dp_diagnostics
-        SettingsCategory.ADVANCED -> R.drawable.ic_dp_advanced
-        SettingsCategory.LANGUAGE -> R.drawable.ic_dp_language
+        SettingsCategory.EXPERIMENTAL -> R.drawable.ic_dp_advanced
         SettingsCategory.ABOUT -> R.drawable.ic_dp_about
     }
 
     private fun settingsCategoryTitle(category: SettingsCategory): String = getString(when (category) {
-        SettingsCategory.OVERVIEW -> R.string.settings_overview
         SettingsCategory.CONNECTION -> R.string.connection
         SettingsCategory.DISPLAY -> R.string.settings_display
         SettingsCategory.AUDIO -> R.string.audio
         SettingsCategory.NAVIGATION -> R.string.settings_navigation
         SettingsCategory.VEHICLE -> R.string.settings_vehicle
         SettingsCategory.DIAGNOSTICS -> R.string.diagnostics
-        SettingsCategory.ADVANCED -> R.string.settings_advanced
-        SettingsCategory.LANGUAGE -> R.string.language_section_title
+        SettingsCategory.EXPERIMENTAL -> R.string.settings_advanced
         SettingsCategory.ABOUT -> R.string.about
     })
 
     private fun settingsCategoryContent(content: LinearLayout) {
         when (settingsCategory) {
-            SettingsCategory.OVERVIEW -> settingsOverview(content)
             SettingsCategory.CONNECTION -> connectionSettings(content)
             SettingsCategory.DISPLAY -> displaySettings(content)
             SettingsCategory.AUDIO -> audioSettings(content)
             SettingsCategory.NAVIGATION -> navigationSettings(content)
             SettingsCategory.VEHICLE -> vehicleSettings(content)
             SettingsCategory.DIAGNOSTICS -> diagnosticsSettings(content)
-            SettingsCategory.ADVANCED -> advancedSettings(content)
-            SettingsCategory.LANGUAGE -> {
-                settingsPageTitle(content, getString(R.string.language_section_title), getString(R.string.settings_language_summary))
-                renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.LANGUAGE))
-            }
+            SettingsCategory.EXPERIMENTAL -> advancedSettings(content)
+
             SettingsCategory.ABOUT -> about(content)
         }
-    }
-
-    private fun settingsOverview(content: LinearLayout) {
-        settingsPageTitle(content, getString(R.string.settings_overview), getString(R.string.settings_overview_subtitle))
-        val readiness = card().apply {
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-        }
-        readinessCard = readiness
-        renderedReadiness = null
-        refreshReadiness()
-        content.addView(readiness, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-        content.addView(button(getString(R.string.setup_guide), false) { openSetupGuide(fromSettings = true) },
-            LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(6) })
-        content.addView(label(getString(R.string.setup_guide_description), 14, MUTED).apply {
-            setPadding(0, 0, 0, dp(20))
-        })
-
-        val destinations = listOf(
-            SettingsCategory.CONNECTION to R.string.settings_connection_summary,
-            SettingsCategory.DISPLAY to R.string.settings_display_summary,
-            SettingsCategory.AUDIO to R.string.settings_audio_summary,
-            SettingsCategory.NAVIGATION to R.string.settings_navigation_summary,
-            SettingsCategory.VEHICLE to R.string.settings_vehicle_summary,
-            SettingsCategory.LANGUAGE to R.string.settings_language_summary,
-            SettingsCategory.ABOUT to R.string.about_diplay,
-            SettingsCategory.DIAGNOSTICS to R.string.settings_diagnostics_summary,
-            SettingsCategory.ADVANCED to R.string.settings_advanced_subtitle,
-        )
-        val categoryGap = dp(SETTINGS_BLOCK_GAP_DP)
-        val twoColumns = isExpandedSettingsLayout && resources.configuration.let {
-            SettingsLayoutPolicy.overviewHasTwoColumns(it.screenWidthDp, it.fontScale)
-        }
-        if (twoColumns) {
-            val columns = row().apply { gravity = Gravity.TOP }
-            val setup = column()
-            setup.addView(settingsSectionHeading(R.string.settings_your_setup))
-            destinations.forEach { item ->
-                setup.addView(settingsSummaryCard(item.first, getString(item.second)),
-                    LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = categoryGap })
-            }
-            columns.addView(setup, LinearLayout.LayoutParams(0, -2, 1f))
-            columns.addView(space(14), LinearLayout.LayoutParams(dp(14), 1))
-            val quick = column()
-            quick.addView(settingsSectionHeading(R.string.settings_quick_settings))
-            quick.addView(quickSettingsCard())
-            columns.addView(quick, LinearLayout.LayoutParams(0, -2, 1f))
-            content.addView(columns, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-        } else {
-            content.addView(settingsSectionHeading(R.string.settings_your_setup))
-            destinations.forEach { item ->
-                content.addView(settingsSummaryCard(item.first, getString(item.second)),
-                    LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = categoryGap })
-            }
-            content.addView(settingsSectionHeading(R.string.settings_quick_settings).apply { setPadding(0, dp(10), 0, dp(8)) })
-            content.addView(quickSettingsCard(), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-        }
-
-        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.OVERVIEW))
     }
 
     private fun currentReadiness() = SettingsReadiness.of(
@@ -1230,30 +1087,30 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsReadiness.CHOOSE_IPHONE -> card.addView(button(getString(R.string.settings_choose_iphone_action), true) {
                 choosePhone()
             }, matchButton(12, 56))
-            SettingsReadiness.SETUP_ERROR, SettingsReadiness.HOTSPOT_SETUP -> card.addView(button(getString(R.string.open_connection_setup), true) {
-                openConnectionSetupFromSettings()
-            }, matchButton(12, 56))
+            // The connection setup card directly below already owns this action.
+            SettingsReadiness.SETUP_ERROR, SettingsReadiness.HOTSPOT_SETUP -> Unit
             else -> Unit
         }
     }
 
-    private fun quickSettingsCard(): LinearLayout = card().also(::buildQuickSettings).also(::normalizeSpacing)
-
-    private fun buildQuickSettings(card: LinearLayout): Unit = card.run {
-        toggle(this, getString(R.string.connect_when_diplay_opens),
-            getString(R.string.default_connection_description),
-            DiPlayPreferences.autoConnect(this@DiPlayActivity)) { DiPlayPreferences.saveAutoConnect(this@DiPlayActivity, it) }
-        appearanceControl(this)
-        toggle(this, getString(R.string.full_screen), getString(R.string.settings_full_screen_description),
-            AirPlayPersistence.loadHideTopBar(this@DiPlayActivity) && AirPlayPersistence.loadHideBottomBar(this@DiPlayActivity)) { enabled ->
-            AirPlayPersistence.saveHideTopBar(this@DiPlayActivity, enabled)
-            AirPlayPersistence.saveHideBottomBar(this@DiPlayActivity, enabled)
-            applyFullscreenMode()
+    private fun settingsCategoryPicker(content: LinearLayout) {
+        val destinations = row()
+        var selected: View? = null
+        SettingsCategory.entries.forEach { category ->
+            val destination = settingsRailDestination(category)
+            if (category == settingsCategory) selected = destination
+            destinations.addView(destination, LinearLayout.LayoutParams(
+                dp(SettingsLayoutPolicy.compactCategoryWidthDp(
+                    resources.configuration.screenWidthDp - SETTINGS_BLOCK_GAP_DP * 2,
+                    resources.configuration.fontScale,
+                )), dp(52),
+            ))
         }
-        toggle(this, getString(R.string.report_location_to_iphone),
-            "${getString(R.string.location_reporting_reconnects)} ${getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th)}",
-            AirPlayPersistence.loadLocationReportingEnabled(this@DiPlayActivity), save = ::onLocationReportingChanged)
-        Unit
+        content.addView(android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(destinations)
+            doOnLayout { selected?.let { scrollTo(it.left, 0) } }
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
     private fun openSettingsCategory(category: SettingsCategory) {
@@ -1263,34 +1120,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         render()
     }
 
-    private fun settingsSectionHeading(title: Int) = label(getString(title), 22, TEXT, true).apply {
-        setPadding(0, 0, 0, dp(10))
-    }
-
-    private fun settingsSummaryCard(category: SettingsCategory, summary: String): LinearLayout = card().apply {
-        val warning = category == SettingsCategory.ADVANCED
-        setPadding(dp(24), dp(10), dp(24), dp(10))
-        isClickable = true
-        isFocusable = true
-        foreground = android.graphics.drawable.LayerDrawable(arrayOf(
-            android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(RIPPLE), null, null),
-            focusRing((layoutCornerRadius() * 1.35f / resources.displayMetrics.density).roundToInt())))
-        contentDescription = getString(R.string.settings_open_category, settingsCategoryTitle(category))
-        addView(row().apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(ImageView(this@DiPlayActivity).apply {
-                setImageResource(settingsCategoryIcon(category))
-                imageTintList = ColorStateList.valueOf(if (warning) WARNING else ACCENT)
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(20) })
-            addView(column().apply {
-                addView(label(settingsCategoryTitle(category), 17, if (warning) WARNING else TEXT, true))
-                addView(label(summary, 13, MUTED).apply { setPadding(0, dp(3), 0, 0) })
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-        })
-        setOnClickListener { openSettingsCategory(category) }
-    }
-
     private fun settingsPageTitle(content: LinearLayout, title: String, subtitle: String) {
         content.addView(label(title, if (isExpandedSettingsLayout) 34 else 26, TEXT, true))
         content.addView(label(subtitle, 16, MUTED).apply { setPadding(0, dp(6), 0, dp(20)) })
@@ -1298,6 +1127,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun connectionSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.connection), getString(R.string.settings_connection_summary))
+        val readiness = card()
+        readinessCard = readiness
+        renderedReadiness = null
+        refreshReadiness()
+        content.addView(readiness, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
+        content.addView(button(getString(R.string.setup_guide), false) { openSetupGuide(fromSettings = true) },
+            matchButton(0, 56).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.CONNECTION))
     }
 
@@ -1332,12 +1168,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun navigationSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_navigation), getString(R.string.settings_navigation_summary))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.NAVIGATION))
-        // The BYD card is hidden without its receiver; say so instead of leaving a gap.
-        if (!BydOutputSettings.available(this)) {
-            content.addView(label(getString(R.string.settings_byd_navigation_unavailable), 15, MUTED).apply {
-                setPadding(dp(4), 0, dp(4), dp(SETTINGS_BLOCK_GAP_DP))
-            })
-        }
+
     }
 
     private fun vehicleSettings(content: LinearLayout) {
@@ -1346,7 +1177,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         section(content, getString(R.string.settings_advanced), R.drawable.ic_dp_advanced) { card ->
             card.addView(label(getString(R.string.settings_vehicle_description), 16, MUTED))
             card.addView(button(getString(R.string.settings_open_advanced), false) {
-                settingsCategory = SettingsCategory.ADVANCED
+                settingsCategory = SettingsCategory.EXPERIMENTAL
                 render()
             }, matchButton(14, 56))
         }
@@ -1367,7 +1198,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // Category names first, so a card that only links to a category cannot claim its name.
         val index = SettingsCategory.entries.associateByTo(linkedMapOf(), ::settingsCategoryTitle)
         try {
-            for (category in SettingsCategory.entries.filter { it != SettingsCategory.OVERVIEW } + SettingsCategory.OVERVIEW) {
+            for (category in SettingsCategory.entries) {
                 settingsCategory = category
                 val titles = mutableListOf(settingsCategoryTitle(category))
                 searchIndexSink = titles
@@ -1589,7 +1420,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         isClickable = true
         isFocusable = true
         contentDescription = "${result.title}, $category"
-        foreground = android.graphics.drawable.LayerDrawable(arrayOf(
+        foreground = android.graphics.drawable.LayerDrawable(arrayOf<android.graphics.drawable.Drawable>(
             android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(RIPPLE), null, null), focusRing(12)))
         minimumHeight = dp(56)
         gravity = Gravity.CENTER_VERTICAL
@@ -1632,22 +1463,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             })
         }
         content.addView(caution, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.ADVANCED))
-        advancedVehicleDataSettings(content)
-    }
-
-    private fun advancedVehicleDataSettings(content: LinearLayout) {
-        section(content, getString(R.string.settings_vehicle), R.drawable.ic_dp_dashboard) { card ->
-            card.addView(button(getString(if (bydVehicleAdvancedExpanded)
-                R.string.hide_advanced_vehicle_data else R.string.advanced_vehicle_data), false) {
-                bydVehicleAdvancedExpanded = !bydVehicleAdvancedExpanded
-                render()
-            }, matchButton(0, 56))
-            if (bydVehicleAdvancedExpanded) {
-                advancedVehicleData(card)
-                if (!BydOutputSettings.available(this)) clusterSongSwitch(card)
-            }
-        }
+        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.EXPERIMENTAL))
     }
 
     private fun renderSections(
@@ -1753,8 +1569,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     setPadding(0, dp(4), 0, dp(8))
                 })
             }
-            card.addView(button(getString(R.string.boot_start_repair), false) { repairBootStart() }, matchButton(6, 56))
-            card.addView(label(getString(R.string.boot_start_repair_desc), 14, MUTED).apply { setPadding(0, dp(8), 0, dp(6)) })
             card.addView(button("${getString(R.string.choose_iphone_prefix)}${DiPlayPreferences.phoneName(this)}", false) { choosePhone() }, matchButton(12, 60))
         }
         filteredSection(content, SettingsSection.USB_CONNECTION,
@@ -1770,7 +1584,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }
             card.addView(label(getString(R.string.settings_usb_charging_description), 14, MUTED))
         }
-        if (settingsSectionFilter?.contains(SettingsSection.BYD_ADB) != false) bydAdbSettings(content)
+        if (settingsSectionFilter?.contains(SettingsSection.HOTSPOT_AUTOMATION) != false) hotspotAdbSettings(content)
         filteredSection(content, SettingsSection.DISPLAY_AND_PERFORMANCE,
             getString(R.string.display_and_performance), R.drawable.ic_dp_display) { card ->
             val appearances = AppAppearance.entries
@@ -1900,13 +1714,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         // Opt-in controls that can cost sound or video on some head units.
         filteredSection(content, SettingsSection.ADVANCED_MEDIA,
             getString(R.string.settings_advanced_media), R.drawable.ic_dp_advanced) { card ->
-            if (Build.VERSION.SDK_INT == 32) {
-                toggle(card, getString(R.string.settings_hide_byd_call_popup),
-                    getString(R.string.settings_hide_byd_call_popup_description),
-                    AirPlayPersistence.loadHideBydCallPopup(this)) {
-                    AirPlayPersistence.saveHideBydCallPopup(this, it)
-                }
-            }
+
             toggle(card, getString(R.string.efficient_video), getString(R.string.use_hevc_leave_off_for_the_widest_head_unit_compatibility), AirPlayPersistence.loadHevcEnabled(this)) {
                 AirPlayPersistence.saveHevcEnabled(this, it)
                 markReconnectNeeded()
@@ -1952,13 +1760,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 markReconnectNeeded()
             }
             toggle(card, getString(R.string.phone_audio_route), getString(R.string.phone_audio_route_description),
-                BydOutputSettings.phoneAudioRoute(this)) {
-                BydOutputSettings.setPhoneAudioRoute(this, it)
+                PhoneAudioSettings.phoneAudioRoute(this)) {
+                PhoneAudioSettings.setPhoneAudioRoute(this, it)
                 PhoneAudioRoute.settingsChanged(this)
             }
             toggle(card, getString(R.string.phone_audio_route_apps), getString(R.string.phone_audio_route_apps_description),
-                BydOutputSettings.phoneAudioRouteApps(this)) {
-                BydOutputSettings.setPhoneAudioRouteApps(this, it)
+                PhoneAudioSettings.phoneAudioRouteApps(this)) {
+                PhoneAudioSettings.setPhoneAudioRouteApps(this, it)
                 PhoneAudioRoute.settingsChanged(this)
                 // The watcher for other apps' calls needs DiPlay running outside a CarPlay session too, which
                 // the accessibility service provides.
@@ -1995,6 +1803,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.car_button_in_carplay), R.drawable.ic_dp_car) { card -> carButtonCard = card; carButtonControls(card) }
         filteredSection(content, SettingsSection.AUDIO_ROUTING,
             getString(R.string.audio_routing), R.drawable.ic_dp_audio) { card ->
+            playbackVolumeControl(card, navigation = false)
+            playbackVolumeControl(card, navigation = true)
+            card.addView(label(getString(R.string.settings_carplay_volume_description), 14, MUTED))
             mediaChannelControl(card)
             navigationChannelControl(card)
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
@@ -2007,11 +1818,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.settings_navigation_wheel_volume), R.drawable.ic_dp_audio) { card ->
             navigationWheelControls(card)
         }
-        filteredSection(content, SettingsSection.AMBIENT_LIGHTING, getString(R.string.settings_ambient_title)) { card ->
-            card.addView(button(ambientConfigurationLabel(AmbientMusicSettings.load(this)), false) {
-                showAmbientConfiguration()
-            }, matchButton(0, 60))
-        }
+
         filteredSection(content, SettingsSection.LOCATION,
             getString(R.string.location), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.report_location_to_iphone),
@@ -2019,54 +1826,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.loadLocationReportingEnabled(this), save = ::onLocationReportingChanged)
             card.addView(label(getString(R.string.location_reporting_reconnects), 14, MUTED))
         }
-        // Cluster video does not require a BYD navigation broadcast receiver.
         filteredSection(content, SettingsSection.CLUSTER_MAP,
             getString(R.string.carplay_map_on_instrument_cluster_experimental), R.drawable.ic_dp_dashboard) { card ->
-            reconnectingToggle(card, getString(R.string.adb_cluster_activity_mode),
-                getString(R.string.adb_cluster_activity_description), AirPlayPersistence.loadAdbClusterEnabled(this)) {
-                AirPlayPersistence.saveAdbClusterEnabled(this, it)
-                ClusterActivityOutput.stopForSettings()
-                render()
-            }
-            reconnectingToggle(card, getString(R.string.platform21_cluster_mode),
-                getString(R.string.platform21_cluster_description), AirPlayPersistence.loadLegacyClusterEnabled(this)) {
-                AirPlayPersistence.saveLegacyClusterEnabled(this, it)
-                ClusterActivityOutput.stopForSettings()
-                render()
-            }
-            val adbCluster = AdbClusterRouter.enabled(this)
-            if (adbCluster) {
-                card.addView(button(getString(R.string.adb_cluster_authorize), false) { authorizeClusterRouting() }, matchButton(10, 56))
-                card.addView(button(getString(R.string.adb_cluster_open), false) { ClusterActivityOutput.retry(force = true) }, matchButton(10, 56))
-            }
-            if (adbCluster && !AirPlayPersistence.loadLegacyClusterEnabled(this) && com.shilapi.xcertplay.hud.BydOemClusterNavi.applicable(this)) {
-                val holds = com.shilapi.xcertplay.hud.BydOemClusterHold.entries
-                card.addView(label(getString(R.string.oem_cluster_map_description), 14, MUTED))
-                choice(card, getString(R.string.oem_cluster_map), holds.map { it.localizedLabel(this) },
-                    holds.indexOf(BydOutputSettings.oemClusterHold(this))) { index ->
-                    BydOutputSettings.setOemClusterHold(this, holds[index])
-                    ClusterActivityOutput.stopForSettings()
-                    markReconnectNeeded()
-                }
-            }
-            val clusterDisplay = ClusterMapPresentation.findDisplay(this)
-            val clusterSize = clusterDisplay?.let { ClusterMapPresentation.sizeOf(it) }
-            val diLink4 = adbCluster || (clusterDisplay != null && clusterSize != null &&
-                DiLink4ClusterDisplay.matches(clusterDisplay.name, clusterSize.x, clusterSize.y))
-            val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
             reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
-                if (clusterDisplay != null || adbCluster) getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c)
-                else getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
-                clusterMapEnabled) {
+                getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
+                AirPlayPersistence.loadClusterMapEnabled(this)) {
                 AirPlayPersistence.saveClusterMapEnabled(this, it)
                 render()
             }
-            if (clusterMapEnabled) {
-                clusterSpeedometerControls(card)
-                clusterMusicControls(card)
+            if (AirPlayPersistence.loadClusterMapEnabled(this)) {
                 toggle(card, getString(R.string.center_map_card),
-                    if (clusterDisplay != null || adbCluster) getString(R.string.center_map_card_description)
-                    else getString(R.string.center_map_card_virtual_description),
+                    getString(R.string.center_map_card_virtual_description),
                     AirPlayPersistence.loadCenterMapOverlay(this)) {
                     AirPlayPersistence.saveCenterMapOverlay(this, it)
                     if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
@@ -2097,243 +1867,28 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         card.addView(button(getString(R.string.btn_auto_apply_permissions), false) { autoApplyPermissions() }, matchButton(8, 54))
                     }
                 }
-                if (clusterDisplay != null || adbCluster) {
-                    if (DiLink51ClusterLayout.supported() && !adbCluster) {
-                        val automatic = DiLink51ClusterLayout.automatic(this)
-                        toggle(card, getString(R.string.follow_instrument_theme_and_map_card),
-                            getString(R.string.show_the_side_map_only_when_its_card_is_open_and_switch_to), automatic) {
-                            DiLink51ClusterLayout.saveAutomatic(this, it)
-                            render()
-                            markReconnectNeeded()
-                        }
-                        val allowed = DiLink51ClusterMonitor.hasAccess(this)
-                        card.addView(label(if (allowed) getString(R.string.usage_access_enabled)
-                            else getString(R.string.usage_access_setup_needed_for_automatic_mode), 14, if (allowed) MUTED else WARNING))
-                        card.addView(actionButton(getString(R.string.automatic_map_setup_adb), false) { showClusterAccessSetup() }, matchButton(10, 56))
-                        if (!automatic) {
-                            val themes = DiLink51ClusterLayout.Theme.entries
-                            choice(card, getString(R.string.instrument_theme), themes.map { it.localizedLabel(this) }, themes.indexOf(DiLink51ClusterLayout.theme(this))) {
-                                DiLink51ClusterLayout.saveTheme(this, themes[it])
-                                markReconnectNeeded()
-                            }
-                            card.addView(label(getString(R.string.manual_mode_match_the_cluster_theme_here_the_map_cannot_fo), 14, MUTED))
-                        }
-                        val contrasts = DiLink51ClusterLayout.Contrast.entries
-                        choice(card, getString(R.string.instrument_contrast), contrasts.map { it.localizedLabel(this) }, contrasts.indexOf(DiLink51ClusterLayout.contrast(this))) {
-                            DiLink51ClusterLayout.saveContrast(this, contrasts[it])
-                            markReconnectNeeded()
-                        }
-                    } else {
-                        if (diLink4) clusterSafeAreaControls(card)
-                        val sizes = CarPlayClusterDisplay.scalePresets
-                        val contents = CarPlayClusterDisplay.Content.entries
-                        val content = AirPlayPersistence.loadClusterContent(this)
-                        val customCard = CarPlayClusterDisplay.usesCustomTurnCard(content)
-                        val officialCardOnly = content == CarPlayClusterDisplay.Content.TURN_CARD
-                        choice(card, getString(R.string.dashboard_shows), listOf(
-                            getString(R.string.dashboard_content_map),
-                            getString(R.string.dashboard_content_turn_card),
-                            getString(R.string.dashboard_content_map_with_turn_card),
-                            getString(R.string.dashboard_content_map_with_custom_turn_card),
-                        ), contents.indexOf(content).coerceAtLeast(0), reconnects = false) {
-                            val next = contents[it]
-                            val request = ++clusterContentRequestVersion
-                            AirPlayPersistence.saveClusterContent(this, next)
-                            render()
-                            if (content.url != next.url) {
-                                // The iPhone's own contents switch live. DiPlay's card over the map, and the
-                                // DiLink 5.1 layout (always the map), are set up at connection, so they reconnect.
-                                val controller = CarPlayBackgroundSession.snapshot()?.controller
-                                if (customCard || CarPlayClusterDisplay.usesCustomTurnCard(next) ||
-                                    DiLink51ClusterLayout.supported() || controller == null) {
-                                    markReconnectNeeded()
-                                } else controller.showDashboardContent(next.url) { applied ->
-                                    runOnUiThread {
-                                        if (!applied && request == clusterContentRequestVersion &&
-                                            !isFinishing && !isDestroyed &&
-                                            AirPlayPersistence.loadClusterContent(this) == next &&
-                                            CarPlayBackgroundSession.snapshot()?.controller === controller) {
-                                            markReconnectNeeded()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (customCard) {
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_size),
-                                ClusterTurnCardOverlay.sizePercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlaySizePercent(this),
-                            ) { it -> getString(R.string.turn_card_overlay_size_option, it) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlaySizePercent(this, v) } })
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_opacity),
-                                ClusterTurnCardOverlay.opacityPercents,
-                                AirPlayPersistence.loadClusterTurnCardOpacityPercent(this),
-                            ) { it -> getString(R.string.turn_card_overlay_opacity_option, it) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOpacityPercent(this, v) } })
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_horizontal),
-                                ClusterTurnCardOverlay.xPercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlayXPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlayXPercent(this, v) } })
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_vertical),
-                                ClusterTurnCardOverlay.yPercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlayYPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 40) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlayYPercent(this, v) } })
-                            card.addView(button(getString(R.string.reset_turn_card_overlay), false) {
-                                AirPlayPersistence.saveClusterTurnCardOverlayXPercent(this, ClusterTurnCardOverlay.DEFAULT_X_PERCENT)
-                                AirPlayPersistence.saveClusterTurnCardOverlayYPercent(this, ClusterTurnCardOverlay.DEFAULT_Y_PERCENT)
-                                render()
-                            }, matchButton(10, 56))
-                            card.addView(label(getString(R.string.turn_card_overlay_note), 14, MUTED))
-                        }
-                        val turnCard = officialCardOnly
-                        if (!diLink4) {
-                            choice(card, getString(if (turnCard) R.string.turn_card_size else R.string.cluster_map_size),
-                                listOf(getString(R.string.cluster_size_standard), getString(R.string.cluster_size_larger), getString(R.string.cluster_size_largest), getString(R.string.cluster_size_smallest)),
-                                sizes.indexOf(AirPlayPersistence.loadClusterMapScalePercent(this)).coerceAtLeast(0)) {
-                                AirPlayPersistence.saveClusterMapScalePercent(this, sizes[it])
-                            }
-                        }
-                        if (!diLink4 || AirPlayPersistence.loadClusterSafeAreaRect(this) == null) {
-                            card.addView(overlaySliderRow(
-                                getString(if (turnCard) R.string.turn_card_horizontal else R.string.car_marker_horizontal),
-                                CarPlayClusterDisplay.markerXPercents,
-                                AirPlayPersistence.loadClusterMarkerXPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterMarkerXPercent(this, v) } }
-                                .also { it.onCommit = { markReconnectNeeded() } })
-                            card.addView(overlaySliderRow(
-                                getString(if (turnCard) R.string.turn_card_vertical else R.string.car_marker_vertical),
-                                CarPlayClusterDisplay.markerYPercents,
-                                AirPlayPersistence.loadClusterMarkerYPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 45) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterMarkerYPercent(this, v) } }
-                                .also { it.onCommit = { markReconnectNeeded() } })
-                            card.addView(button(getString(if (turnCard) R.string.reset_turn_card_to_centre else R.string.reset_car_marker_to_centre), false) {
-                                AirPlayPersistence.saveClusterMarkerXPercent(this, 50)
-                                AirPlayPersistence.saveClusterMarkerYPercent(this, 45)
-                                render()
-                                markReconnectNeeded()
-                            }, matchButton(10, 56))
-                            choice(card, getString(R.string.cluster_small_window_marker), listOf(
-                                getString(R.string.cluster_small_window_off),
-                                getString(R.string.cluster_small_window_on),
-                                getString(R.string.cluster_small_window_auto),
-                            ), AirPlayPersistence.loadClusterSmallWindowMode(this)) {
-                                AirPlayPersistence.saveClusterSmallWindowMode(this, it)
-                                render()
-                                markReconnectNeeded()
-                            }
-                            card.addView(label(getString(R.string.cluster_small_window_marker_description), 14, MUTED).apply {
-                                setPadding(0, dp(8), 0, dp(6))
-                            })
-                            if (AirPlayPersistence.loadClusterSmallWindowMode(this) == 2) {
-                                val adbMode = BydNavigationOutputs.clusterNaviMode()
-                                if (adbMode != null) {
-                                    card.addView(label(getString(R.string.cluster_small_window_adb_ok, adbMode.label), 14, MUTED)
-                                        .apply { setPadding(0, dp(4), 0, dp(4)) })
-                                } else if (!DiLink51ClusterMonitor.hasAccess(this)) {
-                                    card.addView(label(getString(R.string.cluster_small_window_access_missing), 14, WARNING)
-                                        .apply { setPadding(0, dp(4), 0, dp(4)) })
-                                    card.addView(button(getString(R.string.cluster_small_window_grant_access), false) {
-                                        runCatching {
-                                            openSystem(Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                                        }
-                                    }, matchButton(6, 56))
-                                } else {
-                                    card.addView(label(getString(R.string.cluster_small_window_access_ok), 14, MUTED)
-                                        .apply { setPadding(0, dp(4), 0, dp(4)) })
-                                }
-                            }
-                            if (AirPlayPersistence.loadClusterSmallWindowMode(this) != 0) {
-                                card.addView(overlaySliderRow(
-                                    getString(R.string.cluster_small_window_horizontal),
-                                    CarPlayClusterDisplay.markerXPercents,
-                                    AirPlayPersistence.loadClusterSmallWindowMarkerXPercent(this),
-                                ) { it -> overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50) }
-                                    .also { it.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowMarkerXPercent(this, v) } }
-                                    .also { it.onCommit = { markReconnectNeeded() } })
-                                card.addView(overlaySliderRow(
-                                    getString(R.string.cluster_small_window_vertical),
-                                    CarPlayClusterDisplay.markerYPercents,
-                                    AirPlayPersistence.loadClusterSmallWindowMarkerYPercent(this),
-                                ) { it -> overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 45) }
-                                    .also { it.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowMarkerYPercent(this, v) } }
-                                    .also { it.onCommit = { markReconnectNeeded() } })
-                                if (AirPlayPersistence.loadClusterContent(this) ==
-                                    com.shilapi.xcertplay.airplay.CarPlayClusterDisplay.Content.MAP_WITH_CUSTOM_CARD) {
-                                    choice(card, getString(R.string.cluster_small_window_card_theme), listOf(
-                                        getString(R.string.cluster_small_window_card_theme_follow),
-                                        getString(R.string.turn_card_theme_day),
-                                        getString(R.string.turn_card_theme_night),
-                                    ), AirPlayPersistence.loadClusterSmallWindowCardTheme(this), reconnects = false) {
-                                        AirPlayPersistence.saveClusterSmallWindowCardTheme(this, it)
-                                    }
-                                    val smallWindowPlacementPreview = ClusterCardPlacementPreview(this, ClusterCardPlacementPreview.Mode.SMALL).also {
-                                        card.addView(it, LinearLayout.LayoutParams(-1, dp(240)))
-                                    }
-                                    card.addView(overlaySliderRow(
-                                        getString(R.string.cluster_small_window_card_size),
-                                        ClusterTurnCardOverlay.sizePercents,
-                                        AirPlayPersistence.loadClusterSmallWindowCardSizePercent(this),
-                                    ) { it -> getString(R.string.turn_card_overlay_size_option, it) }
-                                        .also { it2 -> it2.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowCardSizePercent(this, v); smallWindowPlacementPreview.invalidate() } })
-                                    card.addView(overlaySliderRow(
-                                        getString(R.string.cluster_small_window_card_horizontal),
-                                        ClusterTurnCardOverlay.smallWindowXPercents,
-                                        AirPlayPersistence.loadClusterSmallWindowCardXPercent(this),
-                                    ) { it -> overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 80) }
-                                        .also { it2 -> it2.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowCardXPercent(this, v); smallWindowPlacementPreview.invalidate() } })
-                                    card.addView(overlaySliderRow(
-                                        getString(R.string.cluster_small_window_card_vertical),
-                                        ClusterTurnCardOverlay.smallWindowYPercents,
-                                        AirPlayPersistence.loadClusterSmallWindowCardYPercent(this),
-                                    ) { it -> overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 25) }
-                                        .also { it2 -> it2.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowCardYPercent(this, v); smallWindowPlacementPreview.invalidate() } })
-                                    card.addView(overlaySliderRow(
-                                        getString(R.string.cluster_small_window_card_opacity),
-                                        ClusterTurnCardOverlay.opacityPercents,
-                                        AirPlayPersistence.loadClusterSmallWindowCardOpacityPercent(this),
-                                    ) { it -> getString(R.string.turn_card_overlay_opacity_option, it) }
-                                        .also { it2 -> it2.onSave = { v -> AirPlayPersistence.saveClusterSmallWindowCardOpacityPercent(this, v) } })
-                                }
-                                card.addView(label(getString(R.string.cluster_small_window_hint), 14, MUTED).apply { setPadding(0, dp(10), 0, 0) })
-                            }
-                        }
-                        if (!diLink4) {
-                            toggle(card, getString(R.string.dashboard_map_only_in_small_and_full_navi),
-                                getString(R.string.dashboard_map_only_in_small_and_full_navi_description),
-                                BydOutputSettings.clusterStreamPause(this)) {
-                                BydOutputSettings.setClusterStreamPause(this, it)
-                                if (it) checkAdbState(mayAsk = true)
-                            }
-                        }
-                    }
-                }
             }
         }
-        // FCE head units show this card for their cluster's navigation view, which has its own opt-in.
-        val bydNavigation = BydOutputSettings.available(this)
-        if (bydNavigation || BydOutputSettings.fceClusterAvailable()) filteredSection(content, SettingsSection.BYD_NAVIGATION,
-            getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
-            toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
-                getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
-                com.shilapi.xcertplay.hud.BydOutputSettings.enabled(this)) { com.shilapi.xcertplay.hud.BydOutputSettings.setEnabled(this, it) }
-            if (BydOutputSettings.fceClusterAvailable()) {
-                toggle(card, getString(R.string.settings_fce_cluster_guidance),
-                    getString(R.string.settings_fce_cluster_guidance_description),
-                    BydOutputSettings.fceCluster(this)) { BydOutputSettings.setFceCluster(this, it) }
+        if (FceNavigationSettings.available()) filteredSection(content, SettingsSection.FCE_NAVIGATION,
+            getString(R.string.settings_fce_cluster_guidance), R.drawable.ic_dp_navigation) { card ->
+            toggle(card, getString(R.string.settings_fce_cluster_guidance),
+                getString(R.string.settings_fce_cluster_guidance_description),
+                FceNavigationSettings.enabled(this)) { FceNavigationSettings.setEnabled(this, it) }
+        }
+        filteredSection(content, SettingsSection.EXTERNAL_CONTROLLER,
+            getString(R.string.settings_external_controller), R.drawable.ic_dp_controls) { card ->
+            toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
+                AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
+        }
+        filteredSection(content, SettingsSection.HOTSPOT_JOIN,
+            getString(R.string.hotspot_join_title), R.drawable.ic_dp_connection) { card ->
+            if (searchIndexSink == null) {
+                val join = hotspotJoinControls ?: HotspotJoinControls(this,
+                    { CarPlayBackgroundSession.hasSession() }, beforeAction = { startupHotspotCancelled = true },
+                    labelFactory = { label(it, 15, MUTED) }, buttonFactory = { title, click -> button(title, false, click) })
+                    .also { hotspotJoinControls = it }
+                card.addView(join.build(includeTitle = false))
             }
-            if (BydOutputSettings.standaloneHudAvailable(this)) {
-                toggle(card, getString(R.string.song_on_hud), getString(R.string.song_on_hud_description),
-                    BydOutputSettings.hudSong(this)) { BydOutputSettings.setHudSong(this, it) }
-            }
-            if (bydNavigation) clusterSongSwitch(card)
         }
         filteredSection(content, SettingsSection.PERMISSIONS_AND_HELP,
             getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
@@ -2342,7 +1897,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(button(getString(R.string.bluetooth_settings), false) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, matchButton(10, 60))
             card.addView(button(getString(R.string.wireless_connection_help), false) { wirelessHelp() }, matchButton(10, 60))
         }
-        languageSettings(content)
     }
 
     private fun about(content: LinearLayout) {
@@ -2645,7 +2199,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
-    private fun userAgent() = "DiPlay/${version()}"
+    private fun userAgent() = "CarPlay/${version()}"
 
     // An opted-in connection prepares the hotspot in the controller instead of stopping at this reminder.
     private fun carHotspotOff(): Boolean =
@@ -2653,40 +2207,36 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(this) == false &&
             !(CarHotspotSettings.enabled(this) && CarHotspotTethering.permitted(this))
 
-    private fun bydAdbSettings(parent: LinearLayout) {
+    private fun hotspotAdbSettings(parent: LinearLayout) {
         if (AirPlayPersistence.loadWirelessHotspotMode(this) != WirelessHotspotMode.MANUAL) return
-        if (!CarHotspotSetup.isBydHeadUnit(this)) {
-            Log.i("DiPlay-Hotspot", "settings hidden: BYD head unit not detected")
-            return
-        }
+
         if (searchIndexSink != null) {
             // Index discoverable names without starting the asynchronous permission probe.
             searchIndexSink?.addAll(listOf(
-                getString(R.string.byd_adb_features),
                 getString(R.string.auto_car_hotspot_title),
                 getString(R.string.btn_auto_apply_permissions),
             ))
             return
         }
         val controls = column().apply { visibility = View.GONE }
-        bydAdbControls = controls
+        hotspotAdbControls = controls
         parent.addView(controls)
         Thread({
             val access = runCatching { CarHotspotSetup.check(applicationContext) }
                 .onFailure { Log.w("DiPlay-Hotspot", "settings ADB check failed", it) }
                 .getOrDefault(LocalAdb.Access.UNREACHABLE)
-            Log.i("DiPlay-Hotspot", "settings eligibility: byd=true adb=$access visible=${CarHotspotSettings.visible(true, access)}")
+            Log.i("DiPlay-Hotspot", "settings eligibility: adb=$access visible=${CarHotspotSettings.visible(true, access)}")
             runOnUiThread {
-                if (bydAdbControls !== controls || isFinishing || isDestroyed) return@runOnUiThread
+                if (hotspotAdbControls !== controls || isFinishing || isDestroyed) return@runOnUiThread
                 if (CarHotspotSettings.visible(true, access)) {
                     controls.visibility = View.VISIBLE
-                    renderBydAdbControls(controls, access)
+                    renderHotspotAdbControls(controls, access)
                 }
             }
         }, "diplay-hotspot-adb-check").start()
     }
 
-    private fun renderBydAdbControls(controls: LinearLayout, access: LocalAdb.Access) {
+    private fun renderHotspotAdbControls(controls: LinearLayout, access: LocalAdb.Access) {
         controls.removeAllViews()
         adbSwitches.keys.retainAll(setOf(R.string.open_after_the_car_starts))
         adbStatus = null
@@ -2696,7 +2246,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             controls.visibility = View.GONE
             return
         }
-        section(controls, getString(R.string.byd_adb_features), R.drawable.ic_dp_permissions) { card ->
+        section(controls, getString(R.string.auto_car_hotspot_title), R.drawable.ic_dp_permissions) { card ->
             if (AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL) {
                 adbToggle(card, R.string.auto_car_hotspot_title, R.string.auto_car_hotspot_description,
                     read = { CarHotspotSettings.enabled(this) },
@@ -2729,7 +2279,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         needsAdb: () -> Boolean = { true },
         permissions: () -> List<CarHotspotSetup.Permission> = { emptyList() }, save: (Boolean) -> Unit) {
         val control = toggle(parent, getString(title), getString(description), read(),
-            enabled = !adbSwitchChangePending && !vehicleAdbWorkInProgress()) { enabled ->
+            enabled = !adbSwitchChangePending) { enabled ->
             if (updatingAdbSwitches || adbSwitchChangePending) return@toggle
             if (enabled && needsAdb()) requestAdbSwitchChange(permissions()) { save(true) }
             else save(enabled)
@@ -2738,18 +2288,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun requestAdbSwitchChange(permissions: List<CarHotspotSetup.Permission>, save: () -> Unit) {
-        if (adbSwitchChangePending || vehicleAdbWorkInProgress()) {
+        if (adbSwitchChangePending) {
             updateAdbSwitches()
             return
         }
-        cancelAutomaticVehicleValidationForUserOperation(
-            resumeAfter = automaticVehicleValidationInProgress || automaticVehicleValidationPending,
-        )
         val app = applicationContext
         adbSwitchChangePending = true
         updateAdbSwitches()
         adbStatus?.setText(R.string.adb_checking_may_ask)
-        if (page == "settings" && bydVehicleAdvancedExpanded) render()
         Thread({
             var access = LocalAdb.Access.UNREACHABLE
             val ready = runCatching {
@@ -2771,9 +2317,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 if (ready) save()
                 updateAdbSwitches()
                 toast(getString(message))
-                runPendingAutomaticVehicleValidation()
                 // Re-enable the vehicle controls disabled while this authorization was outstanding.
-                if (page == "settings" && bydVehicleAdvancedExpanded) render()
             }
         }, "diplay-adb-switch").start()
     }
@@ -2782,13 +2326,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         updatingAdbSwitches = true
         for ((control, read) in adbSwitches.values) {
             control.isChecked = read()
-            control.isEnabled = !adbSwitchChangePending && !vehicleAdbWorkInProgress()
+            control.isEnabled = !adbSwitchChangePending
         }
         updatingAdbSwitches = false
     }
-
-    private fun vehicleAdbWorkInProgress(): Boolean =
-        adbCheckInProgress || vehicleProbeAuthorizationInProgress || vehicleProbeInProgress
 
     private fun startCarHotspotOnLaunch() {
         if (!startupHotspotEligible()) return
@@ -2825,33 +2366,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             .setNegativeButton(getString(R.string.cancel), null).show()
     }
 
-    // BYD maps the AOSP tether action to its own hotspot screen; other firmware falls back to Wi-Fi settings.
-    // BYD shows that screen as a dialog and closes it unless its own settings or the car home screen is on top,
     // so the home screen goes first.
-    private fun repairBootStart() {
-        val dialog = appDialogBuilder()
-            .setTitle(getString(R.string.boot_start_repair))
-            .setMessage(getString(R.string.boot_start_repair_running))
-            .setNegativeButton(getString(R.string.common_cancel), null)
-            .show()
-        Thread({
-            val result = runCatching {
-                com.shilapi.xcertplay.hud.BydBootStartRepair.apply(applicationContext, packageName)
-            }.getOrNull()
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                dialog.dismiss()
-                val text = result?.lines?.joinToString("\n")?.let { getString(R.string.boot_start_repair_result, it) }
-                    ?: getString(R.string.adb_check_failed)
-                appDialogBuilder()
-                    .setTitle(getString(R.string.boot_start_repair))
-                    .setMessage(text)
-                    .setPositiveButton(android.R.string.ok, null)
-                    .show()
-            }
-        }, "diplay-boot-repair").start()
-    }
-
     private fun openCarWifiSettings() {
         val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
         val target = packageManager.resolveActivity(hotspot, 0)?.activityInfo?.packageName
@@ -2859,24 +2374,20 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
             return
         }
-        if (target == "com.byd.carsettings") {
-            runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
-        }
+
         if (runCatching { startActivity(hotspot) }.isSuccess) return
         openSystem(Intent(Settings.ACTION_WIRELESS_SETTINGS))
     }
 
     private fun openCarClientWifiSettings() {
         val wifi = Intent(Settings.ACTION_WIFI_SETTINGS)
-        if (packageManager.resolveActivity(wifi, 0)?.activityInfo?.packageName == "com.byd.carsettings") {
-            runCatching { startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)) }
-        }
+
         openSystem(wifi)
     }
 
     private fun openSetupGuide(fromSettings: Boolean) {
         setupFromSettings = fromSettings
-        setupStep = SetupGuide.STEP_CAR
+        setupStep = SetupGuide.STEP_CONNECTION
         page = "setup"
         render()
     }
@@ -2885,20 +2396,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         SetupGuide.markSeen(this)
         page = if (setupFromSettings) "settings" else "home"
         setupFromSettings = false
-        setupStep = SetupGuide.STEP_CAR
+        setupStep = SetupGuide.STEP_CONNECTION
         render()
         if (connectNow) connect(AirPlayPersistence.loadWirelessEnabled(this))
     }
 
-    private fun dilinkLabel(generation: DiLinkGeneration) = getString(when (generation) {
-        DiLinkGeneration.DILINK_3 -> R.string.dilink_3
-        DiLinkGeneration.DILINK_4 -> R.string.dilink_4
-        DiLinkGeneration.DILINK_5 -> R.string.dilink_5
-        DiLinkGeneration.UNKNOWN -> R.string.dilink_not_sure
-    })
-
     private fun setupGuide(content: LinearLayout) {
-        val step = setupStep.coerceIn(SetupGuide.STEP_CAR, SetupGuide.STEP_DONE)
+        val step = setupStep.coerceIn(SetupGuide.STEP_CONNECTION, SetupGuide.STEP_DONE)
         content.addView(label(getString(R.string.setup_step_of, step + 1, SetupGuide.STEP_COUNT), 13, ACCENT, true)
             .apply { letterSpacing = .12f })
         val progress = row().apply { setPadding(0, dp(10), 0, dp(20)) }
@@ -2911,7 +2415,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         content.addView(progress)
         when (step) {
-            SetupGuide.STEP_CAR -> setupCarStep(content)
             SetupGuide.STEP_CONNECTION -> setupConnectionStep(content)
             SetupGuide.STEP_IPHONE -> setupIphoneStep(content)
             SetupGuide.STEP_FEATURES -> setupFeaturesStep(content)
@@ -2930,34 +2433,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun setupTitle(content: LinearLayout, title: Int, description: String) {
         content.addView(label(getString(title), 34, TEXT, true))
         content.addView(label(description, 17, MUTED).apply { setPadding(0, dp(8), 0, dp(24)) })
-    }
-
-    private fun setupCarStep(content: LinearLayout) {
-        val detection = DiLinkGeneration.detect()
-        val selected = DiLinkGeneration.confirmed(this) ?: detection.generation
-        setupTitle(content, R.string.setup_car_title, when (detection.source) {
-            DiLinkGeneration.Source.SYSTEM_VERSION -> getString(R.string.setup_car_detected, dilinkLabel(detection.generation))
-            DiLinkGeneration.Source.LIKELY -> getString(R.string.setup_car_likely, dilinkLabel(detection.generation))
-            DiLinkGeneration.Source.NONE -> getString(R.string.setup_car_unknown)
-        })
-        val card = card()
-        card.addView(label(getString(R.string.setup_car_choose), 22, TEXT, true))
-        val wide = resources.configuration.screenWidthDp >= 850
-        val choices = if (wide) row() else column()
-        DiLinkGeneration.entries.forEachIndexed { index, generation ->
-            val chosen = generation == selected
-            choices.addView(button("${if (chosen) "✓  " else ""}${dilinkLabel(generation)}", chosen) {
-                DiLinkGeneration.save(this, generation)
-                render()
-            }, if (wide) LinearLayout.LayoutParams(0, dp(60), 1f).apply {
-                topMargin = dp(12); if (index > 0) marginStart = dp(12)
-            } else matchButton(12, 60))
-        }
-        card.addView(choices)
-        detection.evidence?.let {
-            card.addView(label(getString(R.string.setup_car_evidence, it), 13, MUTED).apply { setPadding(0, dp(16), 0, 0) })
-        }
-        content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
     private fun setupConnectionStep(content: LinearLayout) {
@@ -2983,75 +2458,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun setupFeaturesStep(content: LinearLayout) {
-        val generation = DiLinkGeneration.current(this)
-        setupTitle(content, R.string.setup_features_title, getString(R.string.setup_features_description,
-            dilinkLabel(generation)))
-        if (SetupGuide.hasConflictingClusterRoute(generation, AirPlayPersistence.loadAdbClusterEnabled(this))) {
-            val warning = card()
-            warning.addView(label(getString(R.string.setup_cluster_route_conflict), 16, WARNING))
-            warning.addView(button(getString(R.string.setup_cluster_route_turn_off), true) {
-                AirPlayPersistence.saveAdbClusterEnabled(this, false)
-                ClusterActivityOutput.stopForSettings()
-                markReconnectNeeded()
-                render()
-            }, matchButton(12, 56))
-            content.addView(warning, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-        }
+        setupTitle(content, R.string.setup_features_title, getString(R.string.setup_features_description))
         val card = card()
-        SetupGuide.features(generation).forEach { entry ->
-            val before = card.childCount
-            when (entry.feature) {
-                SetupGuide.Feature.AUTO_CONNECT -> toggle(card, getString(R.string.connect_when_diplay_opens),
-                    getString(R.string.default_connection_description), DiPlayPreferences.autoConnect(this)) {
-                    DiPlayPreferences.saveAutoConnect(this, it)
-                }
-                SetupGuide.Feature.LOCATION -> toggle(card, getString(R.string.report_location_to_iphone),
-                    getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th),
-                    AirPlayPersistence.loadLocationReportingEnabled(this), save = ::onLocationReportingChanged)
-                SetupGuide.Feature.CLUSTER_MAP -> reconnectingToggle(card,
-                    getString(R.string.carplay_map_on_instrument_cluster_experimental),
-                    getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c),
-                    AirPlayPersistence.loadClusterMapEnabled(this)) {
-                    AirPlayPersistence.saveClusterMapEnabled(this, it)
-                    render()
-                }
-                SetupGuide.Feature.DILINK4_ADB_CLUSTER -> reconnectingToggle(card,
-                    getString(R.string.adb_cluster_activity_mode), getString(R.string.adb_cluster_activity_description),
-                    AirPlayPersistence.loadAdbClusterEnabled(this)) {
-                    AirPlayPersistence.saveAdbClusterEnabled(this, it)
-                    ClusterActivityOutput.stopForSettings()
-                    render()
-                }
-                SetupGuide.Feature.BYD_NAVIGATION -> if (BydOutputSettings.available(this)) {
-                    toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),
-                        getString(R.string.show_phone_navigation_arrows_distance_and_street_names_on),
-                        BydOutputSettings.enabled(this)) { BydOutputSettings.setEnabled(this, it) }
-                }
-                SetupGuide.Feature.CALLS_ON_DASHBOARD -> toggle(card, getString(R.string.carplay_calls_on_dashboard),
-                    getString(R.string.carplay_calls_on_dashboard_description),
-                    BydOutputSettings.carPlayCalls(this), enabled = !adbSwitchChangePending) { applyCarPlayCalls(it) }
-                SetupGuide.Feature.CALL_KEYS -> toggle(card, getString(R.string.carplay_call_controls_experimental),
-                    getString(R.string.carplay_call_controls_experimental_description),
-                    BydOutputSettings.carPlayCallControls(this)) { applyCallKeys(it) }
-            }
-            if (card.childCount > before) card.addView(setupBadges(entry))
+        toggle(card, getString(R.string.connect_when_diplay_opens),
+            getString(R.string.default_connection_description), DiPlayPreferences.autoConnect(this)) {
+            DiPlayPreferences.saveAutoConnect(this, it)
         }
+        toggle(card, getString(R.string.report_location_to_iphone),
+            getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th),
+            AirPlayPersistence.loadLocationReportingEnabled(this), save = ::onLocationReportingChanged)
         content.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-    }
-
-    private fun setupBadges(entry: SetupGuide.Entry): LinearLayout = row().apply {
-        setPadding(0, dp(2), 0, dp(14))
-        fun badge(text: String, color: Int) = label(text, 12, color, true).apply {
-            background = GradientDrawable().apply {
-                setColor(Color.TRANSPARENT); cornerRadius = dp(10).toFloat(); setStroke(dp(1), color)
-            }
-            setPadding(dp(10), dp(3), dp(10), dp(3))
-        }
-        val tested = entry.status == SetupGuide.Status.TESTED
-        addView(badge(getString(if (tested) R.string.setup_badge_tested else R.string.setup_badge_experimental),
-            if (tested) READY else WARNING), LinearLayout.LayoutParams(-2, -2))
-        if (entry.needsAdb) addView(badge(getString(R.string.setup_badge_adb), ACCENT),
-            LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
     }
 
     private fun setupDoneStep(content: LinearLayout) {
@@ -3061,7 +2477,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         card.addView(button(getString(R.string.settings), false) {
             SetupGuide.markSeen(this)
             setupFromSettings = false
-            setupStep = SetupGuide.STEP_CAR
+            setupStep = SetupGuide.STEP_CONNECTION
             page = "settings"
             render()
         }, matchButton(12, 60))
@@ -3136,11 +2552,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }, matchButton(12, 60))
             parent.addView(label(if (pendingCarHotspotSetup) getString(R.string.finish_setup_save_your_hotspot_details_to_use_this_mode) else if (carHotspotOff()) getString(R.string.hotspot_details_off) else getString(R.string.hotspot_details_saved), 15, if (carHotspotOff()) WARNING else MUTED).apply { setPadding(0, dp(12), 0, 0) })
-            val join = hotspotJoinControls ?: HotspotJoinControls(this,
-                { CarPlayBackgroundSession.hasSession() }, beforeAction = { startupHotspotCancelled = true },
-                labelFactory = { label(it, 15, MUTED) }, buttonFactory = { title, click -> button(title, false, click) })
-                .also { hotspotJoinControls = it }
-            parent.addView(join.build())
         } else if (mode == WirelessHotspotMode.EXISTING_WIFI) {
             parent.addView(label(getString(R.string.existing_wifi_instructions), 16, MUTED))
             parent.addView(button(getString(R.string.open_car_wi_fi_settings), false) { openCarClientWifiSettings() }, matchButton(12, 60))
@@ -3196,6 +2607,39 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         parent.addView(label(getString(R.string.settings_wifi_direct_band_note), 15, MUTED).apply {
             setPadding(0, 0, 0, dp(12))
         })
+    }
+
+    private fun playbackVolumeControl(parent: LinearLayout, navigation: Boolean) {
+        val title = getString(if (navigation) R.string.settings_carplay_navigation_volume else R.string.settings_carplay_media_volume)
+        val volume = com.shilapi.xcertplay.media.CarPlayAudioVolume
+        val control = button("$title · ${volume.percent(this, navigation)}%", false) {}
+        control.setOnClickListener {
+            val selected = volume.percent(this, navigation)
+            val label = label("$selected%", 22, TEXT, true)
+            val slider = SeekBar(appDialogContext()).apply {
+                max = 100
+                progress = selected
+                contentDescription = title
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        label.text = "$progress%"
+                    }
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+                })
+            }
+            val body = column().apply {
+                setPadding(dp(SETTINGS_BLOCK_GAP_DP), dp(SETTINGS_BLOCK_GAP_DP), dp(SETTINGS_BLOCK_GAP_DP), 0)
+                addView(label)
+                addView(slider, matchButton(0, 56))
+            }
+            appDialogBuilder().setTitle(title).setView(body)
+                .setPositiveButton(R.string.save) { _, _ ->
+                    volume.save(this, navigation, slider.progress)
+                    control.text = "$title · ${slider.progress}%"
+                }.setNegativeButton(R.string.cancel, null).show()
+        }
+        parent.addView(control, matchButton(0, 56).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
     }
 
     private fun mediaChannelControl(parent: LinearLayout) {
@@ -3426,45 +2870,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
-    private fun clusterSpeedometerControls(card: LinearLayout) {
-        toggle(card, getString(R.string.settings_cluster_speedometer),
-            getString(R.string.settings_cluster_speedometer_description), AirPlayPersistence.loadClusterSpeedometerEnabled(this)) {
-            AirPlayPersistence.saveClusterSpeedometerEnabled(this, it)
-            render()
-        }
-        if (AirPlayPersistence.loadClusterSpeedometerEnabled(this)) {
-            card.addView(overlaySliderRow(
-                getString(R.string.settings_cluster_speedometer_horizontal), ClusterSpeedometerOverlay.xPercents,
-                AirPlayPersistence.loadClusterSpeedometerX(this),
-            ) { value -> "$value %" }.also { row ->
-                row.getChildAt(0).layoutDirection = android.text.TextUtils.getLayoutDirectionFromLocale(resources.configuration.locales[0])
-                row.onSave = { value -> AirPlayPersistence.saveClusterSpeedometerX(this, value) }
-            })
-            card.addView(overlaySliderRow(
-                getString(R.string.settings_cluster_speedometer_vertical), ClusterSpeedometerOverlay.yPercents,
-                AirPlayPersistence.loadClusterSpeedometerY(this),
-            ) { value -> "$value %" }.also { row ->
-                row.getChildAt(0).layoutDirection = android.text.TextUtils.getLayoutDirectionFromLocale(resources.configuration.locales[0])
-                row.onSave = { value -> AirPlayPersistence.saveClusterSpeedometerY(this, value) }
-            })
-            card.addView(overlaySliderRow(
-                getString(R.string.settings_cluster_speedometer_size), ClusterSpeedometerOverlay.sizePercents,
-                AirPlayPersistence.loadClusterSpeedometerSize(this),
-            ) { value -> "$value %" }.also { row ->
-                row.getChildAt(0).layoutDirection = android.text.TextUtils.getLayoutDirectionFromLocale(resources.configuration.locales[0])
-                row.onSave = { value -> AirPlayPersistence.saveClusterSpeedometerSize(this, value) }
-            })
-            card.addView(overlaySliderRow(
-                getString(R.string.settings_cluster_speedometer_opacity), ClusterSpeedometerOverlay.opacityPercents,
-                AirPlayPersistence.loadClusterSpeedometerOpacity(this),
-            ) { value -> "$value %" }.also { row ->
-                row.getChildAt(0).layoutDirection = android.text.TextUtils.getLayoutDirectionFromLocale(resources.configuration.locales[0])
-                row.onSave = { value -> AirPlayPersistence.saveClusterSpeedometerOpacity(this, value) }
-            })
-        }
-    }
-
-    /** A 1%-step slider row for overlay placement; every step saves, so the card moves live. */
     private fun overlaySliderRow(title: String, values: List<Int>, current: Int, describe: (Int) -> String): OverlaySliderRow =
         OverlaySliderRow(this, title, values, current, describe)
 
@@ -3513,47 +2918,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             delta < 0 -> "$negative ${-delta} %"
             else -> "$positive $delta %"
         }
-    }
-
-    private fun showClusterAccessSetup() {
-        val command = "adb shell appops set $packageName GET_USAGE_STATS allow"
-        val body = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
-        body.addView(label(getString(R.string.one_time_setup_on_this_car), 20, TEXT, true))
-        body.addView(label(getString(R.string.usage_access_lets_diplay_follow_the_instrument_theme_and_m), 15, MUTED))
-        body.addView(label(getString(R.string.s_1_connect_a_computer_with_adb_installed_to_the_car_using), 16, TEXT))
-        body.addView(label(command, 16, TEXT).apply {
-            typeface = android.graphics.Typeface.MONOSPACE
-            setTextIsSelectable(true)
-            setPadding(0, dp(16), 0, dp(16))
-        })
-        body.addView(button(getString(R.string.copy_command), false) {
-            getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(
-                android.content.ClipData.newPlainText(getString(R.string.clipboard_usage_access), command))
-            toast(getString(R.string.copied_to_the_car_clipboard_run_the_command_on_your_comput))
-        }, matchButton(0, 56))
-        body.addView(label(getString(R.string.cluster_adb_multi_device, packageName), 14, MUTED))
-        body.addView(label(getString(R.string.s_3_tap_check_and_enable_below_this_enables_the_cluster_ma), 16, TEXT))
-        val status = label(if (DiLink51ClusterMonitor.hasAccess(this)) getString(R.string.permission_enabled_ready) else getString(R.string.permission_not_enabled), 16, TEXT)
-        body.addView(status)
-        val dialog = appDialogBuilder().setTitle(getString(R.string.automatic_cluster_map_setup))
-            .setView(ScrollView(appDialogContext()).apply { addView(body) })
-            .setNegativeButton(getString(R.string.close), null)
-            .setPositiveButton(getString(R.string.check_and_enable), null).create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                if (DiLink51ClusterMonitor.hasAccess(this)) {
-                    AirPlayPersistence.saveClusterMapEnabled(this, true)
-                    DiLink51ClusterLayout.saveAutomatic(this, true)
-                    dialog.dismiss()
-                    render()
-                    toast(getString(R.string.automatic_map_enabled_open_the_cluster_map_card_or_select))
-                    reconnectIfRunning()
-                } else {
-                    status.text = getString(R.string.still_waiting_for_usage_access_check_that_the_command_ran)
-                }
-            }
-        }
-        dialog.show()
     }
 
     private fun promptEnableUsbAutoConfirm() {
@@ -3685,7 +3049,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             render()
         }
         if (!NavigationWheelSettings.enabled(this) || WheelKeyService.connected()) return
-        card.addView(label(getString(R.string.settings_navigation_wheel_service_required), 14, WARNING))
+        card.addView(label(getString(R.string.settings_navigation_wheel_service_required), 14, MUTED))
         card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
             if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
         }, matchButton(10, 56))
@@ -3705,27 +3069,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     /** Steering-wheel keys for the dashboard map zoom and the CarPlay joystick: the switches, the key service and the keys. */
     // One place for the key service setup, above every feature that needs it.
     private fun wheelKeysSettings(card: LinearLayout) {
-        // The joystick and map zoom use BYD's media and custom keys.
-        val byd = CarHotspotSetup.isBydHeadUnit(this)
         val zoomAvailable = wheelMapZoomAvailable()
         val vehicleKeysOn = WheelZoomSettings.joystick(this) ||
             (zoomAvailable && WheelZoomSettings.enabled(this))
         if (WheelZoomSettings.siriKey(this) || vehicleKeysOn) wheelKeyServiceControls(card)
         siriKeyControls(card)
-        // Any head unit: a paired keyboard, remote or rotary controller works alongside touch.
-        toggle(card, getString(R.string.settings_external_controller), getString(R.string.settings_external_controller_description),
-            AirPlayPersistence.loadExternalController(this)) { AirPlayPersistence.saveExternalController(this, it) }
         // Keep previously configured controls reachable even if package detection misses the car.
-        if (byd || zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
+        if (zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
     }
 
     // Map zoom only works where the dashboard map card used to show these controls.
-    private fun wheelMapZoomAvailable(): Boolean {
-        if (!AirPlayPersistence.loadClusterMapEnabled(this)) return false
-        val adbCluster = AdbClusterRouter.enabled(this)
-        if (DiLink51ClusterLayout.supported() && !adbCluster) return false
-        return adbCluster || ClusterMapPresentation.findDisplay(this) != null
-    }
+    private fun wheelMapZoomAvailable(): Boolean = AirPlayPersistence.loadClusterMapEnabled(this)
 
     private fun wheelKeyControls(card: LinearLayout) {
         val zoomAvailable = wheelMapZoomAvailable()
@@ -3910,799 +3264,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     /** The 0.2.9 Dashboard song setting, shown once: in the BYD navigation card, or under Advanced vehicle data. */
-    private fun clusterSongSwitch(card: LinearLayout) {
-        toggle(card, getString(R.string.cluster_song),
-            getString(R.string.cluster_song_description),
-            BydOutputSettings.clusterSong(this), enabled = !adbSwitchChangePending) {
-            BydOutputSettings.setClusterSong(this, it)
-            if (it) checkAdbState(mayAsk = true)
-            BydNavigationOutputs.clusterSongChanged(it)
-        }
-        toggle(card, getString(R.string.cluster_song_on_change), getString(R.string.cluster_song_on_change_description),
-            BydOutputSettings.clusterSongOnChange(this), enabled = !adbSwitchChangePending) {
-            BydOutputSettings.setClusterSongOnChange(this, it)
-            BydNavigationOutputs.clusterSongOnChangeChanged()
-        }
-        toggle(card, getString(R.string.carplay_call_controls_experimental),
-            getString(R.string.carplay_call_controls_experimental_description),
-            BydOutputSettings.carPlayCallControls(this)) { applyCallKeys(it) }
-        toggle(card, getString(R.string.carplay_calls_on_dashboard),
-            getString(R.string.carplay_calls_on_dashboard_description),
-            BydOutputSettings.carPlayCalls(this), enabled = !adbSwitchChangePending) { applyCarPlayCalls(it) }
-    }
-
-    private fun applyCallKeys(enabled: Boolean) {
-        BydOutputSettings.setCarPlayCallControls(this, enabled)
-        if (enabled && !WheelKeyService.connected()) {
-            Thread({
-                val access = WheelKeyService.enableOverAdb(this)
-                if (access != com.shilapi.xcertplay.adb.LocalAdb.Access.READY) {
-                    runOnUiThread { toast(getString(R.string.wheel_keys_adb_failed, access.name)) }
-                }
-            }, "diplay-call-keys-enable").start()
-        }
-    }
-
-    private fun applyCarPlayCalls(enabled: Boolean) {
-        BydOutputSettings.setCarPlayCalls(this, enabled)
-        if (enabled) checkAdbState(mayAsk = true)
-        BydNavigationOutputs.carPlayCallsChanged(enabled)
-    }
-
-    private fun advancedVehicleData(card: LinearLayout) {
-        val legacyMode = BydOutputSettings.legacyVehicleProbe(this)
-        card.addView(label(getString(R.string.advanced_vehicle_data_description), 14, MUTED)
-            .apply { setPadding(0, dp(12), 0, 0) })
-        choice(
-            card,
-            getString(R.string.vehicle_data_mode),
-            listOf(
-                getString(R.string.vehicle_data_mode_default),
-                getString(R.string.vehicle_data_mode_legacy),
-            ),
-            if (legacyMode) 1 else 0,
-            reconnects = false,
-            announcesReconnect = vehicleDataSwitchesOn(),
-            // A switch during ADB work would be dropped by the running step.
-            enabled = !adbSwitchChangePending && !vehicleAdbWorkInProgress(),
-        ) { selectVehicleDataMode(it == 1) }
-        if (!legacyMode) {
-            defaultVehicleData(card)
-            return
-        }
-        val capabilities = displayedVehicleCapabilities()
-        val adbText = when {
-            vehicleProbeAuthorizationInProgress -> getString(R.string.adb_checking_may_ask)
-            adbCheckInProgress -> getString(if (adbCheckMayAsk)
-                R.string.adb_checking_may_ask else R.string.adb_checking)
-            vehicleProbeInProgress || automaticVehicleValidationInProgress ->
-                getString(R.string.probing_vehicle_data)
-            adbCheckFailed -> getString(R.string.adb_check_failed)
-            adbAccessState == null && capabilities != null -> getString(R.string.vehicle_probe_saved_automatic)
-            adbAccessState == null -> getString(R.string.adb_not_checked)
-            else -> adbLinkStatusText(requireNotNull(adbAccessState))
-        }
-        val healthy = capabilities != null && !adbCheckFailed && vehicleProbeOutcome?.error == null &&
-            pendingVehicleLostFields.isEmpty() &&
-            (adbAccessState == null || adbAccessState == BydAdbAccess.State.READY)
-        card.addView(label(adbText, 14, if (healthy) MUTED else WARNING)
-            .apply { setPadding(0, dp(12), 0, 0) })
-        if (capabilities != null) {
-            showVehicleProbeResults(card, capabilities)
-            showVehicleDataSettings(card, capabilities)
-        }
-        if (vehicleProbeAuthorizationInProgress || adbCheckInProgress ||
-            vehicleProbeInProgress || automaticVehicleValidationInProgress) return
-        vehicleProbeOutcome?.error?.let {
-            card.addView(label(getString(R.string.vehicle_probe_failed, it), 14, WARNING)
-                .apply { setPadding(0, dp(10), 0, 0) })
-        }
-        if (pendingVehicleLostFields.isNotEmpty()) {
-            card.addView(label(
-                getString(
-                    R.string.vehicle_probe_lost_saved_fields,
-                    localizedVehicleFields(pendingVehicleLostFields),
-                ),
-                14,
-                WARNING,
-            ).apply { setPadding(0, dp(10), 0, 0) })
-            card.addView(button(getString(R.string.replace_saved_vehicle_data_anyway), false) {
-                replaceSavedVehicleDataAnyway()
-            }, matchButton(10, 56))
-        }
-        val needsUserAction = capabilities == null || adbCheckFailed || vehicleProbeOutcome?.error != null ||
-            pendingVehicleLostFields.isNotEmpty() ||
-            adbAccessState in setOf(BydAdbAccess.State.NOT_APPROVED, BydAdbAccess.State.ADB_OFF, BydAdbAccess.State.PAIRING_ONLY)
-        if (needsUserAction) {
-            val title = if (adbAccessState == BydAdbAccess.State.NOT_APPROVED) {
-                R.string.request_adb_authorization
-            } else if (capabilities == null) {
-                R.string.probe_adb_and_vehicle_data
-            } else {
-                R.string.probe_vehicle_data_again
-            }
-            card.addView(button(getString(title), false) {
-                probeVehicleData(mayAsk = true)
-            }.apply { isEnabled = !adbSwitchChangePending && !adbCheckInProgress }, matchButton(10, 56))
-        }
-    }
-
-    private fun defaultVehicleData(card: LinearLayout) {
-        val adbText = when {
-            vehicleProbeAuthorizationInProgress -> getString(R.string.adb_checking_may_ask)
-            adbCheckInProgress -> getString(if (adbCheckMayAsk)
-                R.string.adb_checking_may_ask else R.string.adb_checking)
-            vehicleProbeInProgress -> getString(R.string.probing_vehicle_data)
-            adbCheckFailed -> getString(R.string.adb_check_failed)
-            adbAccessState == null -> getString(R.string.adb_not_checked)
-            else -> adbLinkStatusText(requireNotNull(adbAccessState))
-        }
-        val healthy = !adbCheckFailed && vehicleProbeOutcome?.error == null &&
-            (adbAccessState == null || adbAccessState == BydAdbAccess.State.READY)
-        card.addView(label(adbText, 14, if (healthy) MUTED else WARNING)
-            .apply { setPadding(0, dp(12), 0, 0) })
-        val busy = vehicleProbeAuthorizationInProgress || adbCheckInProgress || vehicleProbeInProgress
-        if (!busy && adbAccessState == BydAdbAccess.State.READY) {
-            defaultVehicleStatus?.let { showDefaultVehicleReadings(card, it) }
-        }
-        vehicleProbeOutcome?.error?.let {
-            card.addView(label(getString(R.string.vehicle_probe_failed, it), 14, WARNING)
-                .apply { setPadding(0, dp(10), 0, 0) })
-        }
-        showVehicleDataSettings(card, capabilities = null)
-        if (!busy) {
-            card.addView(button(getString(R.string.check_adb_access), false) {
-                checkAdbState(mayAsk = true)
-            }.apply { isEnabled = !adbSwitchChangePending }, matchButton(10, 56))
-        }
-    }
-
-    /** The last default-mode reads; a value an enabled switch needs is a warning when missing. */
-    private fun showDefaultVehicleReadings(card: LinearLayout, status: BydAdbAccess.Status) {
-        fun reading(value: String?, unreadable: Int, needed: Boolean) {
-            val text = value ?: getString(unreadable).takeIf { needed } ?: return
-            card.addView(label(text, 14, if (value != null) MUTED else WARNING))
-        }
-        val battery = status.batteryPercent?.let { percent ->
-            status.rangeKm?.let { getString(R.string.adb_battery_reading, percent.roundToInt(), it) }
-        }
-        reading(battery, R.string.adb_battery_unreadable, BydOutputSettings.batteryToIphone(this))
-        reading(status.speedKmh?.let { getString(R.string.adb_vehicle_speed_reading, it.roundToInt()) },
-            R.string.adb_vehicle_speed_unreadable, BydOutputSettings.wheelSpeedToIphone(this))
-        reading(status.gear?.let { getString(R.string.adb_vehicle_gear_reading, it.letter.toString()) },
-            R.string.adb_vehicle_gear_unreadable,
-            BydOutputSettings.wheelSpeedToIphone(this) || BydOutputSettings.videoWhileParked(this))
-    }
-
-    private fun selectVehicleDataMode(legacyMode: Boolean) {
-        if (adbSwitchChangePending) return
-        // A stale mode dialog must also invalidate a probe when the Boolean stays the same.
-        synchronized(vehicleOperationLock) { vehicleProbeGeneration++ }
-        vehicleProbeAuthorizationInProgress = false
-        vehicleProbeInProgress = false
-        if (!legacyMode) {
-            cancelAutomaticVehicleValidationForUserOperation(resumeAfter = false)
-            synchronized(vehicleOperationLock) {
-                BydOutputSettings.setLegacyVehicleProbe(this, false)
-            }
-            vehicleProbeOutcome = null
-            pendingVehicleReplacement = null
-            pendingVehicleLostFields = emptySet()
-            defaultVehicleStatus = null
-            render()
-            // The session was built from the legacy probe; apply once the default reads succeed.
-            vehicleDataReconnectPending = vehicleDataSwitchesOn()
-            if (vehicleDataReconnectPending) checkAdbState(mayAsk = true)
-            return
-        }
-        if (BydVehicleFieldStore.load(this) == null) {
-            probeVehicleData(mayAsk = true, activateLegacyModeOnSuccess = true)
-            return
-        }
-        synchronized(vehicleOperationLock) {
-            BydOutputSettings.setLegacyVehicleProbe(this, true)
-        }
-        vehicleProbeOutcome = null
-        pendingVehicleReplacement = null
-        pendingVehicleLostFields = emptySet()
-        scheduleAutomaticVehicleValidation()
-        render()
-        // With every vehicle-data switch off, the mode changes nothing CarPlay was told.
-        if (vehicleDataSwitchesOn()) reconnectForVehicleSetting()
-    }
-
-    // Probe results are saved before they are shown, so the saved snapshot is the newest without
-    // trusting the clock.
-    private fun displayedVehicleCapabilities(): BydVehicleCapabilities? =
-        BydVehicleFieldStore.load(this) ?: vehicleProbeOutcome?.capabilities
-
-    private fun localizedVehicleFields(fields: Set<BydVehicleField>): String = fields.map { field ->
-        getString(when (field) {
-            BydVehicleField.SPEED -> R.string.vehicle_field_speed
-            BydVehicleField.GEAR -> R.string.vehicle_field_gear
-            BydVehicleField.SOC, BydVehicleField.RANGE, BydVehicleField.REMAINING_KWH ->
-                R.string.vehicle_field_battery
-            BydVehicleField.BMS_STATE -> R.string.vehicle_field_charging
-        })
-    }.distinct().joinToString()
-
-    private fun replaceSavedVehicleDataAnyway() {
-        val candidate = pendingVehicleReplacement ?: return
-        // Never over a snapshot saved since the comparison; a failed write is shown, not thrown.
-        val error = runCatching {
-            BydVehicleFieldStore.replaceAnyway(applicationContext, pendingVehicleReplacementExpected, candidate)
-        }.fold(
-            onSuccess = { replaced -> if (replaced) null else getString(R.string.vehicle_probe_snapshot_changed) },
-            onFailure = { it.message ?: it.javaClass.simpleName },
-        )
-        Log.i(BYD_VEHICLE_TAG, "user replaced saved vehicle data error=${error ?: "none"}")
-        pendingVehicleReplacement = null
-        pendingVehicleLostFields = emptySet()
-        vehicleProbeOutcome = error?.let { BydVehicleProbeOutcome(BydAdbAccess.State.READY, error = it) }
-        render()
-    }
-
-    private fun showVehicleProbeResults(card: LinearLayout, capabilities: BydVehicleCapabilities) {
-        val catalogFields = capabilities.fields.values.count { it.address?.source == BydFieldSource.FIRMWARE }
-        card.addView(label(getString(if (capabilities.catalogAvailable)
-            R.string.vehicle_probe_catalog_ready else R.string.vehicle_probe_catalog_fallback, catalogFields),
-            14, if (capabilities.catalogAvailable) MUTED else WARNING).apply { setPadding(0, dp(14), 0, 0) })
-
-        val speed = capabilities.result(BydVehicleField.SPEED)
-        val speedValue = speed.value
-        val speedText = when {
-            speedValue != null -> getString(R.string.adb_vehicle_speed_reading, speedValue.roundToInt())
-            speed.supported -> getString(R.string.vehicle_probe_cached_supported, getString(R.string.vehicle_field_speed))
-            else -> getString(R.string.adb_vehicle_speed_unreadable)
-        }
-        card.addView(label(speedText, 14, if (speed.supported) MUTED else WARNING))
-        val gear = capabilities.result(BydVehicleField.GEAR)
-        val gearValue = gear.value
-        val gearText = when {
-            gearValue != null -> getString(R.string.adb_vehicle_gear_reading, gearLetter(gearValue.toInt()))
-            gear.supported -> getString(R.string.vehicle_probe_cached_supported, getString(R.string.vehicle_field_gear))
-            else -> getString(R.string.adb_vehicle_gear_unreadable)
-        }
-        card.addView(label(gearText, 14, if (gear.supported) MUTED else WARNING))
-
-        if (capabilities.batterySupported) {
-            val percentValue = capabilities.result(BydVehicleField.SOC).value
-            val rangeValue = capabilities.result(BydVehicleField.RANGE).value
-            val energy = capabilities.result(BydVehicleField.REMAINING_KWH).value
-            card.addView(label(if (percentValue == null || rangeValue == null) {
-                getString(R.string.vehicle_probe_cached_supported, getString(R.string.vehicle_field_battery))
-            } else if (energy != null) {
-                getString(R.string.vehicle_probe_battery_reading,
-                    percentValue.roundToInt(), rangeValue.roundToInt(), energy)
-            } else {
-                getString(R.string.vehicle_probe_battery_without_energy,
-                    percentValue.roundToInt(), rangeValue.roundToInt())
-            }, 14, if (energy != null || percentValue == null) MUTED else WARNING))
-        } else {
-            card.addView(label(getString(R.string.adb_battery_unreadable), 14, WARNING))
-        }
-        val charging = capabilities.result(BydVehicleField.BMS_STATE)
-        val chargingValue = charging.value
-        val chargingText = when {
-            chargingValue != null -> getString(R.string.vehicle_probe_charging_state, chargingValue.toInt())
-            charging.supported -> getString(R.string.vehicle_probe_cached_supported, getString(R.string.vehicle_field_charging))
-            else -> getString(R.string.vehicle_probe_charging_unreadable)
-        }
-        card.addView(label(chargingText, 14, if (charging.supported) MUTED else WARNING))
-    }
-
-    private fun showVehicleDataSettings(card: LinearLayout, capabilities: BydVehicleCapabilities?) {
-        toggle(card, getString(R.string.bt_suspend_during_carplay), getString(R.string.bt_suspend_during_carplay_description),
-            AirPlayPersistence.loadBtSuspendDuringCarplay(this), enabled = !adbSwitchChangePending) {
-            AirPlayPersistence.saveBtSuspendDuringCarplay(this, it)
-            markReconnectNeeded()
-            if (it) checkAdbState(mayAsk = true)
-        }
-        if (AirPlayPersistence.loadBtSuspendDuringCarplay(this)) {
-            val delays = listOf(5, 10, 15, 30)
-            choice(card, getString(R.string.bt_suspend_delay), delays.map { getString(R.string.bt_suspend_delay_option, it) },
-                delays.indexOf(AirPlayPersistence.loadBtSuspendDelaySeconds(this)).coerceAtLeast(0), reconnects = false) {
-                AirPlayPersistence.saveBtSuspendDelaySeconds(this, delays[it])
-                markReconnectNeeded()
-            }
-        }
-        if (capabilities == null || capabilities.batterySupported) {
-            toggle(card, getString(R.string.car_battery_for_the_iphone),
-                getString(R.string.car_battery_for_the_iphone_description),
-                BydOutputSettings.batteryToIphone(this), enabled = !adbSwitchChangePending) {
-                BydOutputSettings.setBatteryToIphone(this, it)
-                onVehicleDataSettingChanged(it)
-            }
-            val connectors = EvChargingConnectors.entries
-            choice(card, getString(R.string.charging_connectors), connectors.map { it.localizedLabel(this) },
-                connectors.indexOf(BydOutputSettings.chargingConnectors(this))) {
-                BydOutputSettings.setChargingConnectors(this, connectors[it])
-            }
-            val lowCharge = BydOutputSettings.lowChargePresets
-            choice(card, getString(R.string.low_charge_warning), lowCharge.map {
-                    getString(if (it == BydOutputSettings.DEFAULT_LOW_CHARGE_PERCENT)
-                        R.string.percent_default else R.string.percent_value, it)
-                }, lowCharge.indexOf(BydOutputSettings.lowChargePercent(this)).coerceAtLeast(0), reconnects = false) {
-                BydOutputSettings.setLowChargePercent(this, lowCharge[it])
-            }
-        }
-        if (capabilities == null || capabilities.motionSupported) {
-            toggle(card, getString(R.string.wheel_speed_for_tunnels),
-                getString(R.string.wheel_speed_for_tunnels_description),
-                BydOutputSettings.wheelSpeedToIphone(this), enabled = !adbSwitchChangePending) {
-                BydOutputSettings.setWheelSpeedToIphone(this, it)
-                onVehicleDataSettingChanged(it)
-            }
-        }
-        if (capabilities == null || capabilities.gearSupported) {
-            toggle(card, getString(R.string.video_while_parked),
-                getString(R.string.video_while_parked_description),
-                BydOutputSettings.videoWhileParked(this), enabled = !adbSwitchChangePending) {
-                BydOutputSettings.setVideoWhileParked(this, it)
-                onVehicleDataSettingChanged(it)
-            }
-        }
-    }
-
-    private fun onVehicleDataSettingChanged(enabled: Boolean) {
-        if (!enabled) {
-            reconnectForVehicleSetting()
-        } else if (BydOutputSettings.legacyVehicleProbe(this)) {
-            scheduleAutomaticVehicleValidation()
-            reconnectForVehicleSetting()
-        } else {
-            // Default mode applies the switch once a check reads what the enabled switches need.
-            vehicleDataReconnectPending = true
-            checkAdbState(mayAsk = true)
-        }
-    }
-
-    // The approval dialog can open only after an explicit user action.
-    private fun checkAdbState(mayAsk: Boolean) {
-        if (adbSwitchChangePending || vehicleAdbWorkInProgress()) return
-        val legacy = BydOutputSettings.legacyVehicleProbe(this)
-        // Only a validation this check interrupts runs again; a Dashboard switch needs no vehicle check.
-        cancelAutomaticVehicleValidationForUserOperation(
-            resumeAfter = automaticVehicleValidationInProgress || automaticVehicleValidationPending,
-        )
-        val generation = ++adbCheckGeneration
-        adbCheckInProgress = true
-        adbCheckMayAsk = mayAsk
-        adbCheckFailed = false
-        render()
-        val backend = BydVehicleSettingsBackendProvider.current
-        backend.execute("diplay-adb-state") {
-            val result = runCatching {
-                if (legacy) {
-                    BydAdbAccess.Status(backend.checkState(applicationContext, mayAsk))
-                } else {
-                    // The default battery path must publish its first sample before CarPlay reconnects.
-                    backend.check(applicationContext, mayAsk)
-                }
-            }
-            runOnUiThread {
-                val current = generation == adbCheckGeneration
-                if (current) {
-                    adbCheckInProgress = false
-                    adbCheckMayAsk = false
-                }
-                if (!current || isFinishing || isDestroyed) return@runOnUiThread
-                adbCheckFailed = result.isFailure
-                val status = result.getOrNull()
-                adbAccessState = status?.state
-                if (!legacy) defaultVehicleStatus = status
-                if (!legacy && adbAccessState == BydAdbAccess.State.READY) {
-                    vehicleProbeOutcome = null
-                }
-                render()
-                // Unreadable data keeps the current connection; the page shows what is missing.
-                if (!legacy && vehicleDataReconnectPending && status?.state == BydAdbAccess.State.READY &&
-                    enabledVehicleDataReadable(null, status)) {
-                    vehicleDataReconnectPending = false
-                    reconnectForVehicleSetting()
-                }
-                runPendingAutomaticVehicleValidation()
-            }
-        }
-    }
-
-    /** First probe or user retry: one click handles ADB authorization, probing and persistence. */
-    private fun probeVehicleData(mayAsk: Boolean) =
-        probeVehicleData(mayAsk, activateLegacyModeOnSuccess = false)
-
-    private fun probeVehicleData(mayAsk: Boolean, activateLegacyModeOnSuccess: Boolean) {
-        if (adbSwitchChangePending || vehicleAdbWorkInProgress()) return
-        val expectedLegacyMode = BydOutputSettings.legacyVehicleProbe(this)
-        val expectedSnapshot = cancelAutomaticVehicleValidationForUserOperation(resumeAfter = false)
-        val generation = ++vehicleProbeGeneration
-        vehicleProbeAuthorizationInProgress = mayAsk
-        vehicleProbeInProgress = !mayAsk
-        adbCheckFailed = false
-        pendingVehicleReplacement = null
-        pendingVehicleLostFields = emptySet()
-        Log.i(BYD_VEHICLE_TAG, "user vehicle probe starting mayAsk=$mayAsk")
-        render()
-        val backend = BydVehicleSettingsBackendProvider.current
-        backend.execute("diplay-byd13-probe") {
-            val app = applicationContext
-            val attempt = runCatching {
-                val access = backend.checkState(app, mayAsk)
-                if (access != BydAdbAccess.State.READY) {
-                    VehicleProbeAttempt(BydVehicleProbeOutcome(access))
-                } else {
-                    runOnUiThread {
-                        if (generation == vehicleProbeGeneration && !isFinishing && !isDestroyed) {
-                            vehicleProbeAuthorizationInProgress = false
-                            vehicleProbeInProgress = true
-                            render()
-                        }
-                    }
-                    var candidate = backend.probe(app, persist = false)
-                    if (candidate.access == BydAdbAccess.State.NOT_APPROVED) {
-                        // adbd confirms "Always allow" before it saves the key, so this new connection can be early.
-                        Log.i(BYD_VEHICLE_TAG, "probe connection not approved yet; retrying once")
-                        Thread.sleep(ADB_KEY_SAVE_WAIT_MILLIS)
-                        candidate = backend.probe(app, persist = false)
-                    }
-                    val candidateCapabilities = candidate.capabilities
-                    when {
-                        candidate.access == BydAdbAccess.State.NOT_APPROVED -> VehicleProbeAttempt(
-                            outcome = candidate,
-                            allowedOnlyOnce = true,
-                        )
-                        candidateCapabilities == null -> VehicleProbeAttempt(candidate)
-                        else -> {
-                            // Invalidation must guard persistence/publication, not only the UI callback.
-                            val replacement = synchronized(vehicleOperationLock) {
-                                if (generation != vehicleProbeGeneration ||
-                                    BydOutputSettings.legacyVehicleProbe(app) != expectedLegacyMode) null
-                                else BydVehicleFieldStore.replaceAutomatically(
-                                    app,
-                                    expectedSnapshot,
-                                    candidateCapabilities,
-                                )
-                            } ?: return@runCatching VehicleProbeAttempt(
-                                outcome = BydVehicleProbeOutcome(candidate.access),
-                                snapshotChanged = true,
-                            )
-                            when {
-                                replacement.saved -> VehicleProbeAttempt(candidate)
-                                replacement.snapshotChanged -> VehicleProbeAttempt(
-                                    outcome = candidate,
-                                    snapshotChanged = true,
-                                )
-                                else -> VehicleProbeAttempt(
-                                    outcome = BydVehicleProbeOutcome(candidate.access),
-                                    heldCandidate = candidateCapabilities,
-                                    lostFields = replacement.lostFields,
-                                )
-                            }
-                        }
-                    }
-                }
-            }.getOrElse { error ->
-                VehicleProbeAttempt(
-                    BydVehicleProbeOutcome(
-                        BydAdbAccess.State.READY,
-                        error = error.message ?: error.javaClass.simpleName,
-                    ),
-                )
-            }
-            runOnUiThread {
-                val current = generation == vehicleProbeGeneration
-                if (current) {
-                    vehicleProbeAuthorizationInProgress = false
-                    vehicleProbeInProgress = false
-                }
-                if (!current || isFinishing || isDestroyed) return@runOnUiThread
-                pendingVehicleReplacement = attempt.heldCandidate
-                pendingVehicleReplacementExpected = expectedSnapshot
-                pendingVehicleLostFields = attempt.lostFields
-                vehicleProbeOutcome = when {
-                    attempt.allowedOnlyOnce -> attempt.outcome.copy(
-                        error = getString(R.string.vehicle_probe_allowed_once),
-                    )
-                    attempt.snapshotChanged -> attempt.outcome.copy(
-                        capabilities = null,
-                        error = getString(R.string.vehicle_probe_snapshot_changed),
-                    )
-                    else -> attempt.outcome
-                }
-                adbAccessState = attempt.outcome.access
-                val activatedLegacyMode = activateLegacyModeOnSuccess &&
-                    vehicleProbeOutcome?.capabilities != null
-                if (activatedLegacyMode) {
-                    BydOutputSettings.setLegacyVehicleProbe(this, true)
-                }
-                if (vehicleProbeOutcome?.capabilities != null) automaticVehicleValidationStarted = true
-                Log.i(
-                    BYD_VEHICLE_TAG,
-                    "user vehicle probe access=${attempt.outcome.access} " +
-                        "saved=${vehicleProbeOutcome?.capabilities != null} " +
-                        "lost=${attempt.lostFields.joinToString()} " +
-                        "error=${vehicleProbeOutcome?.error ?: "none"}",
-                )
-                render()
-                if (activatedLegacyMode && vehicleDataSwitchesOn()) reconnectForVehicleSetting()
-                runPendingAutomaticVehicleValidation()
-            }
-        }
-    }
-
-    /**
-     * After the first saved probe, validation is automatic and never asks for authorization. ADB
-     * transport failure keeps the saved snapshot; only two complete READY-but-unreadable checks
-     * trigger one automatic field re-probe.
-     */
-    private fun validateSavedVehicleConfigurationAutomatically() {
-        if (!BydOutputSettings.legacyVehicleProbe(this)) return
-        val saved = BydVehicleFieldStore.load(applicationContext) ?: return
-        if (adbSwitchChangePending || vehicleAdbWorkInProgress()) {
-            automaticVehicleValidationPending = true
-            return
-        }
-        if (automaticVehicleValidationInProgress) {
-            // A request during a run, such as a switch just turned on, runs once this one ends.
-            automaticVehicleValidationPending = true
-            return
-        }
-        if (automaticVehicleValidationStarted) return
-        automaticVehicleValidationStarted = true
-        automaticVehicleValidationInProgress = true
-        val generation = ++vehicleValidationGeneration
-        Log.i(BYD_VEHICLE_TAG, "automatic vehicle validation starting savedFirmware=${saved.firmwareKey}")
-        if (page == "settings" && bydVehicleAdvancedExpanded) render()
-        val backend = BydVehicleSettingsBackendProvider.current
-        backend.execute("diplay-byd13-auto-validate") {
-            val app = applicationContext
-            val validation = runCatching {
-                var status = backend.check(app, mayAsk = false)
-                var outcome: BydVehicleProbeOutcome? = null
-                var heldCandidate: BydVehicleCapabilities? = null
-                var lostFields: Set<BydVehicleField> = emptySet()
-                var snapshotChanged = false
-                var readable = status.state == BydAdbAccess.State.READY && enabledVehicleDataReadable(saved, status)
-                if (status.state == BydAdbAccess.State.READY && !enabledVehicleDataReadable(saved, status)) {
-                    Log.w(BYD_VEHICLE_TAG, "saved vehicle fields unreadable; validating once more")
-                    try {
-                        Thread.sleep(VEHICLE_VALIDATION_RETRY_MILLIS)
-                    } catch (_: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                    }
-                    // A cancelled validation reads nothing more alongside the operation that replaced it.
-                    if (generation != vehicleValidationGeneration) {
-                        return@runCatching VehicleValidationAttempt(
-                            status = status,
-                            snapshotChanged = true,
-                        )
-                    }
-                    status = backend.check(app, mayAsk = false)
-                    readable = status.state == BydAdbAccess.State.READY && enabledVehicleDataReadable(saved, status)
-                    if (status.state == BydAdbAccess.State.READY && !readable) {
-                        if (generation != vehicleValidationGeneration) {
-                            return@runCatching VehicleValidationAttempt(
-                                status = status,
-                                snapshotChanged = true,
-                            )
-                        }
-                        Log.w(BYD_VEHICLE_TAG, "saved vehicle fields still unreadable; automatic re-probe starting")
-                        val candidate = backend.probe(app, persist = false)
-                        if (generation != vehicleValidationGeneration) {
-                            return@runCatching VehicleValidationAttempt(
-                                status = status,
-                                snapshotChanged = true,
-                            )
-                        }
-                        outcome = candidate
-                        candidate.capabilities?.let { next ->
-                            val replacement = synchronized(vehicleOperationLock) {
-                                if (generation != vehicleValidationGeneration) null
-                                else BydVehicleFieldStore.replaceAutomatically(app, saved, next)
-                            } ?: return@runCatching VehicleValidationAttempt(
-                                status = status,
-                                snapshotChanged = true,
-                            )
-                            when {
-                                replacement.saved -> Unit
-                                replacement.snapshotChanged -> {
-                                    snapshotChanged = true
-                                    outcome = null
-                                }
-                                else -> {
-                                    heldCandidate = next
-                                    lostFields = replacement.lostFields
-                                    outcome = BydVehicleProbeOutcome(candidate.access)
-                                }
-                            }
-                        }
-                    }
-                }
-                VehicleValidationAttempt(
-                    status = status,
-                    outcome = outcome,
-                    heldCandidate = heldCandidate,
-                    lostFields = lostFields,
-                    snapshotChanged = snapshotChanged,
-                    savedFieldsReadable = readable,
-                )
-            }
-            runOnUiThread {
-                val current = generation == vehicleValidationGeneration
-                if (current) automaticVehicleValidationInProgress = false
-                if (!current || isFinishing || isDestroyed) return@runOnUiThread
-                adbCheckFailed = validation.isFailure
-                validation.exceptionOrNull()?.let { Log.w(BYD_VEHICLE_TAG, "automatic vehicle validation failed", it) }
-                validation.getOrNull()?.let { result ->
-                    adbAccessState = result.outcome?.access ?: result.status.state
-                    when {
-                        result.snapshotChanged -> Unit
-                        result.savedFieldsReadable && result.outcome == null -> {
-                            // An open offer to replace stays: this check may not have read its lost fields.
-                            vehicleProbeOutcome = null
-                        }
-                        result.lostFields.isNotEmpty() -> {
-                            vehicleProbeOutcome = result.outcome
-                            pendingVehicleReplacement = result.heldCandidate
-                            pendingVehicleReplacementExpected = saved
-                            pendingVehicleLostFields = result.lostFields
-                        }
-                        result.outcome != null -> {
-                            vehicleProbeOutcome = result.outcome
-                            pendingVehicleReplacement = null
-                            pendingVehicleLostFields = emptySet()
-                        }
-                    }
-                    Log.i(
-                        BYD_VEHICLE_TAG,
-                        "automatic vehicle validation access=${adbAccessState} " +
-                            "reprobed=${result.outcome != null} " +
-                            "saved=${result.outcome?.capabilities != null && result.lostFields.isEmpty()} " +
-                            "lost=${result.lostFields.joinToString()} " +
-                            "snapshotChanged=${result.snapshotChanged} " +
-                            "error=${result.outcome?.error ?: "none"}",
-                    )
-                }
-                if (page == "settings" && bydVehicleAdvancedExpanded) {
-                    render()
-                }
-                runPendingAutomaticVehicleValidation()
-            }
-        }
-    }
-
-    private fun scheduleAutomaticVehicleValidation() {
-        if (!BydOutputSettings.legacyVehicleProbe(this)) {
-            automaticVehicleValidationPending = false
-            handler.removeCallbacks(automaticVehicleValidation)
-            return
-        }
-        automaticVehicleValidationStarted = false
-        automaticVehicleValidationPending = true
-        handler.removeCallbacks(automaticVehicleValidation)
-        handler.post(automaticVehicleValidation)
-    }
-
-    private fun cancelAutomaticVehicleValidationForUserOperation(
-        resumeAfter: Boolean,
-    ): BydVehicleCapabilities? = synchronized(vehicleOperationLock) {
-        handler.removeCallbacks(automaticVehicleValidation)
-        automaticVehicleValidationPending = resumeAfter
-        if (resumeAfter) automaticVehicleValidationStarted = false
-        vehicleValidationGeneration++
-        automaticVehicleValidationInProgress = false
-        BydVehicleFieldStore.load(applicationContext)
-    }
-
-    private fun runPendingAutomaticVehicleValidation() {
-        if (!automaticVehicleValidationPending || adbSwitchChangePending ||
-            vehicleAdbWorkInProgress() || automaticVehicleValidationInProgress) return
-        handler.removeCallbacks(automaticVehicleValidation)
-        handler.post(automaticVehicleValidation)
-    }
-
-    /** Whether [status] has every reading an enabled switch needs; null [capabilities] is default mode. */
-    private fun enabledVehicleDataReadable(
-        capabilities: BydVehicleCapabilities?,
-        status: BydAdbAccess.Status,
-    ): Boolean {
-        if (BydOutputSettings.batteryToIphone(this) && capabilities?.batterySupported != false &&
-            (status.batteryPercent == null || status.rangeKm == null)) return false
-        if (BydOutputSettings.wheelSpeedToIphone(this) && capabilities?.motionSupported != false &&
-            (status.speedKmh == null || status.gear == null)) return false
-        if (BydOutputSettings.videoWhileParked(this) && capabilities?.gearSupported != false && status.gear == null) return false
-        return true
-    }
-
-    private fun adbLinkStatusText(state: BydAdbAccess.State): String = when (state) {
-        BydAdbAccess.State.READY -> getString(R.string.adb_access_ready)
-        BydAdbAccess.State.NOT_APPROVED -> getString(R.string.adb_enabled_not_approved)
-        BydAdbAccess.State.ADB_OFF -> getString(R.string.adb_off)
-        BydAdbAccess.State.PAIRING_ONLY -> getString(R.string.adb_pairing_only)
-    }
-
-    private fun gearLetter(value: Int): String = when (value) {
-        1 -> "P"
-        2 -> "R"
-        3 -> "N"
-        else -> "D"
-    }
-
-    private fun reconnectForVehicleSetting() {
-        if (CarPlayBackgroundSession.hasSession()) connect(AirPlayPersistence.loadWirelessEnabled(this))
-    }
-
-    private fun vehicleDataSwitchesOn() = BydOutputSettings.batteryToIphone(this) ||
-        BydOutputSettings.wheelSpeedToIphone(this) || BydOutputSettings.videoWhileParked(this)
-
     private fun hasPreciseLocation() =
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     // The cluster screen is described at connection time, so a running session reconnects over
     // its current link. The position choices need no call: getString(R.string.apply_and_reconnect) already does it.
-    private fun clusterSafeAreaControls(card: LinearLayout) {
-        val rect = AirPlayPersistence.loadClusterSafeAreaRect(this)
-            ?: DiLink4ClusterDisplay.defaultSafeAreaRect(
-                markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
-                markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this))
-        card.addView(label(getString(R.string.safe_area_mapping_summary,
-            rect.width, rect.height, rect.left, rect.top, 1920, 720), 14, MUTED))
-        card.addView(actionButton(getString(R.string.cluster_safe_area_edit), false) {
-            openClusterSafeAreaEditor()
-        }, matchButton(10, 56))
-        card.addView(button(getString(R.string.cluster_safe_area_reset), false) {
-            AirPlayPersistence.clearClusterSafeAreaRect(this)
-            render()
-            markReconnectNeeded()
-        }, matchButton(10, 56))
-        card.addView(label(getString(R.string.cluster_safe_area_hint), 14, MUTED))
-    }
-
-    private fun openClusterSafeAreaEditor() {
-        clusterSafeAreaDialog?.dismiss()
-        val previewOwner = Any()
-        val initial = AirPlayPersistence.loadClusterSafeAreaRect(this)
-            ?: DiLink4ClusterDisplay.defaultSafeAreaRect(
-                markerXPercent = AirPlayPersistence.loadClusterMarkerXPercent(this),
-                markerYPercent = AirPlayPersistence.loadClusterMarkerYPercent(this))
-        val editor = SafeAreaEditorView(this).apply {
-            setBackgroundColor(SURFACE)
-            setRect(initial, 1920, 720)
-        }
-        // A standalone dialog gives the weighted preview an exact available height.
-        // AlertDialog's wrap-content custom panel can collapse it to zero.
-        val dialog = appDialog().apply { requestWindowFeature(Window.FEATURE_NO_TITLE) }
-        val panel = column().apply {
-            setPadding(dp(16), dp(8), dp(16), dp(8))
-            setBackgroundColor(SURFACE)
-        }
-        panel.addView(label(getString(R.string.cluster_safe_area_edit), 18, TEXT, true))
-        panel.addView(label(getString(R.string.cluster_safe_area_live_hint), 14, MUTED))
-        panel.addView(ClusterSafeAreaPreviewFrame(this, editor), LinearLayout.LayoutParams(-1, 0, 1f))
-        val actions = row()
-        actions.addView(button(getString(R.string.cancel), false) { dialog.dismiss() },
-            LinearLayout.LayoutParams(0, dp(56), 1f))
-        actions.addView(button(getString(if (CarPlayBackgroundSession.hasSession())
-            R.string.apply_and_reconnect else R.string.save), true) {
-            editor.currentRectForSource()?.let { AirPlayPersistence.saveClusterSafeAreaRect(this, it) }
-            dialog.dismiss()
-            render()
-            reconnectIfRunning()
-        }, LinearLayout.LayoutParams(0, dp(56), 1f))
-        panel.addView(actions)
-        dialog.setContentView(panel, ViewGroup.LayoutParams(-1, -1))
-        editor.onRectChanged = { ClusterActivityOutput.updateSafeAreaPreview(previewOwner, it) }
-        clusterSafeAreaDialog = dialog
-        dialog.setOnDismissListener {
-            editor.onRectChanged = null
-            ClusterActivityOutput.endSafeAreaPreview(previewOwner)
-            if (clusterSafeAreaDialog === dialog) clusterSafeAreaDialog = null
-        }
-        dialog.show()
-        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.9f).toInt(),
-            (resources.displayMetrics.heightPixels * 0.85f).toInt())
-        ClusterActivityOutput.beginSafeAreaPreview(previewOwner, initial, this)
-    }
-
     private fun reconnectIfRunning() {
         if (CarPlayBackgroundSession.hasSession()) connect(AirPlayPersistence.loadWirelessEnabled(this))
     }
@@ -5007,7 +3573,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val custom = AirPlayPersistence.loadCustomAirPlayIconFile(this)?.let { BitmapFactory.decodeFile(it.absolutePath) }
         val preview = row().apply { gravity = Gravity.CENTER_VERTICAL }
         preview.addView(ImageView(this).apply {
-            setImageBitmap(custom ?: BitmapFactory.decodeResource(resources, R.raw.ic_car_home))
+            setImageBitmap(custom ?: BitmapFactory.decodeResource(resources, R.raw.ic_xingrui))
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = rounded(SURFACE, BORDER)
             clipToOutline = true
@@ -5229,24 +3795,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         refreshReconnectBar()
         refreshReadiness()
     }
-    private fun authorizeClusterRouting() {
-        val app = applicationContext
-        Thread({
-            val result = runCatching {
-                com.shilapi.xcertplay.adb.LocalAdb(com.shilapi.xcertplay.adb.AdbKeys.load(app)).use {
-                    it.connect(mayAsk = true)
-                }
-            }.getOrNull()
-            runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
-                    toast(if (result == com.shilapi.xcertplay.adb.LocalAdb.Access.READY)
-                        getString(R.string.adb_access_ready) else getString(R.string.adb_not_approved))
-                    if (result == com.shilapi.xcertplay.adb.LocalAdb.Access.READY) ClusterActivityOutput.retry()
-                }
-            }
-        }, "adb-cluster-authorize").start()
-    }
-
     private fun reportFileName() = "DiPlay-${SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())}.txt"
 
     private fun saveReportToDownloads() {
@@ -5290,44 +3838,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
                     appendLine(PhoneWakeDiagnostics.report(appContext))
                     appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
-                    appendLine()
-                    appendLine("--- Current cluster display diagnostics (even when disabled) ---")
-                    appendLine(ClusterMapPresentation.diagnosticReport(appContext))
-                    appendLine()
-                    appendLine("--- ADB cluster activity routing ---")
-                    appendLine("adbClusterActivityEnabled=${AirPlayPersistence.loadAdbClusterEnabled(appContext)}")
-                    appendLine("clusterActivityMainTask=${ClusterActivityOutput.mainTaskId} surfaceValid=${ClusterActivityOutput.surface?.isValid}")
-                    AdbClusterRouter.report(appContext).lineSequence().forEach { line ->
-                        DiagnosticRedactor.redact(line)?.let { appendLine(it) }
-                    }
-                    appendLine()
-                    appendLine("--- Standalone HUD compatibility ---")
-                    appendLine(BydOutputSettings.standaloneHudDiagnosticReport(appContext))
-                    appendLine()
-                    appendLine("--- BYD vehicle-data probe ---")
-                    appendLine(
-                        "mode=${if (BydOutputSettings.legacyVehicleProbe(appContext)) "legacy-probe" else "default"} " +
-                            "switches location=${AirPlayPersistence.loadLocationReportingEnabled(appContext)} " +
-                            "battery=${BydOutputSettings.batteryToIphone(appContext)} " +
-                            "wheelSpeed=${BydOutputSettings.wheelSpeedToIphone(appContext)} " +
-                            "parkedVideo=${BydOutputSettings.videoWhileParked(appContext)}",
-                    )
-                    val bydCapabilities = BydVehicleFieldStore.load(appContext)
-                    if (bydCapabilities == null) {
-                        appendLine("no saved successful probe")
-                    } else {
-                        appendLine(
-                            "catalog=${bydCapabilities.catalogAvailable} detectedAt=${bydCapabilities.detectedAtMillis} " +
-                                "savedFirmware=${bydCapabilities.firmwareKey} " +
-                                "currentFirmware=${BydVehicleFieldStore.firmwareKey()}",
-                        )
-                        for (field in BydVehicleField.entries) {
-                            val probe = bydCapabilities.result(field)
-                            appendLine("${field.name}: supported=${probe.supported} " +
-                                (probe.address?.let { "tx=${it.transaction} dev=${it.device} fid=${it.fid} source=${it.source}" }
-                                    ?: "address=none"))
-                        }
-                    }
                     appendLine()
                     appendLine("--- Last display negotiation (timestamps distinguish it from current settings) ---")
                     appendLine(DisplayDiagnosticSnapshot.report(appContext))
@@ -5493,18 +4003,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         return grid
     }
-    private fun version() = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0-beta.1"
-    private fun languageSettings(content: LinearLayout) {
-        filteredSection(content, SettingsSection.LANGUAGE,
-            getString(R.string.language_section_title), R.drawable.ic_dp_language) { card ->
-            card.addView(label(getString(R.string.language_hint), 14, MUTED))
-            val current = AppLocale.preference(this)
-            val languageButton = button("${getString(R.string.language_app_language)} · ${AppLocale.displayName(this, current)}", false) { }
-            languageButton.setOnClickListener { AppLocale.showPicker(this) }
-            card.addView(languageButton, matchButton(12, 60))
-        }
-    }
-
+    private fun version() = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
     private fun section(parent: LinearLayout, title: String, icon: Int? = null, build: (LinearLayout) -> Unit) {
         searchIndexSink?.add(title)
         val card = card()
@@ -5590,102 +4089,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         parent.addView(result.rowView)
         return result.switch
     }
-    private fun ambientConfigurationLabel(value: AmbientMusicSettings.Values): String {
-        val mode = if (!value.music) getString(R.string.settings_ambient_static) else when (value.colorMode) {
-            AmbientColorMode.ENERGY -> getString(R.string.settings_ambient_energy)
-            AmbientColorMode.BEAT -> getString(R.string.settings_ambient_beat)
-            AmbientColorMode.TEMPO -> getString(R.string.settings_ambient_tempo)
-            AmbientColorMode.BASS -> getString(R.string.settings_ambient_bass)
-            AmbientColorMode.SMART -> getString(R.string.settings_ambient_smart)
-        }
-        val speed = when (value.speed) { AmbientColorSpeed.SLOW -> getString(R.string.settings_ambient_slow); AmbientColorSpeed.STANDARD -> getString(R.string.settings_ambient_standard); AmbientColorSpeed.FAST -> getString(R.string.settings_ambient_fast) }
-        return getString(R.string.settings_ambient_configuration) + " · " + getString(R.string.settings_ambient_summary, getString(if (value.enabled) R.string.settings_ambient_enabled else R.string.settings_ambient_disabled), mode, speed, value.selectedColors.size, value.brightness)
-    }
-
-    private fun showAmbientConfiguration() {
-        var draft = AmbientMusicSettings.load(this)
-        val body = column().apply { setPadding(dp(24), dp(12), dp(24), dp(12)) }
-        body.addView(label(getString(R.string.settings_ambient_parked_notice), 14, MUTED))
-        toggle(body, getString(R.string.settings_ambient_enable), getString(R.string.settings_ambient_enable_description), draft.enabled) {
-            draft = draft.copy(enabled = it)
-        }
-        toggle(body, getString(R.string.settings_ambient_music), getString(R.string.settings_ambient_music_description), draft.music) {
-            draft = draft.copy(music = it)
-        }
-        toggle(body, getString(R.string.settings_ambient_album), getString(R.string.settings_ambient_album_description), draft.colorSource == AmbientColorSource.ALBUM) {
-            draft = draft.copy(colorSource = if (it) AmbientColorSource.ALBUM else AmbientColorSource.SELECTED)
-        }
-        choice(body, getString(R.string.settings_ambient_color_mode), listOf(getString(R.string.settings_ambient_energy), getString(R.string.settings_ambient_beat), getString(R.string.settings_ambient_tempo), getString(R.string.settings_ambient_bass), getString(R.string.settings_ambient_smart)), draft.colorMode.ordinal, reconnects = false) {
-            draft = draft.copy(colorMode = AmbientColorMode.entries[it])
-        }
-        choice(body, getString(R.string.settings_ambient_speed), listOf(getString(R.string.settings_ambient_slow), getString(R.string.settings_ambient_standard), getString(R.string.settings_ambient_fast)), draft.speed.ordinal, reconnects = false) {
-            draft = draft.copy(speed = AmbientColorSpeed.entries[it])
-        }
-        val paletteButton = button(getString(R.string.settings_ambient_palette_summary, draft.selectedColors.size), false) {}
-        paletteButton.setOnClickListener {
-            val checked = BooleanArray(31) { it + 1 in draft.selectedColors }
-            val paletteDialog = AlertDialog.Builder(this).setTitle(getString(R.string.settings_ambient_palette))
-                .setMultiChoiceItems((1..31).map { it.toString() }.toTypedArray(), checked) { _, index, selected -> checked[index] = selected }
-                .setNeutralButton(getString(R.string.settings_ambient_select_all), null)
-                .setPositiveButton(getString(R.string.save), null)
-                .setNegativeButton(getString(R.string.cancel), null).create()
-            paletteDialog.setOnShowListener {
-                paletteDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
-                    checked.fill(true)
-                    for (index in checked.indices) paletteDialog.listView.setItemChecked(index, true)
-                }
-                paletteDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    val selected = checked.indices.filter { checked[it] }.map { it + 1 }
-                    if (selected.isEmpty()) toast(getString(R.string.settings_ambient_select_one))
-                    else {
-                        draft = draft.copy(selectedColors = selected, color = selected.first())
-                        paletteButton.text = getString(R.string.settings_ambient_palette_summary, selected.size)
-                        paletteDialog.dismiss()
-                    }
-                }
-            }
-            paletteDialog.show()
-        }
-        body.addView(paletteButton, matchButton(0, 60)); body.addView(space(12))
-        choice(body, getString(R.string.settings_ambient_brightness), (0..6).map { if (it == 0) getString(R.string.settings_ambient_minimum) else it.toString() }, draft.brightness, reconnects = false) {
-            draft = draft.copy(brightness = it)
-        }
-        choice(body, getString(R.string.settings_ambient_area), listOf(getString(R.string.settings_ambient_front), getString(R.string.settings_ambient_rear), getString(R.string.settings_ambient_all)), draft.area - 1, reconnects = false) {
-            draft = draft.copy(area = it + 1)
-        }
-        val dialog = AlertDialog.Builder(this).setTitle(getString(R.string.settings_ambient_configuration))
-            .setView(ScrollView(this).apply { addView(body) })
-            .setPositiveButton(getString(R.string.save), null)
-            .setNegativeButton(getString(R.string.cancel), null).create()
-        dialog.setOnShowListener {
-            val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            save.setOnClickListener {
-                val selected = draft.copy(colorCycle = draft.music)
-                fun commit() {
-                    AmbientMusicSettings.save(this, selected)
-                    dialog.dismiss()
-                    render()
-                }
-                if (!selected.enabled) commit()
-                else {
-                    save.isEnabled = false
-                    save.text = getString(R.string.settings_ambient_checking)
-                    ambientSupportCheck(applicationContext).whenComplete { supported, _ ->
-                        runOnUiThread {
-                            if (!dialog.isShowing || isFinishing || isDestroyed) return@runOnUiThread
-                            save.isEnabled = true
-                            save.text = getString(R.string.save)
-                            if (supported == true) commit()
-                            else toast(getString(R.string.settings_ambient_unavailable))
-                        }
-                    }
-                }
-            }
-        }
-        dialog.show()
-    }
-
-    // [announcesReconnect] labels a choice whose [save] reconnects by itself.
     private fun choice(parent: LinearLayout, title: String, options: List<String>, current: Int, reconnects: Boolean = true,
         announcesReconnect: Boolean = reconnects, enabled: Boolean = true, save: (Int) -> Unit) {
         var selection = current
@@ -6118,9 +4521,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
                 !intent.hasExtra("page")
 
-        private const val BYD_VEHICLE_TAG = "DiPlay-BYD13"
-        private const val VEHICLE_VALIDATION_RETRY_MILLIS = 500L
-        private const val ADB_KEY_SAVE_WAIT_MILLIS = 500L
         private const val APPEARANCE_POLL_MILLIS = 2_000L
         private const val APPEARANCE_BUTTON_TAG = "app_appearance_button"
         private const val SETTINGS_SEARCH_BUTTON_TAG = "settings_search_button"

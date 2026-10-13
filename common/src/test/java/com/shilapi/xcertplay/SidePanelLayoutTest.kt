@@ -85,7 +85,7 @@ class SidePanelLayoutTest {
         assertEquals(534, params.height)
     }
 
-    @Test fun adoptingAnOpenSidePanelRestoresItsViewAndRefreshWithoutChangingTheArea() {
+    @Test fun adoptingAnOpenSidePanelRestoresItsViewAndControllerWithoutChangingTheArea() {
         val areas = CarPlayViewAreas.build(2560, 1440, CarPlayDock.AUTOMATIC, null, sidePanel = true)!!
         val selected = areas.sidePanel()!!
         areas.use(selected)
@@ -99,7 +99,7 @@ class SidePanelLayoutTest {
         assertEquals(selected, areas.current)
         assertEquals(true, get("sidePanelShown"))
         assertEquals(View.VISIBLE, panel.visibility)
-        assertTrue((get("mainHandler") as Handler).hasCallbacks(get("sidePanelTick") as Runnable))
+        assertSame(controller, get("controller"))
     }
 
     private fun place(width: Int, height: Int) {

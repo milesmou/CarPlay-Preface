@@ -153,7 +153,7 @@ class SettingsWidgetsTest {
         val options = views(row.container).filterIsInstance<RadioButton>().toList()
         assertEquals(listOf(WirelessHotspotMode.MANUAL, WirelessHotspotMode.WIFI_P2P, WirelessHotspotMode.EXISTING_WIFI),
             options.map { it.tag })
-        assertEquals("Built-in car hotspot (recommended)", options.first().text.toString())
+        assertEquals(context.getString(com.shilapi.xcertplay.host.R.string.settings_built_in_car_hotspot_recommended), options.first().text.toString())
         assertEquals(WirelessHotspotMode.WIFI_P2P, options.first { it.isChecked }.tag)
     }
 

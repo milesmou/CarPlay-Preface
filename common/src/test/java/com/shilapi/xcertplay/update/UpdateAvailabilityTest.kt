@@ -67,6 +67,35 @@ class UpdateAvailabilityTest {
         assertTrue(UpdateAvailability.shouldCheck(context, now - 1))
     }
 
+    @Test fun repositoryMigrationClearsUpstreamMetadataAndAllowsAnImmediateCheck() {
+        val values = context.getSharedPreferences("diplay_update_availability", Context.MODE_PRIVATE)
+        values.edit()
+            .putString("repository", "shihabal3amri/DiPlay")
+            .putString("tag", "v0.2.18")
+            .putString("apk_name", "DiPlay-0.2.18.apk")
+            .putString("apk_url", "https://github.com/shihabal3amri/DiPlay/releases/download/v0.2.18/DiPlay-0.2.18.apk")
+            .putString("checksums_url", "https://github.com/shihabal3amri/DiPlay/releases/download/v0.2.18/SHA256SUMS.txt")
+            .putLong("last_attempt_millis", 10_000_000L)
+            .putString("last_result", "found v0.2.18")
+            .putBoolean("background_checks", false)
+            .commit()
+
+        assertNull(UpdateAvailability.available(context, "0.1.0"))
+        assertTrue(UpdateAvailability.shouldCheck(context, 10_000_001L))
+        assertFalse(UpdateAvailability.backgroundChecksEnabled(context))
+        assertFalse(values.contains("apk_url"))
+        assertFalse(values.contains("last_result"))
+        assertEquals("milesmou/CarPlay-Preface", values.getString("repository", null))
+    }
+
+    @Test fun unscopedLegacyMetadataIsNotUsedForTheFork() {
+        UpdateAvailability.save(context, release("v0.2.18"))
+        context.getSharedPreferences("diplay_update_availability", Context.MODE_PRIVATE)
+            .edit().remove("repository").commit()
+
+        assertNull(UpdateAvailability.available(context, "0.1.0"))
+    }
+
     private fun release(tag: String) = UpdateRelease(
         tagName = tag,
         apkName = "DiPlay-$tag.apk",

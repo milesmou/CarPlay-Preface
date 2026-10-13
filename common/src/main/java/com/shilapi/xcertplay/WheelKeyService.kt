@@ -17,29 +17,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
+import com.shilapi.xcertplay.telecom.PhoneAudioSettings
+import com.shilapi.xcertplay.hud.NavigationOutputs
 import com.shilapi.xcertplay.airplay.AirPlayKnobState
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.glance.CarPlayGlance
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.NavigationPlayback
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
-import com.shilapi.xcertplay.hud.BydOutputSettings
 
-/**
- * Optional: steering-wheel keys zoom CarPlay's dashboard map and work as a CarPlay joystick. BYD's window
- * manager takes the wheel's keys (volume 291/292, the custom key 305, the media key 289) before any app
- * sees them and acts on them itself. An accessibility service that filters key events gets them earlier,
- * in the input filter, and may keep them. With the zoom setting on and the dashboard map streaming, the
- * mode key (BYD's custom key by default) switches the zoom keys (the volume keys by default) from volume
- * to map zoom until it is pressed again, or, in the timed behaviour, until a few seconds after the last
- * zoom. With the joystick setting on, the joystick key (BYD's media key by default) turns the joystick on
- * and off; while it is on the keys drive CarPlay's main screen as a car's rotary knob would (see
- * [WheelJoystick]). A call always keeps the keys for the call. During a CarPlay call the call key answers on
- * the iPhone (see [CarPlayCallKeys]), and with a CarPlay session DiLink 3's CarPlay voice keys open Siri.
- * With the Siri key setting on, a key the user assigns opens Siri while CarPlay is connected.
- * Every other key passes on unchanged. On
- * the Tang the console's volume sends the same codes as the wheel's, so it zooms and moves too.
- */
+/** Learned wheel keys control map zoom, the CarPlay joystick and Siri while their features are enabled. */
 class WheelKeyService : AccessibilityService() {
     private val keys = WheelZoomKeys()
     private val navigationKeys = NavigationWheelKeyPolicy()
@@ -90,7 +76,6 @@ class WheelKeyService : AccessibilityService() {
     override fun onServiceConnected() {
         running = this
         NavigationWheelSettings.recordAuthorization(this)
-        CarPlayCallKeys.install(this)
         // Lets the watcher for other apps' calls run whenever this accessibility service does.
         PhoneAudioRoute.attach(this)
         refreshEligibility()
@@ -137,12 +122,7 @@ class WheelKeyService : AccessibilityService() {
             return true
         }
         if (navigationKeys.owns(event.keyCode, event.deviceId, event.downTime)) return navigationKey(event)
-        if (CarPlayCallKeys.onKey(this, event.keyCode, down)) return true
-        if (BydOutputSettings.carPlayCallControls(this) &&
-            CarPlayMediaButton.opensSiriWhileCarPlay(event.keyCode) && session() != null) {
-            if (!down) Log.i(TAG, "CarPlay voice key ${event.keyCode}: Siri sent=${CarPlayBackgroundSession.snapshot()?.controller?.requestSiri() == true}")
-            return true
-        }
+
         val key = WheelKey.of(event)
         refreshEligibility()
         val calling = inCall(this)
@@ -194,19 +174,19 @@ class WheelKeyService : AccessibilityService() {
 
     private fun navigationKey(event: KeyEvent): Boolean = navigationKeys.onKey(
         event.action, event.keyCode, event.deviceId, event.downTime, event.repeatCount,
-        eligible = navigationStream() != null,
+        eligible = navigationVolumeEligible(),
     ) { delta -> adjustNavigation(delta) }
 
     private fun navigationStream(): Int? {
-        if (!NavigationWheelSettings.enabled(this) || running !== this || inCall(this) || session() == null) return null
+        if (!navigationVolumeEligible()) return null
         val playback = navigationPlayback()
-        if (!playback.active || playback.priorityVoiceActive) return null
         // Usage routing and a rejected legacy route cannot identify a safe volume stream.
         return playback.legacyStreamType?.takeIf { it in 1..20 && it != AudioManager.STREAM_MUSIC }
     }
 
     private fun adjustNavigation(delta: Int): Boolean {
-        val stream = navigationStream() ?: return false
+        if (!navigationVolumeEligible()) return false
+        val stream = navigationStream() ?: return com.shilapi.xcertplay.media.CarPlayAudioVolume.adjustNavigation(this, delta)
         val audio = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
         return try {
             val minimum = navigationWheelMinimum(stream, android.os.Build.VERSION.SDK_INT) {
@@ -224,6 +204,10 @@ class WheelKeyService : AccessibilityService() {
             false
         }
     }
+
+    private fun navigationVolumeEligible(): Boolean =
+        NavigationWheelSettings.enabled(this) && running === this && !inCall(this) && session() != null &&
+            navigationPlayback().let { it.active && !it.priorityVoiceActive }
 
     private fun eligibleRoute(): Any? = if (WheelZoomSettings.enabled(this)) mapRoute() else null
 
@@ -301,7 +285,6 @@ class WheelKeyService : AccessibilityService() {
             if (on) Toast.makeText(this, "$text\n${getString(R.string.wheel_joystick_hint)}", Toast.LENGTH_LONG).show()
             else Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
         }
-        BydNavigationOutputs.dashboardNote(text)
     }
 
     private fun clearLearning(notify: Boolean = true) {
@@ -330,23 +313,15 @@ class WheelKeyService : AccessibilityService() {
         }
     }
 
-    // On the centre screen, and where the song shows on the dashboard: zoom with BYD's Bluetooth-music
-    // icon (source 6), volume with the song's usual icon.
     private fun announce(zoomOn: Boolean) {
         Log.i(TAG, "zoom mode ${if (zoomOn) "on" else "off"}")
         handler.post {
             Toast.makeText(this, if (zoomOn) R.string.wheel_zoom_mode_on else R.string.wheel_zoom_mode_off, Toast.LENGTH_SHORT).show()
         }
-        if (zoomOn) {
-            BydNavigationOutputs.dashboardNote("🔍 ${getString(R.string.wheel_zoom_note_zoom)}", ZOOM_NOTE_SOURCE)
-        } else {
-            BydNavigationOutputs.dashboardNote("🔊 ${getString(R.string.wheel_zoom_note_volume)}")
-        }
     }
 
     companion object {
         internal const val TAG = "DiPlay-WheelKeys"
-        private const val ZOOM_NOTE_SOURCE = 6
         private const val ELIGIBILITY_POLL_MILLIS = 250L
         private const val ROUTE_CHECK_MILLIS = 1_000L
         internal const val LEARNING_TIMEOUT_MILLIS = 10_000L
@@ -454,8 +429,8 @@ class WheelKeyService : AccessibilityService() {
          * watcher for other apps' calls, which runs only while something keeps DiPlay alive.
          */
         internal fun wanted(context: Context): Boolean = WheelZoomSettings.anyEnabled(context) ||
-            BydOutputSettings.carPlayCallControls(context) || NavigationWheelSettings.restoreAllowed(context) ||
-            BydOutputSettings.phoneAudioRouteApps(context)
+            NavigationWheelSettings.restoreAllowed(context) ||
+            PhoneAudioSettings.phoneAudioRouteApps(context)
 
         /**
          * Android takes the service off the allowed list when the app is force-stopped (BYD's system does
@@ -552,7 +527,7 @@ class WheelKeyService : AccessibilityService() {
 // CarPlay's iAP2 call state can be active even when the head unit leaves Android's mode normal.
 // Native Bluetooth calls also use a call/communication audio mode.
 internal fun inCall(context: Context): Boolean =
-    BydNavigationOutputs.carPlayCall() != null ||
+    NavigationOutputs.carPlayCall() != null ||
         (context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.mode.let { it != null && it != AudioManager.MODE_NORMAL }
 
 /** Use the input-device ID for a held press; saved assignments still use the stable device name. */
@@ -714,22 +689,18 @@ object WheelZoomSettings {
     private const val KEY_JOYSTICK = "joystick"
     private const val KEY_JOYSTICK_AUTO_OFF = "joystick_auto_off"
     private const val KEY_SIRI = "siri_key"
-    private const val BYD_KEYS = "simulate-keys"
     const val TIMED_MODE_MILLIS = 5_000L
     const val JOYSTICK_IDLE_MILLIS = 15_000L
 
-    /**
-     * Defaults are a BYD Tang's wheel: the custom key, volume up and down (the roller), the media key,
-     * previous, next and play/pause. The Siri key has no default: DiPlay's screen already takes BYD's voice key.
-     */
+    /** Vehicle-specific keys must be learned; no OEM key codes are assumed. */
     enum class Role(val defaultKey: WheelKey?) {
-        MODE(WheelKey(305, 300, BYD_KEYS)),
-        ZOOM_IN(WheelKey(291, 115, BYD_KEYS)),
-        ZOOM_OUT(WheelKey(292, 114, BYD_KEYS)),
-        JOYSTICK(WheelKey(289, 89, BYD_KEYS)),
-        PREVIOUS(WheelKey(88, 268, BYD_KEYS)),
-        NEXT(WheelKey(87, 270, BYD_KEYS)),
-        SELECT(WheelKey(353, 505, BYD_KEYS)),
+        MODE(null),
+        ZOOM_IN(null),
+        ZOOM_OUT(null),
+        JOYSTICK(null),
+        PREVIOUS(null),
+        NEXT(null),
+        SELECT(null),
         SIRI(null),
     }
 

@@ -1,15 +1,19 @@
 package com.shilapi.xcertplay
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
+import android.os.Build
 import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.AirPlaySession
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
-import com.shilapi.xcertplay.hud.BydCarPlayCall
+import com.shilapi.xcertplay.hud.NavigationOutputs
 import com.shilapi.xcertplay.hud.CarPlayCallState
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
 import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import java.util.concurrent.ExecutorService
 import org.junit.After
 import org.junit.Assert.*
@@ -19,8 +23,10 @@ import org.junit.runner.RunWith
 import org.mockito.Mockito.*
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
+import org.robolectric.util.ReflectionHelpers
 
 /**
  * The steering wheel's next/previous keys, claimed by the CarPlay window itself.
@@ -37,7 +43,7 @@ class WheelMediaKeyWindowTest {
     private lateinit var controller: CarPlayController
 
     @Before fun setUp() {
-        BydCarPlayCall.end()
+        NavigationOutputs.endNow()
         CarPlayBackgroundSession.clear()
         host = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         host.getSharedPreferences("diplay_wheel_map_zoom", Context.MODE_PRIVATE).edit().clear().commit()
@@ -56,7 +62,7 @@ class WheelMediaKeyWindowTest {
         }
         (host.javaClass.getDeclaredField("mainHandler").apply { isAccessible = true }.get(host) as Handler)
             .removeCallbacksAndMessages(null)
-        BydCarPlayCall.end()
+        NavigationOutputs.endNow()
         CarPlayBackgroundSession.clear()
         host.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
     }
@@ -69,8 +75,7 @@ class WheelMediaKeyWindowTest {
     }
 
     @Test fun oneTapSendsOnePress() {
-        // BYD sends a tap as an instant down/up pair, and a hold as repeats. Either way CarPlay must
-        // see one press, and the release must not reach BYD's own player as an unpaired key.
+        // A down/up pair and hold repeats must produce one CarPlay press and consume its release.
         assertTrue(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_NEXT, true)))
         assertTrue(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_NEXT, true, repeat = 1)))
         assertTrue(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_NEXT, false)))
@@ -78,7 +83,7 @@ class WheelMediaKeyWindowTest {
     }
 
     @Test fun theKeysKeepTheCarsOwnActionDuringACall() {
-        BydCarPlayCall.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
+        NavigationOutputs.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
             u8(2, 4); string(4, "active-call")
         })
         assertEquals(AudioManager.MODE_NORMAL, host.getSystemService(AudioManager::class.java).mode)
@@ -93,11 +98,44 @@ class WheelMediaKeyWindowTest {
         verify(controller, never()).sendMediaButton(anyInt())
     }
 
-    @Test fun playPauseIsLeftAlone() {
-        // The wheel key service and BYD itself both own this key; the window must not take it.
-        assertFalse(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, true)))
-        assertFalse(host.dispatchKeyEvent(key(CarPlayMediaButton.KEYCODE_BYD_AUTO_MEDIA_PLAY_PAUSE, true)))
-        verify(controller, never()).sendMediaButton(anyInt())
+    @Test fun standardPlayPauseReachesCarPlayAndUnknownPrivateKeysAreLeftAlone() {
+        assertTrue(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, true)))
+        assertTrue(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, false)))
+        verify(controller).sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
+        assertFalse(host.dispatchKeyEvent(key(353, true)))
+        verify(controller, times(1)).sendMediaButton(anyInt())
+    }
+
+    @Test @Config(sdk = [28])
+    fun prefaceWindowAndStockBroadcastDoNotSkipTwoTracks() {
+        val product = Build.PRODUCT
+        val model = Build.MODEL
+        val incremental = Build.VERSION.INCREMENTAL
+        try {
+            ReflectionHelpers.setStaticField(Build::class.java, "PRODUCT", "IHU519G")
+            ReflectionHelpers.setStaticField(Build::class.java, "MODEL", "FS11A1")
+            ReflectionHelpers.setStaticField(Build.VERSION::class.java, "INCREMENTAL", "327")
+            `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+            CarPlayMediaKeys.attach(host, controller) { true }
+            CarPlayBackgroundSession.active = true
+            for ((code, time) in listOf(87 to 100L, 88 to 200L, 87 to 300L)) {
+                val down = KeyEvent(time, time, KeyEvent.ACTION_DOWN, code, 0)
+                assertTrue(host.dispatchKeyEvent(down))
+                host.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).addCategory(Intent.CATEGORY_DEFAULT)
+                    .putExtra(Intent.EXTRA_KEY_EVENT, down))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertTrue(host.dispatchKeyEvent(KeyEvent(time, time + 10, KeyEvent.ACTION_UP, code, 0)))
+            }
+            verify(controller, times(2)).sendMediaButton(CarPlayMediaButton.NEXT)
+            verify(controller).sendMediaButton(CarPlayMediaButton.PREVIOUS)
+            verify(controller, times(3)).sendMediaButton(anyInt())
+        } finally {
+            CarPlayMediaKeys.detach(controller)
+            shadowOf(Looper.getMainLooper()).idle()
+            ReflectionHelpers.setStaticField(Build::class.java, "PRODUCT", product)
+            ReflectionHelpers.setStaticField(Build::class.java, "MODEL", model)
+            ReflectionHelpers.setStaticField(Build.VERSION::class.java, "INCREMENTAL", incremental)
+        }
     }
 
     private fun field(name: String, value: Any?) = host.javaClass.getDeclaredField(name)

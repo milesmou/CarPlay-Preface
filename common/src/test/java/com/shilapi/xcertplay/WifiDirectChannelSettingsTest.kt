@@ -39,7 +39,7 @@ class WifiDirectChannelSettingsTest {
     @Test fun defaultIsAutoAndCancelDoesNotSavePreviewedChannel() {
         assertEquals(WifiP2pChannels.AUTO, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
         val control = channelControl(controls())!!
-        assertTrue(control.text.toString().endsWith("Auto"))
+        assertTrue(control.text.toString().endsWith(activity.getString(R.string.auto)))
         control.performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         assertEquals(0, dialog.listView.checkedItemPosition)
@@ -47,7 +47,7 @@ class WifiDirectChannelSettingsTest {
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(WifiP2pChannels.AUTO, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
-        assertTrue(control.text.toString().endsWith("Auto"))
+        assertTrue(control.text.toString().endsWith(activity.getString(R.string.auto)))
     }
 
     @Test fun savedChannelSurvivesModeChangesAndCanBeResetToAuto() {
@@ -76,13 +76,14 @@ class WifiDirectChannelSettingsTest {
         val control = channelControl(controls())!!
         control.performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
-        assertEquals("Auto · 5 GHz", dialog.listView.adapter.getItem(1).toString())
-        assertEquals("Auto · 2.4 GHz", dialog.listView.adapter.getItem(2).toString())
+        val fiveGhz = activity.getString(R.string.settings_wifi_direct_auto_band, activity.getString(R.string.s_5_ghz))
+        assertEquals(fiveGhz, dialog.listView.adapter.getItem(1).toString())
+        assertEquals(activity.getString(R.string.settings_wifi_direct_auto_band, activity.getString(R.string.s_2_4_ghz)), dialog.listView.adapter.getItem(2).toString())
         select(dialog, WifiP2pChannels.AUTO_5_GHZ)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(WifiP2pChannels.AUTO_5_GHZ, AirPlayPersistence.loadWifiP2pPreferredChannel(activity))
-        assertTrue(control.text.toString().endsWith("Auto · 5 GHz"))
+        assertTrue(control.text.toString().endsWith(fiveGhz))
     }
 
     @Test fun invalidOrCorruptSavedChannelsUseAuto() {

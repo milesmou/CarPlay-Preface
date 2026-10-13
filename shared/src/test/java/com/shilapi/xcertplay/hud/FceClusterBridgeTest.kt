@@ -22,8 +22,7 @@ class FceClusterBridgeTest {
     @Before
     fun setUp() {
         app = RuntimeEnvironment.getApplication()
-        BydOutputSettings.setEnabled(app, true)
-        BydOutputSettings.setFceCluster(app, true)
+        FceNavigationSettings.setEnabled(app, true)
         FceClusterBridge.resetForTest({ id, value -> writes += id to value; true }, app)
     }
 
@@ -31,12 +30,12 @@ class FceClusterBridgeTest {
     fun tearDown() = FceClusterBridge.resetForTest({ _, _ -> true }, null)
 
     private fun maneuver(index: Int, type: Int, side: Int = 0) = FceClusterBridge.onFrame(
-        Iap2Frame(BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE,
+        Iap2Frame(CarPlayRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE,
             tlvs(tlv(0x01, 0, index), tlv(0x03, type), tlv(0x08, side))),
     )
 
     private fun route(state: Int, distance: Int, current: Int? = null) = FceClusterBridge.onFrame(
-        Iap2Frame(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, tlvs(
+        Iap2Frame(CarPlayRouteState.ROUTE_GUIDANCE_UPDATE, tlvs(
             tlv(0x01, state),
             tlv(0x0a, distance ushr 24 and 0xff, distance ushr 16 and 0xff, distance ushr 8 and 0xff, distance and 0xff),
             *listOfNotNull(current?.let { tlv(0x0d, 0, it) }).toTypedArray(),
@@ -50,7 +49,7 @@ class FceClusterBridgeTest {
 
     @Test
     fun `nothing is written until the driver opts in`() {
-        BydOutputSettings.setFceCluster(app, false)
+        FceNavigationSettings.setEnabled(app, false)
         maneuver(index = 2, type = 1)
         route(state = 1, distance = 178, current = 2)
 
@@ -101,7 +100,7 @@ class FceClusterBridgeTest {
     }
 
     private fun raw(vararg bytes: Int) = FceClusterBridge.onFrame(
-        Iap2Frame(BydHudRouteState.ROUTE_GUIDANCE_UPDATE, ByteArray(bytes.size) { bytes[it].toByte() }),
+        Iap2Frame(CarPlayRouteState.ROUTE_GUIDANCE_UPDATE, ByteArray(bytes.size) { bytes[it].toByte() }),
     )
 
     // The two RouteGuidanceUpdate frames an older iPhone sent with Google Maps: a source name and
@@ -161,7 +160,7 @@ class FceClusterBridgeTest {
 
     @Test
     fun `disabled setting sends nothing`() {
-        BydOutputSettings.setEnabled(app, false)
+        FceNavigationSettings.setEnabled(app, false)
         maneuver(index = 0, type = 1)
         route(state = 1, distance = 100, current = 0)
         assertTrue(writes.isEmpty())

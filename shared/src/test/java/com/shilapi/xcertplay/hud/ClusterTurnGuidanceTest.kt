@@ -6,7 +6,7 @@ import org.junit.Test
 class ClusterTurnGuidanceTest {
     @Test
     fun straightAheadKeepsTheCard() {
-        val guidance = ClusterTurnGuidance.from(BydClusterFrame.from(BydAppleManeuver(400, 3, 0, "环城路")))
+        val guidance = ClusterTurnGuidance.from(ClusterGuidanceFrame.from(CarPlayManeuver(400, 3, 0, "环城路")))
         assertEquals(9, guidance.icon)
         assertEquals(400, guidance.distanceMeters)
         assertEquals("环城路", guidance.road)
@@ -14,14 +14,14 @@ class ClusterTurnGuidanceTest {
 
     @Test
     fun unknownManeuverMustNotInventAStraightInstruction() {
-        val guidance = ClusterTurnGuidance.from(BydClusterFrame.from(BydAppleManeuver(80, 0, 0)))
+        val guidance = ClusterTurnGuidance.from(ClusterGuidanceFrame.from(CarPlayManeuver(80, 0, 0)))
         assertEquals(0, guidance.icon)
         assertEquals(80, guidance.distanceMeters)
     }
 
     @Test
     fun leftTurnIsUnchanged() {
-        val guidance = ClusterTurnGuidance.from(BydClusterFrame.from(BydAppleManeuver(53, 1, 0)))
+        val guidance = ClusterTurnGuidance.from(ClusterGuidanceFrame.from(CarPlayManeuver(53, 1, 0)))
         assertEquals(2, guidance.icon)
     }
 }

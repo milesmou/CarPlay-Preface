@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_carplay_media_volume">媒体音量</string>
+    <string name="settings_carplay_navigation_volume">导航音量</string>
+    <string name="settings_carplay_volume_description">分别调节 CarPlay 音乐和导航播报的输出比例，保存后立即生效，0% 为静音。车机系统音量仍影响最终响度。自动音频路由也支持独立调节；使用车载蓝牙音频时，音量由车机控制。</string>
+</resources>

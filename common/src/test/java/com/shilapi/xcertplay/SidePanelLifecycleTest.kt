@@ -24,17 +24,13 @@ import org.robolectric.annotation.LooperMode
 class SidePanelLifecycleTest {
     private lateinit var activity: CarPlayHostActivity
     private lateinit var handler: Handler
-    private lateinit var refresh: Runnable
     private lateinit var panel: View
 
     @Before fun setup() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         handler = get("mainHandler") as Handler
-        refresh = get("sidePanelTick") as Runnable
         panel = LinearLayout(activity).also { set("sidePanel", it) }
         set("sidePanelShown", true)
-        handler.postDelayed(refresh, 5_000L)
-        assertTrue(handler.hasCallbacks(refresh))
     }
 
     @After fun cleanup() {
@@ -43,14 +39,14 @@ class SidePanelLifecycleTest {
         (get("airPlayCommandExecutor") as ExecutorService).shutdownNow()
     }
 
-    @Test fun destroyingAHostWithThePanelOpenCancelsItsRepeatedRefresh() {
+    @Test fun destroyingAHostWithThePanelOpenHidesItsView() {
         activity.javaClass.getDeclaredMethod("onDestroy").apply { isAccessible = true }.invoke(activity)
         assertPanelStopped()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
         assertPanelStopped()
     }
 
-    @Test fun shutdownCancelsTheRefreshBeforeTheActivityIsDestroyed() {
+    @Test fun shutdownHidesThePanelBeforeTheActivityIsDestroyed() {
         activity.javaClass.getDeclaredMethod("shutdown", Boolean::class.javaPrimitiveType,
             String::class.java, Function0::class.java).apply { isAccessible = true }
             .invoke(activity, false, "side panel cleanup test", {})
@@ -63,7 +59,6 @@ class SidePanelLifecycleTest {
     private fun assertPanelStopped() {
         assertEquals(false, get("sidePanelShown"))
         assertEquals(View.GONE, panel.visibility)
-        assertFalse("A destroyed/stopped host must not keep refreshing its old views", handler.hasCallbacks(refresh))
     }
 
     private fun get(name: String): Any? = activity.javaClass.getDeclaredField(name)

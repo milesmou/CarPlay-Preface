@@ -144,9 +144,7 @@ class UsbAutoConfirmService : AccessibilityService() {
             return false
         }
 
-        /** BYD's settings app does not answer the standard action but has its own screen (#409). */
         private val ACCESSIBILITY_SCREENS = listOf(
-            ComponentName("com.byd.systemsettings", "com.byd.systemsettings.accessibility.AccessibilityMainActivity"),
             ComponentName("com.android.settings", "com.android.settings.Settings\$AccessibilitySettingsActivity"),
         )
 

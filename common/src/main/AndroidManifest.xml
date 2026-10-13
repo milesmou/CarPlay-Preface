@@ -17,11 +17,10 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- Optional: the dashboard map as a card over the home screen. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
+    <!-- Optional Usage Access for showing the map over the active home screen. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
-        <package android:name="com.byd.carsettings" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
@@ -35,7 +34,7 @@
             <data android:mimeType="*/*" />
         </intent>
     </queries>
-    <application>
+    <application android:name="com.shilapi.xcertplay.DiPlayApplication">
         <provider
             android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"
@@ -85,18 +84,6 @@
                 android:resource="@xml/usb_device_filter" />
         </activity>
 
-        <activity
-            android:name="com.shilapi.xcertplay.AdbClusterActivity"
-            android:label="@string/adb_cluster_activity_label"
-            android:icon="@drawable/ic_dp_navigation"
-            android:taskAffinity="${applicationId}.cluster"
-            android:excludeFromRecents="true"
-            android:resizeableActivity="true"
-            android:allowEmbedded="true"
-            android:exported="true"
-            android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
-            android:theme="@style/Theme.AdbCluster">
-        </activity>
 
         <activity
             android:name="com.shilapi.xcertplay.CarPlayVideoActivity"
@@ -140,7 +127,7 @@
             </intent-filter>
         </service>
 
-        <!-- Optional: steering-wheel keys for the dashboard map zoom (docs/BYD_NAVIGATION.md). -->
+        <!-- Optional: steering-wheel keys for the dashboard map zoom. -->
         <service
             android:name="com.shilapi.xcertplay.WheelKeyService"
             android:exported="true"

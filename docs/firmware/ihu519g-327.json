@@ -1,0 +1,678 @@
+{
+  "schemaVersion": 1,
+  "analyzedAt": "2026-10-13",
+  "scope": "Static evidence for the supplied IHU519G/FS11A1 build 327 only; vehicle validation pending.",
+  "cacheRoot": "agent_docs/firmware/ihu519g-327",
+  "source": {
+    "providedFilename": "23星瑞1.5T固件.zip",
+    "initialFilename": "update.zip",
+    "bytes": 2519405530,
+    "sha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01"
+  },
+  "identity": {
+    "product": "IHU519G",
+    "device": "IHU519G",
+    "model": "FS11A1",
+    "manufacturer": "ecarx",
+    "platformVersion": "ECARX_E02_V1.3",
+    "android": "9",
+    "api": 28,
+    "incremental": "327",
+    "securityPatch": "2021-02-05",
+    "abis": [
+      "arm64-v8a",
+      "armeabi-v7a",
+      "armeabi"
+    ],
+    "fingerprint": "ecarx/IHU519G/IHU519G:9/PQ2A.190405.003/327:user/dev-keys",
+    "evidence": [
+      "system_properties",
+      "vendor_properties"
+    ]
+  },
+  "audio": {
+    "verification": "static_constants_and_configuration",
+    "streams": {
+      "STREAM_ACCESSIBILITY": 10,
+      "STREAM_ALARM": 4,
+      "STREAM_BEEP": 14,
+      "STREAM_BLUETOOTH_SCO": 6,
+      "STREAM_BOOT": 15,
+      "STREAM_DTMF": 8,
+      "STREAM_ECALL": 20,
+      "STREAM_KTV": 19,
+      "STREAM_MUSIC": 3,
+      "STREAM_NAVI": 12,
+      "STREAM_NOTIFICATION": 5,
+      "STREAM_RADAR": 16,
+      "STREAM_RADIO": 13,
+      "STREAM_RING": 2,
+      "STREAM_SYSTEM": 1,
+      "STREAM_SYSTEM_ENFORCED": 7,
+      "STREAM_TTS": 9,
+      "STREAM_TTS_NOTICE": 11,
+      "STREAM_VIRTUAL": 18,
+      "STREAM_VOICE_CALL": 0,
+      "STREAM_VOIP": 17
+    },
+    "usages": {
+      "USAGE_ALARM": 4,
+      "USAGE_ASSISTANCE_ACCESSIBILITY": 11,
+      "USAGE_ASSISTANCE_NAVIGATION_GUIDANCE": 12,
+      "USAGE_ASSISTANCE_SONIFICATION": 13,
+      "USAGE_ASSISTANT": 16,
+      "USAGE_BEEP": 23,
+      "USAGE_BOOT": 24,
+      "USAGE_DTMF": 27,
+      "USAGE_GAME": 14,
+      "USAGE_KTV": 28,
+      "USAGE_MAX": 29,
+      "USAGE_MEDIA": 1,
+      "USAGE_NAVIGATION_HINT": 19,
+      "USAGE_NOTIFICATION": 5,
+      "USAGE_NOTIFICATION_COMMUNICATION_DELAYED": 9,
+      "USAGE_NOTIFICATION_COMMUNICATION_INSTANT": 8,
+      "USAGE_NOTIFICATION_COMMUNICATION_REQUEST": 7,
+      "USAGE_NOTIFICATION_EVENT": 10,
+      "USAGE_NOTIFICATION_RINGTONE": 6,
+      "USAGE_RADAR": 26,
+      "USAGE_RADIO": 17,
+      "USAGE_TTS": 20,
+      "USAGE_TTS_NOTICE": 21,
+      "USAGE_UNKNOWN": 0,
+      "USAGE_VIRTUAL": 22,
+      "USAGE_VIRTUAL_SOURCE": 15,
+      "USAGE_VOICE_COMMUNICATION": 2,
+      "USAGE_VOICE_COMMUNICATION_SIGNALLING": 3,
+      "USAGE_VOICE_ECALL": 18,
+      "USAGE_VOICE_VOIP": 25
+    },
+    "nativeWheelVolume": {
+      "acceptedActiveStreams": [
+        0,
+        3,
+        9,
+        12
+      ],
+      "fallbackStream": 3,
+      "volumeFlags": 5,
+      "holdRepeatMs": 250,
+      "evidence": [
+        "volume_keys"
+      ]
+    },
+    "primaryOutput": {
+      "format": "PCM_16_BIT",
+      "sampleRates": [
+        44100,
+        48000
+      ],
+      "channels": "stereo"
+    },
+    "builtInMicrophone": {
+      "format": "PCM_16_BIT",
+      "sampleRates": [
+        8000,
+        16000
+      ],
+      "channelMasks": [
+        "mono",
+        "stereo"
+      ],
+      "runtimeRecording": "not_verified"
+    },
+    "preprocess": {
+      "source": "voice_communication",
+      "effect": "aec",
+      "runtimeAvailability": "not_verified"
+    },
+    "usbAudioBusAddress": "usb_phone_call",
+    "activePolicyIncludes": [
+      "a2dp_audio_policy_configuration.xml",
+      "r_submix_audio_policy_configuration.xml",
+      "ecarx_audio_policy_volumes.xml",
+      "ecarx_default_volume_tables.xml"
+    ],
+    "usbAudioPolicyIncludedByPrimary": false,
+    "usageAndStreamAreDifferentParameters": true,
+    "evidence": [
+      "framework_audio_constants",
+      "audio_policy",
+      "audio_effects"
+    ]
+  },
+  "wheelKeys": {
+    "verification": "stock_static_code",
+    "mappings": [
+      {
+        "function": "previous",
+        "systemKey": 304,
+        "adapterKey": 200088,
+        "shortPressAndroidMediaKey": 88
+      },
+      {
+        "function": "next",
+        "systemKey": 305,
+        "adapterKey": 200087,
+        "shortPressAndroidMediaKey": 87
+      },
+      {
+        "function": "volume_up",
+        "systemKey": 301,
+        "adapterKey": 200024,
+        "handledByStockVolume": true
+      },
+      {
+        "function": "volume_down",
+        "systemKey": 302,
+        "adapterKey": 200025,
+        "handledByStockVolume": true
+      },
+      {
+        "function": "voice",
+        "systemKey": 298,
+        "adapterKey": 200231,
+        "handledByStockVoice": true
+      },
+      {
+        "function": "play_pause",
+        "systemKey": null,
+        "adapterKey": 200085,
+        "shortPressAndroidMediaKey": 85
+      }
+    ],
+    "mediaIntent": {
+      "action": "android.intent.action.MEDIA_BUTTON",
+      "category": "android.intent.category.DEFAULT",
+      "extra": "android.intent.extra.KEY_EVENT",
+      "pair": [
+        "DOWN",
+        "UP"
+      ]
+    },
+    "customButton": {
+      "setting": "soft_key_function",
+      "mediaPauseValue": 7
+    },
+    "receiverDeliveryOnVehicle": "not_verified",
+    "evidence": [
+      "key_map",
+      "input_sdk",
+      "media_broadcast",
+      "custom_wheel_button"
+    ]
+  },
+  "services": [
+    {
+      "package": "ecarx.xsf.inputservice",
+      "class": "ecarx.xsf.inputservice.InputService",
+      "declaredAttributes": {
+        "label": "@0x7f0c0027",
+        "name": "ecarx.xsf.inputservice.InputService",
+        "enabled": "true",
+        "exported": "true"
+      },
+      "actions": [
+        "android.intent.action.START_INPUT_SERVICE"
+      ],
+      "categories": [
+        "android.intent.category.XCINPUTSERVICE"
+      ],
+      "evidence": [
+        "apk:ecarx.xsf.inputservice"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "ecarx.naviservice",
+      "class": "ecarx.naviservice.service.NaviService",
+      "declaredAttributes": {
+        "name": "ecarx.naviservice.service.NaviService",
+        "permission": "ecarx.oem.permission.OPENAPI_NAVI_PERMISSION",
+        "enabled": "true",
+        "exported": "true"
+      },
+      "actions": [
+        "ecarx.intent.action.NAVI_SERVICE_STARTED"
+      ],
+      "categories": [
+        "ecarx.intent.category.NAVI",
+        "ecarx.intent.category.NAVI_INNER"
+      ],
+      "evidence": [
+        "apk:ecarx.naviservice"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "com.ecarx.sdk.openapi",
+      "class": "com.ecarx.sdk.openapi.ServicePoolService",
+      "declaredAttributes": {
+        "name": "com.ecarx.sdk.openapi.ServicePoolService",
+        "exported": "true"
+      },
+      "actions": [
+        "ecarx.intent.action.OpenAPIService"
+      ],
+      "categories": [],
+      "evidence": [
+        "apk:com.ecarx.sdk.openapi"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "ecarx.xsf.mediacenter",
+      "class": "ecarx.xsf.mediacenter.MediaCenterService",
+      "declaredAttributes": {
+        "name": "ecarx.xsf.mediacenter.MediaCenterService"
+      },
+      "actions": [
+        "ecarx.xsf.MEDIA_CENTER_SERVICE",
+        "ecarx.xsf.mediacenter.intent.action.EAS_SUPPORT_SERVICE",
+        "com.ecarx.eas.core.intent.action.SUPPORT_SERVICE",
+        "ecarx.xsf.MEDIA_CENTER_INTERNAL_API_SERVICE",
+        "ecarx.xsf.ACTION_MEDIA_CENTER_WIDGET_API_SERVICE"
+      ],
+      "categories": [],
+      "evidence": [
+        "apk:ecarx.xsf.mediacenter"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "ecarx.power.service",
+      "class": "ecarx.power.service.ECarXPowerManagerService",
+      "declaredAttributes": {
+        "label": "ECarXPowerManager Service",
+        "name": "ecarx.power.service.ECarXPowerManagerService",
+        "enabled": "true"
+      },
+      "actions": [
+        "android.intent.action.START_ECARX_POWER_MANAGER_SERVICE"
+      ],
+      "categories": [
+        "android.intent.category.ECARXPOWER"
+      ],
+      "evidence": [
+        "apk:ecarx.power.service"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "com.android.car",
+      "class": ".CarService",
+      "declaredAttributes": {
+        "name": ".CarService",
+        "singleUser": "true"
+      },
+      "actions": [
+        "android.car.ICar"
+      ],
+      "categories": [],
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    },
+    {
+      "package": "android.car.input.service",
+      "class": ".DefaultInputService",
+      "declaredAttributes": {
+        "name": ".DefaultInputService",
+        "permission": "android.car.permission.BIND_CAR_INPUT_SERVICE",
+        "exported": "false"
+      },
+      "actions": [],
+      "categories": [],
+      "evidence": [
+        "apk:android.car.input.service"
+      ],
+      "verification": "manifest_only",
+      "thirdPartyAccess": "not_verified"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "ecarx.oem.permission.OPENAPI_NAVI_PERMISSION",
+      "protectionLevelRaw": "0x00000012",
+      "evidence": [
+        "apk:ecarx.naviservice"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "ecarx.oem.permission.OPENAPI_MEDIACENTER_PERMISSION",
+      "protectionLevelRaw": "0x00000012",
+      "evidence": [
+        "apk:ecarx.xsf.mediacenter"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "android.car.permission.CAR_CONTROL_AUDIO_VOLUME",
+      "protectionLevelRaw": "0x00000012",
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "android.car.permission.CAR_CONTROL_AUDIO_SETTINGS",
+      "protectionLevelRaw": "0x00000012",
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "android.car.permission.CAR_NAVIGATION_MANAGER",
+      "protectionLevelRaw": "0x00000012",
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "android.car.permission.BIND_CAR_INPUT_SERVICE",
+      "protectionLevelRaw": "0x00000002",
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only"
+    },
+    {
+      "name": "android.car.permission.CAR_SPEED",
+      "protectionLevelRaw": "0x00000001",
+      "evidence": [
+        "apk:com.android.car"
+      ],
+      "verification": "manifest_only"
+    }
+  ],
+  "video": {
+    "verification": "configuration_only",
+    "hardwareDecoders": [
+      {
+        "name": "OMX.MTK.VIDEO.DECODER.AVC",
+        "mime": "video/avc",
+        "minSize": [
+          64,
+          64
+        ],
+        "maxSize": [
+          3840,
+          2176
+        ]
+      },
+      {
+        "name": "OMX.MTK.VIDEO.DECODER.HEVC",
+        "mime": "video/hevc",
+        "minSize": [
+          16,
+          16
+        ],
+        "maxSize": [
+          3840,
+          2176
+        ]
+      }
+    ],
+    "carPlayFrameRateAndStability": "not_verified",
+    "evidence": [
+      "video_codec"
+    ]
+  },
+  "connectivity": {
+    "wifiInterfaces": {
+      "station": "wlan0",
+      "hotspot": "ap0",
+      "direct": "p2p0"
+    },
+    "adapterWifiFrequencyModes": {
+      "2.4GHz": 1,
+      "5GHz": 2
+    },
+    "wifiConfigurationApBand": {
+      "2.4GHz": 0,
+      "5GHz": 1
+    },
+    "fiveGHzRequiresRuntimeDualBandAndCountryCode": true,
+    "usbHal": "android.hardware.usb@1.1-service-mediatek",
+    "usbRoleNodes": [
+      "/sys/class/dual_role_usb/dual-role-type_c_port0",
+      "/sys/class/dual_role_usb/dual-role-usb20"
+    ],
+    "usbRoleOwner": "root:system",
+    "usbRoleMode": "0664",
+    "physicalPorts": "not_verified",
+    "evidence": [
+      "system_properties",
+      "wifi_frequency",
+      "usb_roles"
+    ]
+  },
+  "display": {
+    "systemDensity": 160,
+    "vendorDensity": 480,
+    "effectiveDensity": "requires_runtime_check",
+    "resolution": "not_confirmed",
+    "refreshRate": "not_confirmed",
+    "evidence": [
+      "system_properties",
+      "vendor_properties"
+    ]
+  },
+  "navigation": {
+    "instrumentSdk": "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction",
+    "emptyImplementations": [
+      "updateTurnByTurnArrow(Bitmap)",
+      "updateTurnByTurnArrow(String)"
+    ],
+    "gcjLocationSupportBranch": "NL_3B",
+    "fs11a1InstrumentAndDrSupport": "not_verified",
+    "evidence": [
+      "instrument_navigation",
+      "gcj_location"
+    ]
+  },
+  "power": {
+    "systemModeSdk": "com.ecarx.xui.adaptapi.device.ext.ISystemMode",
+    "duraspeedDeclaredEnabled": true,
+    "accSleepWakeAndThirdPartyKeepalive": "not_verified",
+    "evidence": [
+      "system_modes",
+      "vendor_properties"
+    ]
+  },
+  "evidence": {
+    "system_properties": {
+      "path": "system/build.prop",
+      "bytes": 4120,
+      "sha256": "7ac555a1e2f4aa03f9cae3c1b2a63e55edc3ff33197d1cd1fb5738e7367ab548"
+    },
+    "vendor_properties": {
+      "path": "vendor/build.prop",
+      "bytes": 5232,
+      "sha256": "8263c210f12817e58df5d452681d24ef9eb925f85baf7952618f5fa63a9197b7"
+    },
+    "framework_audio_constants": {
+      "path": "system/framework/boot-framework.vdex",
+      "bytes": 20928196,
+      "sha256": "3b40cf31d181d325410c8efb1c1983c038c7c2a09ea7222572133b2294a9b08b"
+    },
+    "key_map": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/impl/KeyMapAdapterApi.java",
+      "bytes": 8187,
+      "sha256": "c5b3021413bd393bf164b0fa79feb531b2cab0d4acc6af969ca20ab4829b86e5"
+    },
+    "input_sdk": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/impl/InputImpl.java",
+      "bytes": 6681,
+      "sha256": "10f75ffcfab6db3e0d73dd966659c81d12039d7f298321c972b7832a35e4a37e"
+    },
+    "media_broadcast": {
+      "path": "decompiled/input/sources/ecarx/xsf/inputservice/util/InputManagerHelper.java",
+      "bytes": 3073,
+      "sha256": "504296fb777d2dc4a0c5b069de0617bca4b0c05e7f9ee3d2b5d8f51653d2f5f6"
+    },
+    "volume_keys": {
+      "path": "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVolumeAdjustActionBase.java",
+      "bytes": 5604,
+      "sha256": "7a2ff2ec667d086cbef0384e0abe658be51ae765697a2537a4425fddf6a5b705"
+    },
+    "custom_wheel_button": {
+      "path": "decompiled/input/sources/ecarx/xsf/inputservice/factory/SoftKeyFactory.java",
+      "bytes": 2662,
+      "sha256": "9f63bda47ee9b7c072197513c0a41a04ae5c7474d60153953af4125a79298184"
+    },
+    "audio_policy": {
+      "path": "vendor/etc/audio_policy_configuration.xml",
+      "bytes": 13607,
+      "sha256": "3ff0bf5a81810cc22fe2eae7563eb65a6ccd8b05cf03c181f126c3be4c2f13a7"
+    },
+    "audio_effects": {
+      "path": "vendor/etc/audio_effects.xml",
+      "bytes": 5965,
+      "sha256": "065473d09d259d7f4166d37b0507c1fc7b9815f7eef13432410cd25875f95385"
+    },
+    "video_codec": {
+      "path": "vendor/etc/media_codecs_mediatek_video.xml",
+      "bytes": 9267,
+      "sha256": "eea7b29fa3c09ff299083083257d496daa17430e00638cc27da8bfd5c263b298"
+    },
+    "wifi_frequency": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/wifiap/impl/WifiApHandleFileImpl.java",
+      "bytes": 18540,
+      "sha256": "79b5a59ee9a32f5d5dc9911e0fc949d048514c5a6931aa03c32869ba57ba43cc"
+    },
+    "instrument_navigation": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/nav/NaviInteractionImpl.java",
+      "bytes": 17405,
+      "sha256": "f6f75d353ced5847fc033c9cb1cf1d89f1f8de64f00b70ebf02fd13af53e927f"
+    },
+    "gcj_location": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/navigation/impl/gps/IGCJLocationImpl.java",
+      "bytes": 6766,
+      "sha256": "e72111f8780e3bff338e64bb1c02efafa0db7befa715175530c6466242d5b864"
+    },
+    "usb_roles": {
+      "path": "vendor/etc/init/android.hardware.usb@1.1-service-mediatek.rc",
+      "bytes": 995,
+      "sha256": "00eb71a0d4240593d4626fd3f051c5a0bfca290895af7e458f8503406bc94011"
+    },
+    "system_modes": {
+      "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/device/ext/ISystemMode.java",
+      "bytes": 1760,
+      "sha256": "c099278e7be3d731bb510b9f5132fba9026cc7c4ac22c995a0f8f2bf95a25cf2"
+    },
+    "apk:com.android.bluetooth": {
+      "path": "system/app/Bluetooth/Bluetooth.apk",
+      "bytes": 546506,
+      "sha256": "19dd70a10fbb78d82e1e4d1a6c009f0320a1cb488733359eca5543f10001b5a9"
+    },
+    "apk:ecarx.ihu.service": {
+      "path": "system/app/ECarXIhuService/ECarXIhuService.apk",
+      "bytes": 25849,
+      "sha256": "ddc31c4c0a0b9ba7deb778e554eee9ee4a7a582ad3a1c69d9da20f2d5a9cf30f"
+    },
+    "apk:ecarx.power.service": {
+      "path": "system/app/ECarXPowerManagerService/ECarXPowerManagerService.apk",
+      "bytes": 2265400,
+      "sha256": "55283772e69ba988fd99f84694371f254af8af8634a0f510b52ab3e3a7e04df9"
+    },
+    "apk:com.ecarx.hmi": {
+      "path": "system/app/HiCarHMI/HiCarHMI.apk",
+      "bytes": 2314260,
+      "sha256": "401d87f13ab1c075d8a3fdb9ad5d1b18810fee0e48993d025202414a3326b294"
+    },
+    "apk:ecarx.xsf.widget": {
+      "path": "system/app/MediaCenterUi/MediaCenterUi.apk",
+      "bytes": 8280937,
+      "sha256": "c3a5d4cfcf9110d9ee95cadded7d557884eb43d80b9b5fcf0d61ceb412e03302"
+    },
+    "apk:com.ecarx.multimedia": {
+      "path": "system/app/XCMedia2/XCMedia2.apk",
+      "bytes": 90189607,
+      "sha256": "82bb6266993eac81c6c3e6f3191034bec85407ab440e4eccd0fb852437a26bd6"
+    },
+    "apk:ecarx.settings": {
+      "path": "system/app/XCSettings/XCSettings.apk",
+      "bytes": 415166153,
+      "sha256": "f7f668ecad75c56bde82ff3bafd3b1502114549e307b8b8344ab837cb0cf5f95"
+    },
+    "apk:com.ecarx.xcttsservice": {
+      "path": "system/app/XCTtsService/XCTtsService.apk",
+      "bytes": 44692175,
+      "sha256": "b2b40ec626edabc5ba482d0413e915c76e08fd6e8c1378bf86f583c02d674641"
+    },
+    "apk:ecarx.xsf.mediacenter": {
+      "path": "system/app/XSFMediaCenter/XSFMediaCenter.apk",
+      "bytes": 222482,
+      "sha256": "7b63a318b94d2ef6d4bf713da89cffc6aa37160b69a3c263ef7f55a0cd148a15"
+    },
+    "apk:com.ecarx.radio.service": {
+      "path": "system/app/XSFRadioService/XSFRadioService.apk",
+      "bytes": 200033,
+      "sha256": "802084df9dfa5b76fb0ebbb7a083d2161f8271919aaf7d19fb1b8b4f40b508cb"
+    },
+    "apk:android.car.input.service": {
+      "path": "system/priv-app/android.car.input.service/android.car.input.service.apk",
+      "bytes": 541442,
+      "sha256": "ebd5ab545869bfa7bfe2d71d84ef89e614c23f6b9ec17f56ab4b841cff369c46"
+    },
+    "apk:com.android.car": {
+      "path": "system/priv-app/CarService/CarService.apk",
+      "bytes": 8256253,
+      "sha256": "cb3cd3f8b886e71f2ab75ab17eb4b25afa46cfc8e7dace25b7968b2b7a170953"
+    },
+    "apk:android.car.usb.handler": {
+      "path": "system/priv-app/CarUsbHandler/CarUsbHandler.apk",
+      "bytes": 95198,
+      "sha256": "8fa0f8921e792cf2da073eb5aa4ec6eabd704d3857d6924c07f4e8a720eb55c0"
+    },
+    "apk:com.ecarx.naviwidget": {
+      "path": "system/priv-app/NaviServiceUi/NaviServiceUi.apk",
+      "bytes": 15573755,
+      "sha256": "e0ed558308b402187c64e50f7fa03d8b9eb8030392efa7dad870d2d462e99a61"
+    },
+    "apk:com.ecarx.deviceinfo.service": {
+      "path": "system/priv-app/XSFDeviceService/XSFDeviceService.apk",
+      "bytes": 45624499,
+      "sha256": "33c10b3a7d674211b4df4ce19f421e3201a7e448b669059349ed5c294a39f9e3"
+    },
+    "apk:ecarx.xsf.inputservice": {
+      "path": "system/priv-app/XSFInputService/XSFInputService.apk",
+      "bytes": 7213513,
+      "sha256": "be1aec0286dfc8c1879ba4d215cec1e627a72a13b9a7c871da342731e998e030"
+    },
+    "apk:ecarx.naviservice": {
+      "path": "system/priv-app/XSFNaviService/XSFNaviService.apk",
+      "bytes": 11133365,
+      "sha256": "95ad61714a158e1ee3e1eb829cbd2e11c7d1f0bd1f31e31756efe5ad2359d7d1"
+    },
+    "apk:com.ecarx.sdk.openapi": {
+      "path": "system/priv-app/XSFOpenAPIService/XSFOpenAPIService.apk",
+      "bytes": 5824441,
+      "sha256": "3bada64ef495484a9b9a7dd9653aca9a07794c8d6daaa0f74092c02f49b87c53"
+    }
+  },
+  "localCatalogs": [
+    "index.json",
+    "partition-files.json",
+    "extracted-files.json",
+    "apk-manifests.json",
+    "adapter-api-index.json",
+    "adapter-api-constants.json",
+    "configuration-trees.json",
+    "declared-codecs.json",
+    "declared-features.json",
+    "init-services.json"
+  ],
+  "rebuildCatalogCommand": "python scripts/firmware_catalog.py --cache agent_docs/firmware/ihu519g-327 --aapt2 <existing-aapt2-path>"
+}

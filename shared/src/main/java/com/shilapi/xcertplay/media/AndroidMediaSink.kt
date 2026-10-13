@@ -22,7 +22,6 @@ import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.VideoCodec
 import com.shilapi.xcertplay.airplay.toHexString
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
-import com.shilapi.xcertplay.hud.BydBluetoothSuspend
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -39,7 +38,7 @@ internal fun audioTrackAttributesForFocus(track: AudioTrack, configured: AudioAt
 
 /** Owns one focus request for all eligible tracks in a CarPlay sink. */
 internal class AudioFocusCoordinator(
-    context: Context?,
+    private val context: Context?,
     private val enabled: Boolean,
     private val muteMediaOnTransientLoss: Boolean = true,
     private val report: (String) -> Unit = {},
@@ -55,6 +54,8 @@ internal class AudioFocusCoordinator(
     private var focusGeneration = 0L
     private var currentListener = listenerFor(focusGeneration)
     internal val listener: AudioManager.OnAudioFocusChangeListener get() = currentListener
+
+    fun registerVolume(track: AudioTrack, channel: AudioChannel) = CarPlayAudioVolume.register(context, track, channel)
 
     private fun listenerFor(generation: Long) = AudioManager.OnAudioFocusChangeListener { change ->
         synchronized(this) {
@@ -153,7 +154,8 @@ internal class AudioFocusCoordinator(
         // Telephony and assistant speech remain audible, and navigation never enters this map.
         // This changes only the renderer's relative gain, never Android's user stream volume.
         if (entry.channel != AudioChannel.MEDIA || entry.appliedVolume == mediaVolume) return
-        val applied = runCatching { track.setStereoVolume(mediaVolume, mediaVolume) == AudioTrack.SUCCESS }.getOrDefault(false)
+        val applied = CarPlayAudioVolume.setFocusGain(track, mediaVolume) ||
+            runCatching { track.setStereoVolume(mediaVolume, mediaVolume) == AudioTrack.SUCCESS }.getOrDefault(false)
         if (applied) entry.appliedVolume = mediaVolume
     }
 
@@ -218,7 +220,6 @@ class AndroidMediaSink(
     // Each downlink publishes its own reference; a mic must match that stream and sample rate.
     private val callEchoReferences = ConcurrentHashMap<AudioStreamId, EchoReference>()
     private val appContext = context?.applicationContext
-    private val ambientSinkToken = AmbientMusicController.openSink(appContext)
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
@@ -523,7 +524,7 @@ class AndroidMediaSink(
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
             val speakerphoneCall = config.audioType == "telephony" &&
-                appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext)
+                false
             if (config.audioType == "telephony" && !speakerphoneCall) enterCommunicationMode(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
                 MicrophoneUplink(config, onAudioDiagnostic,
@@ -591,7 +592,6 @@ class AndroidMediaSink(
     }
 
     fun close() {
-        AmbientMusicController.closeSink(ambientSinkToken)
         synchronized(videoOwnershipLock) {
             videoClosed = true
             videoDecoders.entries.toList().forEach { (type, decoder) -> retire(type, decoder) }
@@ -680,9 +680,8 @@ class AndroidMediaSink(
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
-            ambientSinkToken,
             speakerphoneCall = format.audioType == "telephony" &&
-                appContext != null && BydBluetoothSuspend.isSuspendedByUs(appContext),
+                false,
             echoReference = echoReference,
             voiceFilter = callVoiceFilter && format.audioType == TELEPHONY_AUDIO_TYPE,
         ).also { audioRenderers[id] = it }
@@ -1695,7 +1694,6 @@ private class AudioRenderer(
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
-    private val ambientSinkToken: Long,
     private val speakerphoneCall: Boolean = false,
     /** Receives the played call audio so the call microphone can cancel its echo. */
     private val echoReference: EchoReference? = null,
@@ -1736,10 +1734,6 @@ private class AudioRenderer(
     private val maxArrivalGapMs = AtomicLong()
     private val frameBytes = if (format.channels >= 2) 4 else 2
     private var totalWrittenFrames = 0L
-    private val ambientMedia = AmbientMusicActivityPolicy.acceptsAudio(format.audioType, format.payloadType)
-    private val ambientEnvelope = AmbientMusicEnvelope()
-    private val ambientBass = AmbientMusicBassAnalyzer(format.sampleRate, pcmChannels)
-    private var ambientRendererToken = 0L
     private var writtenFramesThisWindow = 0L
     private var writeErrorsThisWindow = 0
     private var lastWriteErrorCode: Int? = null
@@ -1783,7 +1777,6 @@ private class AudioRenderer(
     }
 
     override fun close() {
-        AmbientMusicController.closeRenderer(ambientRendererToken)
         running = false
         NavigationPlayback.close(navigationPlaybackToken)
         thread.interrupt()
@@ -1936,11 +1929,8 @@ private class AudioRenderer(
             )
         }
         track = built
-        if (ambientMedia) {
-            ambientRendererToken = AmbientMusicController.openRenderer(ambientSinkToken, ambientEnvelope) {
-                built.playbackHeadPosition to (running && built.playState == AudioTrack.PLAYSTATE_PLAYING)
-            }
-        }
+        audioFocusCoordinator.registerVolume(built, selection.channel)
+
         diagnosticStage = "track-attributes"
         trackAttributes = audioTrackAttributesForFocus(built, attributes)
         diagnosticStage = "track-capacity"
@@ -2295,11 +2285,7 @@ private class AudioRenderer(
             }
             if (count < writeLength) partialWritesThisWindow++
             val framesWritten = count / frameBytes
-            if (ambientMedia && AmbientMusicController.wantsPcm(ambientRendererToken)) {
-                ambientEnvelope.append(totalWrittenFrames, framesWritten.toLong(),
-                    AmbientMusicEnvelope.pcmRms(data, offset + written, count),
-                    ambientBass.rms(data, offset + written, count))
-            }
+
             written += count
             totalWrittenFrames += framesWritten
             writtenFramesThisWindow += framesWritten
@@ -2452,7 +2438,6 @@ private class AudioRenderer(
     @Synchronized
     private fun release() {
         NavigationPlayback.close(navigationPlaybackToken)
-        AmbientMusicController.closeRenderer(ambientRendererToken)
         abandonAudioFocus()
         val codec = codec
         this.codec = null
@@ -2471,6 +2456,7 @@ private class AudioRenderer(
         val track = track
         this.track = null
         if (track != null) {
+            CarPlayAudioVolume.unregister(track)
             try {
                 track.pause()
             } catch (_: Exception) {

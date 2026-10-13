@@ -28,12 +28,6 @@ class SettingsLayoutPolicyTest {
         assertFalse(SettingsLayoutPolicy.isExpanded(1280, 399, 1f))
     }
 
-    @Test fun overviewColumnsNeedRoomBesideTheRail() {
-        assertFalse(SettingsLayoutPolicy.overviewHasTwoColumns(853, 1f))
-        assertTrue(SettingsLayoutPolicy.overviewHasTwoColumns(1024, 1f))
-        assertFalse(SettingsLayoutPolicy.overviewHasTwoColumns(1280, 1.3f))
-    }
-
     @Test fun largeTextNeedsProportionallyMoreWidthForTheRail() {
         assertFalse(SettingsLayoutPolicy.isExpanded(1000, 720, 1.3f))
         assertTrue(SettingsLayoutPolicy.isExpanded(1280, 720, 1.3f))
@@ -51,5 +45,18 @@ class SettingsLayoutPolicyTest {
         val assignments = SettingsInformationArchitecture.sectionsByCategory.values.flatten()
         assertEquals(SettingsSection.entries.toSet(), assignments.toSet())
         assertEquals(assignments.toSet().size, assignments.size)
+    }
+
+    @Test fun allExperimentalSectionsHaveAnExperimentalDestination() {
+        val experimental = SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.EXPERIMENTAL)
+        assertEquals(setOf(
+            SettingsSection.CLUSTER_MAP,
+            SettingsSection.EXPERIMENTAL_DISPLAY,
+            SettingsSection.ADVANCED_MEDIA,
+            SettingsSection.NAVIGATION_WHEEL,
+            SettingsSection.FCE_NAVIGATION,
+            SettingsSection.EXTERNAL_CONTROLLER,
+            SettingsSection.HOTSPOT_JOIN,
+        ), experimental)
     }
 }

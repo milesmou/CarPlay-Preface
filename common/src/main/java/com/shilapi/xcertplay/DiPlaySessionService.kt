@@ -35,7 +35,7 @@ class DiPlaySessionService : Service() {
         val stop = PendingIntent.getService(this, 1, Intent(this, DiPlaySessionService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = builder
             .setSmallIcon(R.drawable.ic_diplay_notification)
-            .setContentTitle("DiPlay")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText("CarPlay connection running")
             .setContentIntent(open).setOngoing(true)
             .addAction(Notification.Action.Builder(null, "Disconnect", stop).build()).build()
@@ -56,7 +56,7 @@ class DiPlaySessionService : Service() {
     }
     override fun onTaskRemoved(rootIntent: Intent?) {
         // BYD's recents force-stops the package ~10 ms after removing the task: end guidance first.
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.endNow()
+        com.shilapi.xcertplay.hud.NavigationOutputs.endNow()
         CarPlayBackgroundSession.stop()
         stopSelf()
     }

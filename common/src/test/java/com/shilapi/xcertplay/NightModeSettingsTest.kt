@@ -80,7 +80,7 @@ class NightModeSettingsTest {
         renderSettings()
         assertAmbientVisible(true)
         assertTrue(button(R.string.ambient_light_threshold_title).text.toString().endsWith("75 lux"))
-        assertTrue(button(R.string.ambient_delay_title).text.toString().endsWith("7 s"))
+        assertTrue(button(R.string.ambient_delay_title).text.toString().endsWith(activity.getString(R.string.ambient_delay_summary, 7)))
     }
 
     @Test fun cancellingModeChoiceKeepsSavedModeAndVisibility() {
@@ -130,10 +130,10 @@ class NightModeSettingsTest {
         assertEquals(activity.getString(R.string.carplay_night_schedule_same_time), ShadowToast.getTextOfLatestToast())
     }
 
-    @Test fun overviewRendersEverySavedAppearanceWithItsMatchingChoice() {
+    @Test fun displayPageRendersEverySavedAppearanceWithItsMatchingChoice() {
         for (mode in CarPlayNightMode.entries) {
             AirPlayPersistence.saveCarPlayNightMode(activity, mode)
-            renderOverview()
+            renderDisplayPage()
 
             assertEquals(appearanceSummary(mode), button(R.string.carplay_night_mode).text.toString())
             button(R.string.carplay_night_mode).performClick()
@@ -147,11 +147,11 @@ class NightModeSettingsTest {
         }
     }
 
-    @Test fun choosingScheduledAppearanceFromOverviewKeepsTheDisplaySchedule() {
+    @Test fun choosingScheduledAppearanceFromDisplayPageKeepsTheDisplaySchedule() {
         val schedule = CarPlayNightSchedule(20 * 60 + 15, 5 * 60 + 45)
         AirPlayPersistence.saveCarPlayNightSchedule(activity, schedule)
         AirPlayPersistence.saveCarPlayNightMode(activity, CarPlayNightMode.SYSTEM)
-        renderOverview()
+        renderDisplayPage()
 
         val dialog = selectMode(CarPlayNightMode.SCHEDULE)
         assertEquals(activity.getString(R.string.carplay_night_schedule),
@@ -171,7 +171,7 @@ class NightModeSettingsTest {
 
     @Test fun searchingSettingsWithScheduledAppearanceKeepsTheSavedMode() {
         AirPlayPersistence.saveCarPlayNightMode(activity, CarPlayNightMode.SCHEDULE)
-        renderOverview()
+        renderDisplayPage()
 
         val index = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
             activity, "buildSettingsSearchIndex")
@@ -198,9 +198,9 @@ class NightModeSettingsTest {
     private fun appearanceSummary(mode: CarPlayNightMode) =
         activity.getString(R.string.carplay_night_mode) + " · " + activity.getString(modeLabel(mode))
 
-    private fun renderOverview() {
+    private fun renderDisplayPage() {
         ReflectionHelpers.setField(activity, "page", "settings")
-        ReflectionHelpers.setField(activity, "settingsCategory", SettingsCategory.OVERVIEW)
+        ReflectionHelpers.setField(activity, "settingsCategory", SettingsCategory.DISPLAY)
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "render")
         page = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll").getChildAt(0) as LinearLayout
     }
@@ -217,7 +217,8 @@ class NightModeSettingsTest {
             assertEquals(activity.getString(id), expected, button(id).isShown)
         }
         assertEquals(expected, label(R.string.carplay_night_ambient_hint).isShown)
-        val nightHint = "${activity.getString(R.string.carplay_night_hint)} ${activity.getString(R.string.carplay_night_time_note)}"
+        val separator = if (activity.resources.configuration.locales[0].language == "zh") "" else " "
+        val nightHint = activity.getString(R.string.carplay_night_hint) + separator + activity.getString(R.string.carplay_night_time_note)
         assertTrue(nightHint, views(page).filterIsInstance<TextView>().single { it.text == nightHint }.isShown)
         assertTrue(activity.getString(R.string.picture_adjustments), label(R.string.picture_adjustments).isShown)
     }

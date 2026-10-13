@@ -45,7 +45,7 @@ internal class BackgroundUpdateWorker(context: Context, parameters: WorkerParame
         return try {
             val release = UpdateReleaseLookup.latest(
                 installedVersion = installedVersion,
-                userAgent = "DiPlay/$installedVersion",
+                userAgent = "CarPlay/$installedVersion",
                 openConnection = network::openConnection,
             )
             if (release == null) UpdateAvailability.clear(applicationContext)

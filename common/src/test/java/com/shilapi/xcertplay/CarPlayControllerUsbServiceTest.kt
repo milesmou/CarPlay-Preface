@@ -8,7 +8,7 @@ import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.os.Looper
 import com.shilapi.xcertplay.airplay.*
-import com.shilapi.xcertplay.hud.BydNavigationOutputs
+import com.shilapi.xcertplay.hud.NavigationOutputs
 import com.shilapi.xcertplay.orchestration.*
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import com.shilapi.xcertplay.transport.UsbDeviceId
@@ -31,7 +31,7 @@ class CarPlayControllerUsbServiceTest {
 
     @After fun tearDown() {
         controllers.forEach { it.close(); assertTrue(it.awaitClosed(2_000)) }
-        BydNavigationOutputs.endNow()
+        NavigationOutputs.endNow()
     }
 
     @Test fun wirelessLocalCanBeCreatedAndReachMfiWithoutAUsbService() {

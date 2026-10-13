@@ -6,16 +6,12 @@ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/**
- * Publishes CarPlay arrows and distance to the instrument cluster of FCE head units through
- * [FceCarPropertyWriter], independently of the BYD outputs. Needs both the navigation output switch
- * ([BydOutputSettings.enabled]) and its own opt-in ([BydOutputSettings.fceCluster]).
- */
+/** Publishes navigation to FCE head units through their own opt-in. */
 internal object FceClusterBridge {
     private const val TAG = "DiPlay-FCE-Cluster"
 
     private val lock = Any()
-    private val route = BydHudRouteState()
+    private val route = CarPlayRouteState()
     private val navigation = FceNavigationState()
     private var output = FceClusterOutput(FceCarPropertyWriter())
     private var context: Context? = null
@@ -55,7 +51,7 @@ internal object FceClusterBridge {
     private fun tick() = synchronized(lock) { if (context != null) refreshLocked() }
 
     private fun enabledLocked(): Boolean =
-        context?.let { BydOutputSettings.enabled(it) && BydOutputSettings.fceCluster(it) } == true
+        context?.let { FceNavigationSettings.enabled(it) } == true
 
     private fun refreshLocked() {
         if (!enabledLocked()) return output.stop()

@@ -97,15 +97,16 @@ class TelephonyMicrophoneTest {
         assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
     }
 
-    @Test fun aCallWhileCarBluetoothIsOffUsesTheCabinMicrophone() {
+    @Test fun legacyBluetoothPauseFlagsDoNotOverrideNormalCallRouting() {
         context.getSharedPreferences("diplay_bt_suspend", 0).edit().putBoolean("restore_initially_enabled", true).commit()
         shadowOf(context.getSystemService(BluetoothManager::class.java).adapter).setState(BluetoothAdapter.STATE_OFF)
         manager.mode = AudioManager.MODE_NORMAL
         sink.onMicrophoneStarted(telephony, config("telephony"))
         val record = awaitCapture()
-        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
-        assertEquals(MediaRecorder.AudioSource.MIC, record.audioSource)
-        assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
+        assertEquals(MediaRecorder.AudioSource.VOICE_COMMUNICATION, record.audioSource)
+        assertEquals(setOf("AcousticEchoCanceler", "NoiseSuppressor"),
+            ShadowAudioEffect.getAudioEffects().map { it.javaClass.simpleName }.toSet())
         sink.onMicrophoneStopped(telephony)
         assertEquals(AudioManager.MODE_NORMAL, manager.mode)
     }

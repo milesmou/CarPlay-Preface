@@ -84,7 +84,7 @@ class UsbAutoConfirmServiceTest {
         assertFalse(UsbAutoConfirmService.isTargetPrompt("Allow USB access?", ""))
     }
 
-    @Test fun bydAccessibilityScreenIsUsedWhenTheStandardActionIsMissing() {
+    @Test fun androidAccessibilityScreenIsUsedWhenTheStandardActionIsMissing() {
         val context = org.mockito.Mockito.mock(Context::class.java)
         val opened = mutableListOf<android.content.Intent>()
         org.mockito.Mockito.doAnswer { call ->
@@ -95,7 +95,7 @@ class UsbAutoConfirmServiceTest {
         }.`when`(context).startActivity(org.mockito.ArgumentMatchers.any(android.content.Intent::class.java))
         assertTrue(UsbAutoConfirmService.openSettings(context))
         assertEquals(
-            listOf("com.byd.systemsettings/com.byd.systemsettings.accessibility.AccessibilityMainActivity"),
+            listOf("com.android.settings/com.android.settings.Settings\$AccessibilitySettingsActivity"),
             opened.map { it.component!!.flattenToString() },
         )
     }

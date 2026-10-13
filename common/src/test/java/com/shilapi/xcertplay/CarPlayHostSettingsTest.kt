@@ -70,6 +70,23 @@ class CarPlayHostSettingsTest {
         controllers.close()
     }
 
+    @Test fun experimentalMediaControlsAreInsideACollapsedMenu() {
+        invoke("openSettingsMenu")
+        val button = views(menu()).filterIsInstance<Button>()
+            .single { it.text == activity.getString(R.string.settings_advanced) }
+        val container = (button.parent as ViewGroup).let { parent ->
+            parent.getChildAt(parent.indexOfChild(button) + 1) as ViewGroup
+        }
+        val labels = views(container).filterIsInstance<TextView>().map { it.text.toString() }.toList()
+        assertTrue("HEVC (H.265)" in labels)
+        assertTrue(activity.getString(R.string.hevc_software_decoder) in labels)
+        assertEquals(View.GONE, container.visibility)
+        button.performClick()
+        assertEquals(View.VISIBLE, container.visibility)
+        button.performClick()
+        assertEquals(View.GONE, container.visibility)
+    }
+
     @Test fun disabledGesturePersistsAndDoesNotOpenTheMenu() {
         AirPlayPersistence.saveSettingsGestureFingers(activity, 0)
         invoke("loadPersistedSettings")

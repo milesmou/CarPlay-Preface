@@ -141,7 +141,7 @@ internal class FceNavigationState {
         }
 
     fun accept(messageId: Int, payload: ByteArray) {
-        if (messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE || !validTlvs(payload)) return
+        if (messageId != CarPlayRouteState.ROUTE_GUIDANCE_UPDATE || !validTlvs(payload)) return
         var offset = 0
         while (offset < payload.size) {
             val length = u16(payload, offset)

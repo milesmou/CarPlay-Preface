@@ -37,9 +37,11 @@ internal class HotspotJoinControls(private val activity: Activity, private val s
     private var root: LinearLayout? = null
     private var result: HotspotJoinRepair.Result? = null
     private var busy = false
+    private var includeTitle = true
     @Volatile private var closed = false
 
-    fun build(): LinearLayout = LinearLayout(activity).also {
+    fun build(includeTitle: Boolean = true): LinearLayout = LinearLayout(activity).also {
+        this.includeTitle = includeTitle
         it.orientation = LinearLayout.VERTICAL; root = it; display()
     }
 
@@ -52,7 +54,7 @@ internal class HotspotJoinControls(private val activity: Activity, private val s
         }) }
         fun button(id: Int, action: () -> Unit) { view.addView(buttonFactory(activity.getString(id), action)
             .apply { isEnabled = !busy }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
-        text(R.string.hotspot_join_title)
+        if (includeTitle) text(R.string.hotspot_join_title)
         text(R.string.hotspot_join_description)
         if (busy) text(R.string.hotspot_join_working) else result?.let { text(message(it.code)) }
         button(R.string.hotspot_join_check) { run(HotspotJoinRepair.Action.CHECK) }

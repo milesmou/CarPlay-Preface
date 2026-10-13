@@ -5,6 +5,7 @@ import android.content.Context
 /** Durable metadata only. APK downloads always remain an explicit foreground action. */
 internal object UpdateAvailability {
     private const val PREFERENCES = "diplay_update_availability"
+    private const val REPOSITORY = "repository"
     private const val TAG = "tag"
     private const val APK_NAME = "apk_name"
     private const val APK_URL = "apk_url"
@@ -18,8 +19,24 @@ internal object UpdateAvailability {
 
     internal const val CHECK_INTERVAL_MILLIS = 24L * 60 * 60 * 1000
 
-    private fun preferences(context: Context) =
-        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private fun preferences(context: Context) = synchronized(this) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).also { values ->
+            if (values.getString(REPOSITORY, null) != UpdateClient.REPOSITORY) {
+                // Repository changes invalidate release metadata and the old daily check timer.
+                // Keep the driver's background-check preference and installation history.
+                values.edit()
+                    .remove(TAG)
+                    .remove(APK_NAME)
+                    .remove(APK_URL)
+                    .remove(CHECKSUMS_URL)
+                    .remove(LAST_ATTEMPT_MILLIS)
+                    .remove(LAST_RESULT)
+                    .remove(LAST_RESULT_MILLIS)
+                    .putString(REPOSITORY, UpdateClient.REPOSITORY)
+                    .apply()
+            }
+        }
+    }
 
     fun backgroundChecksEnabled(context: Context): Boolean =
         preferences(context).getBoolean(BACKGROUND_CHECKS, true)
