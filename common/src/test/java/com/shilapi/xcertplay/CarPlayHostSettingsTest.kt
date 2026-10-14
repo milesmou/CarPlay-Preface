@@ -45,7 +45,9 @@ class CarPlayHostSettingsTest {
 
     @Before fun setUp() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
-        controllers = mockConstruction(CarPlayController::class.java)
+        controllers = mockConstruction(CarPlayController::class.java) { controller, _ ->
+            org.mockito.Mockito.`when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
+        }
         (field("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
         setField("airPlayIdentity", AirPlayIdentity.generate())
@@ -56,7 +58,6 @@ class CarPlayHostSettingsTest {
         CarPlayBackgroundSession::class.java.getDeclaredField("owner").apply { isAccessible = true }
             .set(CarPlayBackgroundSession, activity)
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
-        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         invoke("loadPersistedSettings")
         invoke("buildContentView")
     }
@@ -68,6 +69,88 @@ class CarPlayHostSettingsTest {
         (field("airPlayCommandExecutor") as ExecutorService).shutdownNow()
         CarPlayBackgroundSession.clear()
         controllers.close()
+    }
+
+    @Test fun waitingScreenShowsCurrentHotspotCredentialsAndClearsThemOnFailure() {
+        setField("wirelessEnabled", true)
+        val credentials = field("hotspotCredentialsView") as TextView
+        fun update(status: CarPlayStatus) {
+            activity.javaClass.getDeclaredMethod("updateHotspotStatus", CarPlayStatus::class.java)
+                .apply { isAccessible = true }.invoke(activity, status)
+        }
+        val ready = CarPlayStatus.HotspotReady("AndroidShare_test", "2.4 GHz", 0,
+            "02:00:00:00:00:01", "192.0.2.1", "LocalOnlyHotspot", "test-password")
+        update(ready)
+        assertEquals(View.VISIBLE, credentials.visibility)
+        assertTrue(credentials.text.contains("AndroidShare_test"))
+        assertTrue(credentials.text.contains("test-password"))
+        assertFalse(ready.toString().contains("test-password"))
+        update(CarPlayStatus.RunningWireless)
+        assertTrue(credentials.text.contains("test-password"))
+        update(CarPlayStatus.Failed("startup timeout"))
+        assertEquals(View.GONE, credentials.visibility)
+        assertEquals("", credentials.text.toString())
+        update(ready.copy(ssid = "AndroidShare_new", passphrase = "new-password"))
+        assertTrue(credentials.text.contains("new-password"))
+        assertFalse(credentials.text.contains("test-password"))
+        update(CarPlayStatus.StartingHotspot)
+        assertEquals(View.GONE, credentials.visibility)
+        assertEquals("", credentials.text.toString())
+    }
+
+    @Test fun switchingToUsbHidesAndClearsWirelessCredentials() {
+        setField("wirelessEnabled", true)
+        activity.javaClass.getDeclaredMethod("updateHotspotStatus", CarPlayStatus::class.java)
+            .apply { isAccessible = true }.invoke(activity,
+                CarPlayStatus.HotspotReady("AndroidShare_test", "2.4 GHz", 0,
+                    "02:00:00:00:00:01", "192.0.2.1", "LocalOnlyHotspot", "test-password"))
+        setField("wirelessEnabled", false)
+        invoke("updateHotspotStatusBlock")
+        val credentials = field("hotspotCredentialsView") as TextView
+        assertEquals(View.GONE, credentials.visibility)
+        assertEquals("", credentials.text.toString())
+    }
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w360dp-h800dp-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactHotspotCredentialsLargeFontScreenshot() = captureHotspotWaitingScreen("compact", 360, 800)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1280dp-h720dp-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullHotspotCredentialsLargeFontScreenshot() = captureHotspotWaitingScreen("full", 1280, 720)
+
+    private fun captureHotspotWaitingScreen(name: String, widthDp: Int, heightDp: Int) {
+        val config = android.content.res.Configuration(activity.resources.configuration).apply { fontScale = 1.5f }
+        activity.resources.updateConfiguration(config, activity.resources.displayMetrics)
+        setField("wirelessEnabled", true)
+        val root = invoke("buildContentView") as View
+        activity.javaClass.getDeclaredMethod("updateHotspotStatus", CarPlayStatus::class.java)
+            .apply { isAccessible = true }.invoke(activity,
+                CarPlayStatus.HotspotReady("AndroidShare_733804", "2.4 GHz", 0,
+                    "02:00:00:00:00:01", "192.0.2.1", "LocalOnlyHotspot", "example123"))
+        val density = activity.resources.displayMetrics.density
+        val width = (widthDp * density).toInt()
+        val height = (heightDp * density).toInt()
+        repeat(3) {
+            // Unattached test views need an explicit traversal after the responsive layout callback.
+            views(root).forEach { it.forceLayout() }
+            root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+            root.layout(0, 0, width, height)
+        }
+        val credentials = field("hotspotCredentialsView") as TextView
+        assertEquals(View.VISIBLE, credentials.visibility)
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(bitmap))
+        val layout = requireNotNull(credentials.layout)
+        for (line in 0 until layout.lineCount) assertEquals(0, layout.getEllipsisCount(line))
+        val directory = java.io.File("../agent_docs/screenshots/connection-hotspot").apply { mkdirs() }
+        java.io.File(directory, "$name-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
     }
 
     @Test fun experimentalMediaControlsAreInsideACollapsedMenu() {
@@ -242,28 +325,25 @@ class CarPlayHostSettingsTest {
         invoke("openSettingsMenu")
         fullSettingsButton().performClick()
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.LOCAL)
-        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.MANUAL)
-        AirPlayPersistence.saveManualHotspotSsid(activity, "Updated in full settings")
         invoke("onResume")
         assertEquals(MfiTarget.LOCAL, field("mfiTarget"))
-        assertEquals(WirelessHotspotMode.MANUAL, field("wirelessHotspotMode"))
-        assertEquals("Updated in full settings", field("manualHotspotSsid"))
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, field("wirelessHotspotMode"))
     }
 
     @Test fun openingAndCancellingKeepsTheCurrentControllerAndRestoresControls() {
         val controller = attachController()
         invoke("openSettingsMenu")
-        val original = AirPlayPersistence.loadDisplayScaleTenths(activity)
+        val original = AirPlayPersistence.loadDisplayScalePercent(activity)
         resolutionSlider().progress = 0
         gestureButton().performClick()
         assertEquals(3, AirPlayPersistence.loadSettingsGestureFingers(activity))
         invoke("cancelSettingsEdits")
         assertSame(controller, field("controller"))
         assertEquals(0, field("restartGeneration"))
-        assertEquals(original, field("displayScaleTenths"))
+        assertEquals(original, field("displayScalePercent"))
         assertEquals(3, field("gestureFingerCount"))
         invoke("openSettingsMenu")
-        assertEquals(original * 10 - CarPlayDisplayScale.MIN_PERCENT, resolutionSlider().progress)
+        assertEquals(original - CarPlayDisplayScale.MIN_PERCENT, resolutionSlider().progress)
         assertEquals(activity.getString(R.string.settings_gesture_fingers, 3), gestureButton().text)
     }
 
@@ -297,12 +377,10 @@ class CarPlayHostSettingsTest {
 
     @Test fun resumingWithTheMenuOpenPreservesUnsavedConnectionEdits() {
         invoke("openSettingsMenu")
-        setField("wirelessHotspotMode", WirelessHotspotMode.MANUAL)
-        setField("manualHotspotSsid", "Draft hotspot")
+        setField("wirelessHotspotMode", WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         setField("mfiTarget", MfiTarget.LOCAL)
         invoke("onResume")
-        assertEquals(WirelessHotspotMode.MANUAL, field("wirelessHotspotMode"))
-        assertEquals("Draft hotspot", field("manualHotspotSsid"))
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, field("wirelessHotspotMode"))
         assertEquals(MfiTarget.LOCAL, field("mfiTarget"))
         invoke("cancelSettingsEdits")
         assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, field("wirelessHotspotMode"))
@@ -311,7 +389,6 @@ class CarPlayHostSettingsTest {
 
     @Test fun lightAppearanceRepaintsAnOpenMenuWithoutLosingDraftState() {
         invoke("openSettingsMenu")
-        setField("manualHotspotSsid", "Unsaved hotspot")
         val oldMenu = menu()
         val scroll = views(oldMenu).filterIsInstance<android.widget.ScrollView>().single()
         scroll.scrollTo(0, 120)
@@ -321,7 +398,6 @@ class CarPlayHostSettingsTest {
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         assertNotSame(oldMenu, menu())
-        assertEquals("Unsaved hotspot", field("manualHotspotSsid"))
         assertEquals(false, field("appNight"))
         assertEquals(
             DiPlayPalette.LIGHT.overlayBackground,
@@ -339,7 +415,7 @@ class CarPlayHostSettingsTest {
         gestureButton().performClick()
         invoke("saveSettingsAndReconnect")
         assertFalse(field("menuOpen") as Boolean)
-        assertEquals(CarPlayDisplayScale.MIN_TENTHS, AirPlayPersistence.loadDisplayScaleTenths(activity))
+        assertEquals(CarPlayDisplayScale.MIN_PERCENT, AirPlayPersistence.loadDisplayScalePercent(activity))
         assertEquals(4, AirPlayPersistence.loadSettingsGestureFingers(activity))
         assertEquals(1, field("restartGeneration"))
         assertTrue(field("handshakeResetInProgress") as Boolean)
@@ -477,13 +553,13 @@ class CarPlayHostSettingsTest {
             .apply { isAccessible = true }.invoke(activity, intent)
         assertFalse(AirPlayPersistence.loadWirelessEnabled(activity))
         assertFalse(field("wirelessEnabled") as Boolean)
-        assertTrue(field("vpnReady") as Boolean)
+        assertFalse(field("vpnReady") as Boolean)
         assertFalse((field("shuttingDown") as AtomicBoolean).get())
         assertFalse(activity.isFinishing)
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
-    @Test fun switchingToUsbRequestsVpnConsentAndDoesNotRepeatPendingConsent() {
+    @Test fun switchingToUsbDefersVpnConsentUntilTransportFallback() {
         org.robolectric.shadows.ShadowVpnService.setPrepareResult(Intent("test.VPN_CONSENT"))
         attachController()
         AirPlayPersistence.saveWirelessEnabled(activity, true)
@@ -494,10 +570,10 @@ class CarPlayHostSettingsTest {
         val intent = Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).putExtra(UsbManager.EXTRA_DEVICE, device)
         val method = activity.javaClass.getDeclaredMethod("onNewIntent", Intent::class.java).apply { isAccessible = true }
         method.invoke(activity, intent)
-        assertTrue(field("awaitingVpnConsent") as Boolean)
-        assertFalse(field("vpnReady") as Boolean)
+        assertFalse(field("awaitingVpnConsent") as Boolean)
+        assertTrue(field("vpnReady") as Boolean)
         assertNull(field("controller"))
-        assertEquals("test.VPN_CONSENT", shadowOf(activity).nextStartedActivityForResult.intent.action)
+        assertNull(shadowOf(activity).nextStartedActivityForResult)
         method.invoke(activity, intent)
         assertNull(shadowOf(activity).nextStartedActivityForResult)
         assertFalse(activity.isFinishing)
@@ -517,7 +593,7 @@ class CarPlayHostSettingsTest {
             .invoke(activity, intent)
         assertFalse(field("menuOpen") as Boolean)
         assertFalse(field("wirelessEnabled") as Boolean)
-        assertTrue(field("vpnReady") as Boolean)
+        assertFalse(field("vpnReady") as Boolean)
         assertNull(field("controller"))
         assertEquals(1, field("restartGeneration"))
         assertFalse(activity.isFinishing)

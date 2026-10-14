@@ -34,29 +34,18 @@ class ClusterTurnCardPersistenceTest {
         assertEquals(35, AirPlayPersistence.loadClusterTurnCardOverlaySizePercent(context))
     }
 
-    @Test fun legacyMarkerStepsMigrateAroundTheSlidersCentre() {
-        assertEquals(50, AirPlayPersistence.loadClusterMarkerXPercent(context))
-        assertEquals(45, AirPlayPersistence.loadClusterMarkerYPercent(context))
-        AirPlayPersistence.saveClusterMarkerHorizontalStep(context, 1)
-        AirPlayPersistence.saveClusterMarkerVerticalStep(context, -2)
-        assertEquals(60, AirPlayPersistence.loadClusterMarkerXPercent(context))
-        assertEquals(25, AirPlayPersistence.loadClusterMarkerYPercent(context))
-        AirPlayPersistence.saveClusterMarkerXPercent(context, 37)
-        assertEquals(37, AirPlayPersistence.loadClusterMarkerXPercent(context))
-    }
 
-    @Test fun smallWindowCardDefaultsRightOfCentreUntilTheFullScreenCardWasMoved() {
+    @Test fun smallWindowCardKeepsIndependentDefaultsAndPosition() {
         assertEquals(80, AirPlayPersistence.loadClusterSmallWindowCardXPercent(context))
         assertEquals(25, AirPlayPersistence.loadClusterSmallWindowCardYPercent(context))
         assertEquals(40, AirPlayPersistence.loadClusterSmallWindowCardSizePercent(context))
 
-        // A full-screen card the driver placed keeps applying in the small window, as before.
         AirPlayPersistence.saveClusterTurnCardOverlayXPercent(context, 60)
         AirPlayPersistence.saveClusterTurnCardOverlayYPercent(context, 40)
         AirPlayPersistence.saveClusterTurnCardOverlaySizePercent(context, 70)
-        assertEquals(60, AirPlayPersistence.loadClusterSmallWindowCardXPercent(context))
-        assertEquals(40, AirPlayPersistence.loadClusterSmallWindowCardYPercent(context))
-        assertEquals(70, AirPlayPersistence.loadClusterSmallWindowCardSizePercent(context))
+        assertEquals(80, AirPlayPersistence.loadClusterSmallWindowCardXPercent(context))
+        assertEquals(25, AirPlayPersistence.loadClusterSmallWindowCardYPercent(context))
+        assertEquals(40, AirPlayPersistence.loadClusterSmallWindowCardSizePercent(context))
 
         AirPlayPersistence.saveClusterSmallWindowCardXPercent(context, 85)
         AirPlayPersistence.saveClusterSmallWindowCardYPercent(context, 20)
@@ -66,15 +55,6 @@ class ClusterTurnCardPersistenceTest {
         assertEquals(35, AirPlayPersistence.loadClusterSmallWindowCardSizePercent(context))
     }
 
-    @Test fun legacyLeftCentreRightMigrateToPercents() {
-        val prefs = context.getSharedPreferences("xcertplay_airplay", 0)
-        prefs.edit().putString("cluster_turn_card_overlay_position", "LEFT").apply()
-        assertEquals(20, AirPlayPersistence.loadClusterTurnCardOverlayXPercent(context))
-        prefs.edit().putString("cluster_turn_card_overlay_position", "CENTER").apply()
-        assertEquals(50, AirPlayPersistence.loadClusterTurnCardOverlayXPercent(context))
-        prefs.edit().putString("cluster_turn_card_overlay_position", "RIGHT").apply()
-        assertEquals(76, AirPlayPersistence.loadClusterTurnCardOverlayXPercent(context))
-    }
 
     @Test fun overlaySaveNotifiesTheHostWithoutReconnecting() {
         var noticed = 0

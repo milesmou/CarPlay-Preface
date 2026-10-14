@@ -4,6 +4,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class NavigationPlaybackTest {
+    @Test fun mediaOutputDoesNotActivateGuidanceAndExpiresAfterItsBufferDrains() {
+        val token = tracker.open()
+        tracker.played(token, 3, 100, media = true)
+        assertEquals(NavigationPlaybackSnapshot(false, null, false, true, 3), tracker.snapshot())
+        now = 1000
+        assertEquals(NavigationPlaybackSnapshot(false, null), tracker.snapshot())
+        tracker.played(token, null, 0, media = true)
+        tracker.close(token)
+        assertEquals(NavigationPlaybackSnapshot(false, null), tracker.snapshot())
+    }
     private var now = 0L
     private val tracker = NavigationPlaybackTracker(nowMillis = { now })
 

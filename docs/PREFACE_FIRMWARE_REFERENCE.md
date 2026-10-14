@@ -25,9 +25,14 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 - [机器可读的适配事实](firmware/ihu519g-327.json)：身份、音频常量、按键映射、服务、权限和证据校验值，可随仓库保留。
 - [方控与音频接入分析](PREFACE_FIRMWARE_327.md)：已有代码接入范围、去重及真车验证项。
+- [2026-10-14 用户连接报告排查](CONNECTION_REPORT_2026-10-14.md)：运行时报告的设备为 IHU353G，身份与参考 OTA 不一致，证据单独记录；无线曾渲染画面，USB 认证通过但网络与 VPN 授权阻塞，不能外推到构建 327。
 - 本地完整索引：`agent_docs/firmware/ihu519g-327/catalog/index.json`。固件、镜像、APK/JAR、反编译代码及完整索引保存在 Git 忽略目录，可直接继续分析。
 
 这里的“已确认”均指静态文件或代码已确认。系统配置声明、SDK 方法存在、服务 exported，并不证明当前 APK 有权限调用、硬件已启用或实车已经验证。
+
+第三份用户连接报告补充：本轮无线认证后没有 AirPlay TCP；USB 在 IPv6 地址尚为 tentative 时发出启动请求，稍后地址 ready 且邻居可达仍未接入 TCP。工程补上当前临时热点密码显示及系统 USB 已知未就绪地址过滤；仍待实车验证，详见连接报告第三份补充，不作为构建 327 的静态事实。
+
+按用户要求，连接设置新增手动车机热点与临时热点二选一；实现范围及验证限制见 [手动热点说明](MANUAL_HOTSPOT.md)。手动模式现按用户要求在选择时尝试开启系统保存的热点，不修改配置或关闭热点；仍保留权限、状态与会话检查，尚未获得实车验证结果。
 
 ## 后续工程可复用的信息
 
@@ -39,6 +44,7 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 - 原厂对媒体键发 `android.intent.action.MEDIA_BUTTON` 广播，带 DEFAULT category 和 `android.intent.extra.KEY_EVENT`。同一短按产生 DOWN/UP，对广播和 MediaSession 双路送达需要去重。
 - 自定义按键 `soft_key_function=7` 对应媒体暂停动作。语音、电话和音量有原车专用处理，不应把全部私有按键直接转成 CarPlay 按键。
 - 原车音乐包 `com.ecarx.multimedia`（4.0.0 / versionCode 40001095），媒体中心包 `ecarx.xsf.mediacenter`。媒体中心服务 action 为 `ecarx.xsf.MEDIA_CENTER_SERVICE`；其 Binder 协议及应用准入尚未分析，不能仅凭 action 接入桌面媒体卡片。
+- HiCar 配套 SDK 静态实现显示通过定制 `IInputManager.requestKeysInterception` 接管媒体／语音键；工程请求 85/87/88/298，并为语音按钮接入有序广播回退。HiCar 音量沿用原车；本项目新增按媒体播放状态申请音量键拦截的候选实现，第三方拦截效果待验证。电话、方向键、快进快退和唤醒词的处理边界见 [HiCar 对照与按钮审查](PREFACE_FIRMWARE_327.md) 及事实索引 `hicarTrackInterception`、`hicarButtonAudit`。接口权限和效果待实车验证。
 
 证据：`decompiled/input/sources/ecarx/xsf/inputservice/{key,util,factory}/`、`decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/`、`catalog/apk-manifests.json`。
 
@@ -57,7 +63,7 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 上述值直接读取 `boot-framework.vdex` 中 AudioManager/AudioSystem 的 CompactDex 静态字段；完整 STREAM、USAGE、FLAG 常量保存在 `audio-framework-constants.json`。**stream 与 AudioAttributes usage 是不同参数。14 是提示音，不能套作导航。**
 
-- 原厂音量动作查询 `AudioManager.getStreamTypeInActive()`，只接受 0、3、9、12，其余选媒体 3。使用 `getStreamVolume` / `setStreamVolume(..., flags=5)`，长按每 250 ms 重复。应用内音量比例与系统音量是两个层次。
+- 原厂音量动作查询 `AudioManager.getStreamTypeInActive()`，只接受 0、3、9、12，其余选媒体 3。使用 `getStreamVolume` / `setStreamVolume(..., flags=5)`，长按每 250 ms 重复。本项目不再提供应用内音量比例，媒体与导航音量均由系统音频流控制。
 - `vendor/etc/audio_policy_configuration.xml` 的 primary output 声明 PCM 16-bit、44.1/48 kHz、立体声；primary input 声明 PCM 16-bit、8/16 kHz、单声道／双声道／语音上下行 mask。
 - 内置前、后麦克风端口声明 8/16 kHz、单／双声道。可用作 Siri 录音排查起点；真实通路、声道布局、并发录音及 HAL 重采样仍需运行时确认。
 - `vendor/etc/audio_effects.xml` 有实际 `aec` effect，并在 `voice_communication` preprocess 中应用。不能据此声称所有 AudioRecord source 自动获得回声消除；需真车确认录音 source、AEC 可用性及通话抢占。
@@ -78,6 +84,24 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 证据：`decompiled/adapter/sources/com/ecarx/xui/adaptapi/navigation/`、`dim/impl/nav/NaviInteractionImpl.java`、`catalog/apk-manifests.json`。
 
 ### USB、Wi-Fi 与蓝牙连接
+
+#### HiCar 热点创建方式（2026-10-14）
+
+已从原始 system 分区补提取 `HwNearbyCar.apk` 并核对下层实现：Nearby 自行生成 `HiCar-` 加 4 位数字的 SSID 和 8 位数字密码，保存原热点配置，写入 WifiConfiguration，再在 Android 9 上调用系统 `startTethering()`；存在复用及恢复原配置逻辑。这是系统身份使用的 SoftAP 路径，与公共 `LocalOnlyHotspot` 不同。权限、调用链、证据行号与 SHA-256 见 [HiCar 热点分析](HICAR_HOTSPOT_327.md)，机器索引见 `hicarWirelessHotspot`。本次只补充参考资料，没有引入系统热点或 P2P 模式；该静态结论不等于 IHU353G 报告设备已验证。
+
+#### HiCar 有线连接与 CarPlay VPN 的区别（2026-10-13）
+
+构建 327 的 `HiCarHMI.apk` SHA-256 为 `401d87f13ab1c075d8a3fdb9ad5d1b18810fee0e48993d025202414a3326b294`，来源为本页所列 OTA。`catalog/manifests/HiCarHMI.txt:3` 声明 `android.uid.system`；HMI 的 Java 源码与 manifest 搜索未发现 `VpnService` / `BIND_VPN_SERVICE`。这只说明所检查 HMI 层未发现该实现，不证明底层服务的全部行为。
+
+`decompiled/hicar/sources/com/huawei/authagent/service/connect/NearbyConnectControl.java` 注册 USB socket listener（business id 19），`com/huawei/nearbysdk/NearbyConfig.java` 声明 USB channel 为 6；`com/huawei/nearbysdk/NearbyAdapter.java:139–143` 绑定 `com.huawei.nearby/com.huawei.nearby.NearbyService`。2026-10-14 继续追到 `HwNearbyCar.apk` 的 UsbNcmChannel 分支：监听系统 `ncm0_reserved` / `wwan0`，通过 NetworkImpl / INetworkManagementService 配置 IPv4 地址和 DHCP，再绑定普通 socket；这是系统网卡路径，未在该分支发现 VPN 创建调用。它依赖原厂权限且使用 Huawei 网络协议，不能视为可复用的 iPhone NCM / CarPlay 接口。证据、限制和应用内协议栈等不依赖 VPN 的方案见 [USB 无 VPN 分析](USB_WITHOUT_VPN.md)；内核驱动的建立过程和实际权限仍待核对。
+
+2026-10-14 工程已接入系统 USB 网卡优先、VPN 备用的流程。选择系统网卡时，要求 sysfs 的 USB busnum/devnum 与当前 iPhone 的设备路径一致，接口号属于该 iPhone CarPlay 配置的 NCM control/data，并具有已启用的网卡、IPv6 链路本地地址和有效 MAC；不能仅凭 `usb0` 等名称选择，避免误认 TBOX／仪表网卡。已处于目标 USB 配置时不重新执行 SET_CONFIGURATION，以保留系统驱动。先保留 NCM 接口供系统使用，发现网卡后绑定其带 scope 的 IPv6 地址，并向 iPhone 公告真实地址和监听端口。
+
+发现等待上限为 2 秒；无可确认网卡、无读取权限或监听失败时，才按需请求 VPN 授权并由应用接管 NCM。系统路径发出 CarPlayStartSession 后 30 秒仍未建立 AirPlay 会话，也切换到 NCM/VPN，并重新公告地址与端口。已经建立过的会话不由此启动超时切换；用户拒绝或无法授权 VPN 时停止自动重试，保留手动重试。VPN 仍只路由本应用的 IPv6 本地链路通信，不修改系统网卡、sysfs 或其他应用的网络。
+
+这属于工程实现，**不是固件驱动支持或星瑞实车可用性的确认**。当前 targeted 验证覆盖 USB 归属判断、启动超时与会话保护、授权回调和拒绝后停止重试；系统网卡路径、VPN 回退后的 iPhone 会话重建、拔插、音视频及长时间连接仍需实车验证。若固件不生成 iPhone NCM 网卡或应用无法读取归属信息，会使用 VPN 备用路径。未实现应用内 IPv6/TCP/UDP 协议栈，也未复用华为 Nearby 服务。
+
+系统 USB 直连已补充只读启动诊断：接口归属／驱动、IPv6 地址标记、路由和邻居状态、监听端口、RX/TX 变化，以及 StartSession、TCP 和会话阶段。不可读取时明确标为 unavailable；详见 [报告字段与判断方法](USB_SYSTEM_NETWORK_DIAGNOSTICS.md)。这些是工程诊断能力，尚未确认报告设备的实际网络阻塞原因。
 
 - 固件声明 USB host/accessory、Wi-Fi/Wi-Fi Direct、Bluetooth/BLE；这些是 feature 声明，不等同于每个物理 USB 口都支持 iPhone 连接。
 - USB HAL 为 `android.hardware.usb@1.1-service-mediatek`；init 配置列出 `dual-role-type_c_port0` 与 `dual-role-usb20` 的 role 节点，owner root:system、mode 664。记录作排查线索，应用不要直接写 sysfs 强切角色。
@@ -155,3 +179,5 @@ python scripts/firmware_catalog.py --cache agent_docs/firmware/ihu519g-327 --aap
 3. 验证导航 stream 12 及原厂音量选流，媒体／导航并发、通话与蓝牙优先；确认 AudioRecord 的 8/16 kHz、source 与 AEC。
 4. 逐个确认 SDK 是否加载、服务是否允许本应用绑定、权限是否获授、FunctionStatus 及具体车型分支。拒绝访问时记录错误并回退标准 Android 行为。
 5. 验证 USB 物理口、授权／重连、Wi-Fi 频段／路由，以及熄火休眠、唤醒、冷启动、后台保活。诊断记录应去除 VIN、设备唯一 ID、配对地址和网络凭据。
+
+按用户不能依赖 VPN 的运行约束，当前 USB 改用普通服务承载系统 NCM 网卡 socket，删除 USB VPN 授权与回退；这是应用实现变更，不是新增固件可用性证据，实车端到端连接仍待验证，见 [USB 无 VPN 方案](USB_WITHOUT_VPN.md)。

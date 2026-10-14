@@ -165,6 +165,20 @@ class CarPlayVpnService : VpnService() {
         }
     }
 
+    /** Uses an already configured kernel USB NIC; does not create a TUN or claim USB interfaces. */
+    fun attachSystemUsb(
+        bindAddress: Inet6Address,
+        config: AirPlayConfig,
+        identity: AirPlayIdentity,
+        pairings: PairingStore,
+        mfi: MfiAuthenticator?,
+        listener: AirPlaySessionListener,
+        media: AirPlayMediaHandler,
+    ): AttachResult {
+        require(bindAddress.isLinkLocalAddress && bindAddress.scopeId > 0)
+        return attachWireless(bindAddress, config, identity, pairings, mfi, listener, media)
+    }
+
     /** Releases the active AirPlay listener and whichever VPN/NCM transport resources are active. */
     @Synchronized
     fun detach() {

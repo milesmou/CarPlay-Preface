@@ -6,7 +6,7 @@ import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayDisplayConfig
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.network.CarPlayBonjour
-import com.shilapi.xcertplay.network.CarPlayVpnService
+import com.shilapi.xcertplay.network.CarPlaySocketService
 import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.AirPlayMediaHandler
 import com.shilapi.xcertplay.airplay.PairingStore
@@ -95,14 +95,14 @@ class CarPlayBonjourDualStackTest {
     }
 
     @Test fun dualLanThenSingleP2pThenDualLanServesAirPlayInfo() {
-        val controller = Robolectric.buildService(CarPlayVpnService::class.java).create()
+        val controller = Robolectric.buildService(CarPlaySocketService::class.java).create()
         val events = java.util.concurrent.CopyOnWriteArrayList<String>()
         var activeSessions = 0
         try {
             val service = controller.get()
             for (extras in listOf(listOf(InetAddress.getByName("127.0.0.1")), emptyList(),
                                   listOf(InetAddress.getByName("127.0.0.1")))) {
-                assertEquals(CarPlayVpnService.AttachResult.Started, service.attachWireless(
+                assertEquals(CarPlaySocketService.AttachResult.Started, service.attachWireless(
                     InetAddress.getByName("::1"), config.copy(port = 0), identity, PairingStore(), null,
                     object : AirPlaySessionListener {
                         override fun onDebugLog(message: String) { events.add(message) }
@@ -164,10 +164,10 @@ class CarPlayBonjourDualStackTest {
     }
 
     @Test fun serviceDetachesBothSamePortListenersOnAndroid10() {
-        val controller = Robolectric.buildService(CarPlayVpnService::class.java).create()
+        val controller = Robolectric.buildService(CarPlaySocketService::class.java).create()
         try {
             val service = controller.get()
-            assertEquals(CarPlayVpnService.AttachResult.Started, service.attachWireless(
+            assertEquals(CarPlaySocketService.AttachResult.Started, service.attachWireless(
                 InetAddress.getByName("::1"), config.copy(port = 0), identity, PairingStore(), null,
                 object : AirPlaySessionListener {}, object : AirPlayMediaHandler {},
                 listOf(InetAddress.getByName("127.0.0.1"))))

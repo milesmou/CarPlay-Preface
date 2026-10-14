@@ -22,6 +22,8 @@ data class CarPlayNowPlaying(
  * clears it.
  */
 class CarPlayPlaybackStatus {
+    var statusKnown = false
+        private set
     @Volatile var nowPlaying = CarPlayNowPlaying()
         private set
 
@@ -33,6 +35,9 @@ class CarPlayPlaybackStatus {
         val body = runCatching { Iap2BodyReader.of(frame) }.getOrNull() ?: return null
         val media = runCatching { body.optionalGroup(MEDIA_ITEM) }.getOrNull()
         val playback = runCatching { body.optionalGroup(PLAYBACK) }.getOrNull()
+        if (playback != null && playback.has(STATUS)) {
+            runCatching { playback.u8(STATUS) }.onSuccess { statusKnown = true }
+        }
         val previous = nowPlaying
         val next = previous.copy(
             title = media.updatedString(TITLE, previous.title),
@@ -65,6 +70,7 @@ class CarPlayPlaybackStatus {
 
     /** Clears all retained metadata at the end of a CarPlay session. */
     fun clearAll(): CarPlayNowPlaying? {
+        statusKnown = false
         if (nowPlaying == CarPlayNowPlaying()) return null
         nowPlaying = CarPlayNowPlaying()
         return nowPlaying

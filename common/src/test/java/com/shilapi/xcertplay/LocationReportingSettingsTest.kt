@@ -115,6 +115,8 @@ class LocationReportingSettingsTest {
     private fun openSettings() {
         controller = Robolectric.buildActivity(DiPlayActivity::class.java,
             Intent(context, DiPlayActivity::class.java).putExtra("page", "settings")).setup()
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.NAVIGATION))
     }
 
     private fun locationSwitch(): Switch = descendants(activity.window.decorView)

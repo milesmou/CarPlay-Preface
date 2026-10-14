@@ -50,7 +50,7 @@ class PrefaceFirmwareIntegrationTest {
     @Test fun unidentifiedDeviceUsesPrefaceAudioDefaults() {
         assertEquals(3, AirPlayPersistence.loadMediaAudioChannel(context))
         assertEquals(12, AirPlayPersistence.loadNavigationAudioChannel(context))
-        assertEquals(12, AirPlayPersistence.loadNavigationStreamType(context))
+        assertEquals(12, AirPlayPersistence.loadNavigationAudioChannel(context))
     }
 
     @Test fun changingFirmwareDoesNotChangePrefaceDefaults() {
@@ -169,6 +169,32 @@ class PrefaceFirmwareIntegrationTest {
         assertTrue(receiver.handle(event))
         assertTrue(receiver.handle(event))
         assertEquals(listOf(CarPlayMediaButton.NEXT), delivered)
+    }
+
+    @Test fun inputInterceptionReleasesOnFocusLossEvenWithCarPlayInForeground() {
+        val active = mock(CarPlayController::class.java).also { controller = it }
+        `when`(active.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        CarPlayMediaKeys.attach(context, active) { true }
+        CarPlayBackgroundSession.active = true
+        var requests = 0
+        var releases = 0
+        val input = object : PrefaceTrackKeyInterception.Backend {
+            override fun request(callback: (Boolean, Int) -> Unit) { requests++ }
+            override fun release() { releases++ }
+        }
+        ReflectionHelpers.setField(CarPlayMediaKeys, "trackInterception", PrefaceTrackKeyInterception(input) {})
+        shadowOf(context.getSystemService(AudioManager::class.java))
+            .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        CarPlayMediaKeys.onMediaAudioChanged(true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, requests)
+        val request = ReflectionHelpers.getField<AudioFocusRequestCompat>(CarPlayMediaKeys, "focusRequest")
+        ReflectionHelpers.getField<AudioManager.OnAudioFocusChangeListener>(request, "listener")
+            .onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, releases)
+        CarPlayMediaKeys.detach(active)
+        assertEquals(1, releases)
     }
 
     @Test fun receiverExistsOnlyDuringOwnershipAndBluetoothDoesNotDoubleForward() {

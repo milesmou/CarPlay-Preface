@@ -8,11 +8,16 @@ Instructions for coding agents that work on CarPlay-Preface.
 2. 星瑞配置直接默认启用，不以产品、型号、Android 版本或固件构建号识别作为启用门槛；媒体／导航默认流为 3／12，方控媒体广播默认接入。用户已保存的自动路由或自定义配置优先。
 3. 服务存在、权限、会话、焦点、通话及蓝牙音频检查仍需保留，它们是接口可用性和运行状态判断，不是车型适配门槛。通用 Android 能力用于实现星瑞功能，不据此扩展支持车型。
 4. 同步上游时，只引入星瑞所需或可用于星瑞的通用改动，不引入其他车型专属适配。固件静态证据和实车验证结果分别记录，不将默认启用描述为所有星瑞固件均已验证。
-5. 无线连接仅提供原车热点和 Android `LocalOnlyHotspot` 临时热点，不重新引入 Wi-Fi Direct 或现有 Wi-Fi／同一局域网模式。临时热点使用公共 API 与系统分配的名称、密码、频段；保留权限与接口状态检查，断开时释放本应用的预约，不猜测信道或关闭其他应用的热点。
+5. 无线连接提供“临时热点”和“手动车机热点”二选一，默认使用 Android `LocalOnlyHotspot` 临时热点。手动模式选择后，应用尝试使用系统保存配置开启车机热点；用户保存匹配的 SSID 和密码。保留权限和接口检查，无法开启时提示原因及系统设置入口；不修改热点配置或自动关闭热点，存在 CarPlay 会话时不操作热点开关。临时热点使用公共 API 与系统分配的名称、密码、频段，断开时仅释放本应用的预约。两种模式均保留权限、接口归属和运行状态检查，不猜测信道；不引入 Wi-Fi Direct 或现有 Wi-Fi／同一局域网模式，正式发布前不保留旧配置迁移代码。设置变更在下一次连接生效，不擅自中断正在运行的 CarPlay。
+6. 用户已确认实际车机屏幕为 **1920×720 像素、横屏**。后续车机界面测试和截图固定使用 **1920×720 横屏**，不使用竖屏截图验证车机界面；高密度、大字体和窄可用窗口场景也必须保持横屏，在同一分辨率下通过密度、字体比例或可用窗口约束验证。1920×720 是像素分辨率，不是 dp 尺寸；控件仍使用 dp，并根据运行时密度、系统栏及分屏后的实际可用窗口适配。
+
+7. USB 连接使用系统为当前 iPhone NCM 建立的网卡及普通 socket 服务，不依赖 root，不申请 VPN 授权、不建立 VPN/TUN、不回退 VPN。保留 USB 授权、网卡归属、IPv6 就绪和会话检查；网卡不可用或 AirPlay 接入超时时明确失败，不把删除 VPN 回退描述为实车已修复。应用内 TCP/IP 协议栈尚未实现。
 
 ## Checks
 
-Run the CI command from `.github/workflows/android.yml` before you report a change as done:
+只有用户明确要求“完整测试”时，才运行以下 CI 全量检查。普通修改或“构建测试 APK”默认不运行全量单元测试、Lint 或所有模块检查；构建测试包时仅执行用户指定模块的构建任务（默认 `:mobile:assembleDebug`），并继续核对签名及按下文规则自动安装。不要把仅构建成功描述为完整检查通过。
+
+When the user explicitly requests full testing, run the CI command from `.github/workflows/android.yml`:
 
 ```sh
 ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest \
@@ -31,9 +36,9 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 版本与上游同步
 
-1. 当前上游基线为 **DiPlay v0.2.18**。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
-2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的应用 `versionName` 和 `versionCode`。同步时不得直接覆盖为上游的应用版本号。
-3. 用户指定应用版本时采用指定版本；未指定时默认递增本仓库应用版本的补丁号（例如 `0.1.0` → `0.1.1`）。`versionCode` 必须大于上一版本，以支持覆盖升级；修改应用版本时同时更新中文 `README.md`。
+1. 当前上游参考基线为 **DiPlay v0.2.19（选择性同步）**，具体提交与排除范围见 `docs/UPSTREAM_SYNC_0.2.19.md`。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
+2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的 `versionCode`。应用 `versionName` 遵循下一条的发布规则，不得直接覆盖为上游的应用版本号。
+3. 用户指定应用版本时采用指定版本。当前开发版本为 **0.1.1**，在 GitHub 正式发布此版本前，所有开发修改与上游同步均保持 `versionName = "0.1.1"`，不自动递增补丁号。正式发布后，未指定下一版本时默认递增本仓库应用版本的补丁号。`versionCode` 不得回退，新升级构建必须大于上一升级构建，以支持覆盖安装；修改应用版本时同时更新中文 `README.md`。
 4. 如果同步的是尚未发布或零散的上游提交，记录实际同步的提交 SHA 和同步范围，不虚构上游发布版本，也不将部分提交描述为完整同步某个新版本。
 
 ## 构建环境与设备安装
@@ -43,6 +48,10 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 用户明确要求公开现有 APK 签名密钥及签名密码，允许 `signing/carplay-release.p12` 和 `signing/signing.json` 入库。默认发布构建复用这组签名材料，证书指纹不得改变。`scripts/check_public_tree.py` 仅允许以上四个固定路径及已确认内容；其他私钥、令牌、签名密钥和本地配置继续排除，不扩大白名单。公开签名材料不得打包成应用资产。
 
 后续构建 CarPlay 测试 APK（`mobile`／`automotive` 的 Debug 变体，包括 `assembleStandaloneDebug`）也必须使用 `signing/` 中的现有密钥和密码，与 Release 使用同一证书；不要使用 Android 默认 Debug 密钥或另行生成测试密钥。除非用户明确指定其他签名，不设置 `ANDROID_KEYSTORE_*`／`ANDROID_KEY_*` 覆盖参数。构建后核对 APK 证书指纹；旧测试包若使用其他签名导致覆盖安装失败，报告错误，不卸载或清除数据。
+
+### 测试 APK 命名
+
+构建测试 APK 时，交付及安装文件统一命名为 `CarPlay-Preface-<versionName>-<versionCode>-debug.apk`，例如 `CarPlay-Preface-0.1.1-52-debug.apk`。版本名称和构建号必须使用本次 APK 的实际值，示例中的 `52` 不是固定值。保留 Gradle 原始产物及输出元数据，构建成功后在同一输出目录复制为该名称；核对签名后安装并交付命名后的文件。
 
 ### 环境准备与本地缓存
 
@@ -72,7 +81,7 @@ Ask which goal the driver has when they look for the setting. Use the first row 
 
 | Category | Put a setting here when it controls… | Examples |
 | --- | --- | --- |
-| Connection | how the iPhone connects and how DiPlay starts | connection setup, connect on open, start with the car, USB permissions, car hotspot automation, iPhone choice, Android permissions |
+| Connection | how the iPhone connects and how DiPlay starts | connection setup, connect on open, start with the car, USB permissions, temporary hotspot, iPhone choice, Android permissions |
 | Display | how CarPlay looks on the head-unit screen | day/night mode, picture, size, resolution, frame rate, dock, system bars, multi-window resolution |
 | Audio | what the driver hears | media and navigation streams, music buffer |
 | Navigation | location and turn-by-turn guidance | location to iPhone, navigation output for Xingrui |
@@ -83,7 +92,7 @@ Ask which goal the driver has when they look for the setting. Use the first row 
 A setting goes to Advanced when it is experimental, depends on specific firmware, or is an opt-in that can break sound, video or the connection on some head units.
 A control that fixes a common problem and is safe at its default (for example the audio stream choice) stays in its category.
 Exception: a gated control that only its own audience sees, and that completes an everyday goal, stays in that goal's category.
-Example: auto car hotspot needs ADB but appears only for car-hotspot users, so it is in Connection.
+Example: an explicit boot-start permission grant belongs in Connection.
 
 Mark an experimental setting or card with the title suffix ` (experimental)`, never `· experimental`, a dash, or an `Experimental …` prefix.
 Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(экспериментально)`, `(експериментально)`, `（实验性）`, `（實驗性）`, `（実験的機能）`.
@@ -108,7 +117,7 @@ Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(э
 
 ### Settings entry
 
-This branch has no Overview menu. Settings opens on Connection, which holds connection readiness and the setup guide.
+This branch has no Overview menu or standalone connection setup page. Home provides Wireless and USB connection actions; pairing and permissions appear when needed. Settings opens on Connection, which holds connection readiness and connection preferences. There is no first-launch setup guide or guide entry in Settings.
 Every category is directly accessible through the wide-screen rail or compact horizontal category strip.
 About has its own category. Do not reintroduce Overview, quick-setting duplicates, or a language picker.
 

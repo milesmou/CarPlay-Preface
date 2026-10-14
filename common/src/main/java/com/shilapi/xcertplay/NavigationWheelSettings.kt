@@ -2,10 +2,10 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 
-/** Opt-in key routing shares the existing wheel accessibility service and authorization. */
+/** E02 volume routing is enabled by default; previously saved choices and grants are retained. */
 object NavigationWheelSettings {
     private fun prefs(context: Context) = context.getSharedPreferences("diplay_navigation_wheel", Context.MODE_PRIVATE)
-    fun enabled(context: Context): Boolean = prefs(context).getBoolean("enabled", false)
+    fun enabled(context: Context): Boolean = prefs(context).getBoolean("enabled", true)
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean("enabled", enabled).apply()
         WheelKeyService.settingsChanged()

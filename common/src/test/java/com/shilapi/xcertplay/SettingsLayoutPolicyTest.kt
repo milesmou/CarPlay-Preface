@@ -54,8 +54,6 @@ class SettingsLayoutPolicyTest {
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
-            SettingsSection.EXTERNAL_CONTROLLER,
-            SettingsSection.HOTSPOT_JOIN,
         ), experimental)
     }
 }

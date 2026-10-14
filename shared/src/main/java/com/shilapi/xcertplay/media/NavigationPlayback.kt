@@ -1,15 +1,16 @@
 package com.shilapi.xcertplay.media
 
 /** A null stream means usage routing, fallback, or conflicting active legacy routes. */
-data class NavigationPlaybackSnapshot(val active: Boolean, val legacyStreamType: Int?, val priorityVoiceActive: Boolean = false)
+data class NavigationPlaybackSnapshot(val active: Boolean, val legacyStreamType: Int?, val priorityVoiceActive: Boolean = false,
+    val mediaActive: Boolean = false, val mediaLegacyStreamType: Int? = null)
 
 /** Foreground UI can poll this snapshot; it never requests focus or changes volume itself. */
 object NavigationPlayback {
     private val tracker = NavigationPlaybackTracker()
     fun snapshot(): NavigationPlaybackSnapshot = tracker.snapshot()
     internal fun open() = tracker.open()
-    internal fun played(token: NavigationPlaybackTracker.Token, streamType: Int?, bufferedMillis: Long, priorityVoice: Boolean = false) =
-        tracker.played(token, streamType, bufferedMillis, priorityVoice)
+    internal fun played(token: NavigationPlaybackTracker.Token, streamType: Int?, bufferedMillis: Long, priorityVoice: Boolean = false, media: Boolean = false) =
+        tracker.played(token, streamType, bufferedMillis, priorityVoice, media)
     internal fun close(token: NavigationPlaybackTracker.Token) = tracker.close(token)
 }
 
@@ -19,15 +20,15 @@ internal class NavigationPlaybackTracker(
     private val quietTailMillis: Long = 900L,
 ) {
     class Token internal constructor() { internal var closed = false }
-    private data class Entry(val streamType: Int?, val untilMillis: Long, val priorityVoice: Boolean)
+    private data class Entry(val streamType: Int?, val untilMillis: Long, val priorityVoice: Boolean, val media: Boolean)
     private val entries = LinkedHashMap<Token, Entry>()
 
     fun open() = Token()
 
     @Synchronized
-    fun played(token: Token, streamType: Int?, bufferedMillis: Long, priorityVoice: Boolean = false) {
+    fun played(token: Token, streamType: Int?, bufferedMillis: Long, priorityVoice: Boolean = false, media: Boolean = false) {
         if (token.closed) return
-        entries[token] = Entry(streamType, nowMillis() + bufferedMillis.coerceAtLeast(0L) + quietTailMillis, priorityVoice)
+        entries[token] = Entry(streamType, nowMillis() + bufferedMillis.coerceAtLeast(0L) + quietTailMillis, priorityVoice, media)
     }
 
     @Synchronized
@@ -40,8 +41,10 @@ internal class NavigationPlaybackTracker(
     fun snapshot(): NavigationPlaybackSnapshot {
         val now = nowMillis()
         entries.entries.removeAll { it.value.untilMillis <= now }
-        val navigation = entries.values.filter { !it.priorityVoice }
+        val navigation = entries.values.filter { !it.priorityVoice && !it.media }
+        val media = entries.values.filter { it.media }
         val routes = navigation.map { it.streamType }.distinct()
-        return NavigationPlaybackSnapshot(navigation.isNotEmpty(), routes.singleOrNull(), entries.values.any { it.priorityVoice })
+        return NavigationPlaybackSnapshot(navigation.isNotEmpty(), routes.singleOrNull(), entries.values.any { it.priorityVoice },
+            media.isNotEmpty(), media.map { it.streamType }.distinct().singleOrNull())
     }
 }

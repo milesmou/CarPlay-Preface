@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarPlay</title>
+<style>
+:root { color-scheme: dark; }
+body { margin:0; padding:24px 20px 40px; background:#101418; color:#e8eaed;
+  font:16px/1.5 -apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif; }
+main { max-width:520px; margin:0 auto; }
+h1 { font-size:22px; margin:0 0 4px; }
+.card { background:#1b2129; border:1px solid #2a323d; border-radius:16px; padding:18px; margin-top:20px; }
+.card p { color:#9aa0a6; font-size:14px; margin:0 0 14px; }
+input { display:block; width:100%; box-sizing:border-box; margin-bottom:14px; padding:12px 14px; border-radius:12px;
+  border:1px solid #2a323d; background:#101418; color:#e8eaed; font-size:28px; letter-spacing:6px; text-align:center; }
+button { display:block; width:100%; box-sizing:border-box; text-align:center; padding:13px 16px;
+  border-radius:999px; border:0; font-size:16px; font-weight:600; cursor:pointer; background:#a8c7fa; color:#0b2540; }
+button:disabled, input:disabled { opacity:.5; }
+#result { margin-top:12px; font-size:14px; color:#f28b82; min-height:20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>CarPlay</h1>
+  <form class="card" id="form">
+    <p id="prompt"></p>
+    <input id="code" inputmode="numeric" autocomplete="off" maxlength="7" autofocus>
+    <button id="open"></button>
+    <div id="result"></div>
+  </form>
+</main>
+<script>
+var L = {zh: {prompt:"请输入车机上显示的验证码。",open:"打开",wrong:"验证码错误。剩余次数：%1。",
+    locked:"错误次数过多。请在车机上离开此页面后重新打开，以取得新的验证码。",
+    fail:"无法连接车机，请检查连接后重试。"}};
+var key = "zh";
+var t = L[key];
+var $ = function(id) { return document.getElementById(id); };
+document.documentElement.lang = "zh-CN";
+document.documentElement.dir = "ltr";
+$("prompt").textContent = t.prompt;
+$("open").textContent = t.open;
+function closed() { $("result").textContent = t.locked; $("code").disabled = true; $("open").disabled = true; }
+$("form").addEventListener("submit", function(event) {
+  event.preventDefault();
+  // A code that is not six digits yet is not sent, so it does not cost a try.
+  if ($("code").value.replace(/\D/g, "").length !== 6) { $("code").focus(); return; }
+  $("open").disabled = true;
+  $("result").textContent = "";
+  fetch("code", {method: "POST", headers: {"Content-Type": "text/plain"}, body: $("code").value})
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      if (j.path) { location.replace(j.path); return; }
+      if (j.locked) { closed(); return; }
+      $("result").textContent = t.wrong.replace("%1", j.left);
+      $("code").value = ""; $("code").focus(); $("open").disabled = false;
+    })
+    .catch(function() { $("result").textContent = t.fail; $("open").disabled = false; });
+});
+</script>
+</body>
+</html>

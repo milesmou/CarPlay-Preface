@@ -39,6 +39,7 @@ class ManualHotspotManager(
     private val waitLock = Object()
     private var confirmed: HotspotSelection? = null
     private var lastSampleLog = emptyList<String>()
+    private var multicastLock: WifiManager.MulticastLock? = null
     private val wifiManager = appContext.getSystemService(WifiManager::class.java)
         ?: throw IllegalStateException("WifiManager is unavailable")
     private val expectedSsid = ssid
@@ -73,18 +74,14 @@ class ManualHotspotManager(
         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
 
         val readConfiguration = readApConfiguration()
-        val companion = readConfiguration != null &&
-            isFiveGhzCompanion(apSsid = readConfiguration.ssid, expectedSsid = expectedSsid)
-        if (readConfiguration != null && readConfiguration.ssid != expectedSsid && !companion) {
+        if (readConfiguration != null && readConfiguration.ssid != expectedSsid) {
             throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                "Manual hotspot SSID does not match the active local AP configuration: " +
-                    "'${readConfiguration.ssid}'",
+                "Manual hotspot SSID does not match the active local AP configuration",
             )
         }
         // The Android configuration describes the 2.4 GHz network, so its channel, band and
         // frequency say nothing about the companion; only its security carries over.
-        val apConfiguration = if (companion) null else readConfiguration
-        if (companion) onDiagnostic("Manual hotspot uses the car's 5 GHz companion network of the configured hotspot")
+        val apConfiguration = readConfiguration
         validateApConfiguration(apConfiguration)
 
         // 只在候选证据变化时记录，避免每 250ms 重复输出。
@@ -104,14 +101,22 @@ class ManualHotspotManager(
             log = {},
         ).await(timeoutMillis)
         confirmed = selected
+        synchronized(waitLock) {
+            if (closed || isCancelled()) throw java.io.InterruptedIOException("Hotspot startup cancelled")
+            multicastLock = wifiManager.createMulticastLock("carplay-manual-hotspot").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
         onDiagnostic("hotspot interface confirmed iface=${selected.name} index=${selected.index} atNs=${System.nanoTime()}")
         val network = NetworkInterface.getByName(selected.name)
         val localInterface = LocalHotspotInterface(selected.name, selected.address,
             runCatching { network?.hardwareAddress?.toMacAddressString() }.getOrNull()
                 ?.takeUnless { it == "02:00:00:00:00:00" || it == "00:00:00:00:00:00" }
                 ?: HotspotInterfaceBssid.read(selected.name))
-        val connectionFrequency = if (companion) null else frequencyFromConnectionInfo()
-        val scanFrequency = if (companion) null else frequencyFromScanResult(localInterface)
+        // Station connectionInfo is not evidence for the selected AP radio.
+        val connectionFrequency: Int? = null
+        val scanFrequency = frequencyFromScanResult(localInterface)
         val channel = observedManualHotspotChannel(
             apChannel = apConfiguration?.channel ?: 0,
             connectionFrequencyMHz = connectionFrequency,
@@ -161,8 +166,7 @@ class ManualHotspotManager(
             bandLabel = when (expectedBand) {
                 ManualHotspotBand.GHZ_2_4 -> "2.4 GHz"
                 ManualHotspotBand.GHZ_5 -> "5 GHz"
-                ManualHotspotBand.AUTO -> if (companion) "5 GHz" else
-                    frequencyMHz?.let(::bandLabel) ?: observedBandLabel ?: "Auto"
+                ManualHotspotBand.AUTO -> frequencyMHz?.let(::bandLabel) ?: observedBandLabel ?: "Auto"
             },
             backend = WirelessHotspotBackend.MANUAL_HOTSPOT,
         )
@@ -181,7 +185,11 @@ class ManualHotspotManager(
 
     override fun close() {
         closed = true
-        synchronized(waitLock) { waitLock.notifyAll() }
+        val lock = synchronized(waitLock) {
+            waitLock.notifyAll()
+            multicastLock.also { multicastLock = null }
+        }
+        if (lock?.isHeld == true) runCatching { lock.release() }
         interfaces.close()
     }
 

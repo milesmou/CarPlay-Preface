@@ -6,6 +6,18 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class CarPlayPlaybackStatusTest {
+    @Test fun metadataAloneDoesNotEstablishPlaybackAndAnExplicitPauseDoes() {
+        val status = CarPlayPlaybackStatus()
+        status.acceptUpdate(update { group(0) { string(1, "Song") } })
+        assertEquals(false, status.statusKnown)
+        status.acceptUpdate(update { group(1) { u8(0, 2) } })
+        assertEquals(true, status.statusKnown)
+        assertEquals(false, status.playing)
+        status.acceptUpdate(update { group(1) { u32(1, 500) } })
+        assertEquals(true, status.statusKnown)
+        status.clearAll()
+        assertEquals(false, status.statusKnown)
+    }
     private fun update(block: com.shilapi.xcertplay.iap2.body.Iap2BodyBuilder.() -> Unit) =
         Iap2Messages.buildRaw(CarPlayPlaybackStatus.NOW_PLAYING_UPDATE, block)
 

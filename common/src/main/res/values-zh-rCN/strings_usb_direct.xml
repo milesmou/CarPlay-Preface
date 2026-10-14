@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connection_help_usb_direct">iPhone 的 USB 网络未就绪，或手机未接入 AirPlay。请重新插拔 USB 数据线，仍失败时保存诊断报告。此连接使用系统 USB 网卡，无需 VPN 授权或 root。</string>
+</resources>

@@ -33,7 +33,7 @@ internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (Stri
         log("hotspot sample rejected: network_changed=${!snapshot.consistent} apEnabled=${snapshot.apEnabled}")
         return null
     }
-    return snapshot.interfaces.mapNotNull { iface ->
+    val candidates = snapshot.interfaces.mapNotNull { iface ->
         val owned = snapshot.apInterfaces?.contains(iface.name) == true
         val upstream = snapshot.wifiUpstreams?.contains(iface.name) == true
         val address = wirelessHostAddress(iface.addresses.filter {
@@ -57,8 +57,11 @@ internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (Stri
             "defaultConflict=${owned && (upstream || snapshot.defaultInterface == iface.name)}")
         if (reason != "platform_ap" && reason != "wireless_non_upstream") null
         else (if (owned) 100 else 0) to HotspotSelection(iface.name, iface.index, address!!)
-    }.sortedWith(compareByDescending<Pair<Int, HotspotSelection>> { it.first }.thenBy { it.second.name })
-        .firstOrNull()?.second
+    }
+    val owned = candidates.filter { it.first == 100 }
+    val eligible = if (owned.isNotEmpty()) owned else candidates
+    if (eligible.size > 1) log("hotspot selection rejected: ambiguous candidateCount=${eligible.size}")
+    return eligible.singleOrNull()?.second
 }
 
 internal class ManualHotspotReadiness(

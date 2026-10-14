@@ -147,4 +147,15 @@ class ManualHotspotReadinessTest {
         assertNull(select(snapshot(iface(addresses = emptyList()))))
         assertNull(select(snapshot(iface(addresses = listOf(InetAddress.getByName("127.0.0.1"))))))
     }
+
+    @Test fun multiplePossibleApsAreRejectedInsteadOfPickingAlphabetically() {
+        assertNull(select(snapshot(iface("ap0"), iface("wlan1"))))
+        assertNull(select(snapshot(iface("ap0"), iface("wlan1"), ap = setOf("ap0", "wlan1"))))
+        assertEquals("ap0", select(snapshot(iface("ap0"), iface("wlan1"), ap = setOf("ap0")))?.name)
+    }
+
+    @Test fun wifiDirectAndUsbAreNeverFallbackHotspotCandidates() {
+        assertNull(select(snapshot(iface("p2p0"))))
+        assertNull(select(snapshot(iface("usb0"))))
+    }
 }

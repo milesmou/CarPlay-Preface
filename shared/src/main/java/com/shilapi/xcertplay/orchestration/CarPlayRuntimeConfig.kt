@@ -54,7 +54,7 @@ class CarPlayRuntimeConfig(
     val label: String = "xcertplay",
     val hostName: String = "xcertplay",
     val transport: CarPlayTransport = CarPlayTransport.WIRED,
-    val wirelessHotspotMode: WirelessHotspotMode = WirelessHotspotMode.MANUAL,
+    val wirelessHotspotMode: WirelessHotspotMode = WirelessHotspotMode.LOCAL_ONLY_HOTSPOT,
     val manualHotspotSsid: String? = null,
     val manualHotspotPassphrase: String? = null,
     val manualHotspotBand: ManualHotspotBand = ManualHotspotBand.AUTO,
@@ -94,6 +94,9 @@ class CarPlayRuntimeConfig(
         }
         // Only a wireless session starts the hotspot; a USB session must not fail on unused settings.
         if (transport == CarPlayTransport.WIRELESS && wirelessHotspotMode == WirelessHotspotMode.MANUAL) {
+            require(ManualHotspotValidation.error(manualHotspotSsid.orEmpty(), manualHotspotPassphrase.orEmpty()) == null) {
+                "Invalid manual hotspot credentials"
+            }
             val ssid = manualHotspotSsid
             require(!ssid.isNullOrBlank()) {
                 "manualHotspotSsid is required in manual hotspot mode"

@@ -28,9 +28,9 @@ internal class NavigationWheelKeyPolicy {
     }
 }
 
-/** Stream 14 bypasses the public minimum validator on the verified head unit. */
+/** Vendor streams exceed Android's public minimum-volume validator; their minimum is zero. */
 internal fun navigationWheelMinimum(stream: Int, sdk: Int, publicMinimum: (Int) -> Int): Int =
-    if (stream == 14 || sdk < 28) 0 else publicMinimum(stream)
+    if (stream > 10 || sdk < 28) 0 else publicMinimum(stream)
 
 internal fun navigationWheelTarget(current: Int, minimum: Int, maximum: Int, delta: Int): Int? {
     if (minimum > maximum || current !in minimum..maximum || delta !in listOf(-1, 1)) return null

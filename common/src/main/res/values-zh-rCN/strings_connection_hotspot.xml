@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connection_hotspot_credentials">若 iPhone 未自动接入，请在“设置 → 无线局域网”中加入当前热点：\n热点名称：%1$s\n密码：%2$s\n热点重新启动后，名称和密码可能变化。</string>
+</resources>

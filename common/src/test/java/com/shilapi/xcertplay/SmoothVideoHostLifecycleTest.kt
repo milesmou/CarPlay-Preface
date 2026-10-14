@@ -62,6 +62,7 @@ class SmoothVideoHostLifecycleTest {
         // Host startup without vendor-service workers or real transports.
         controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, _ ->
             org.mockito.Mockito.`when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+            org.mockito.Mockito.`when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         }
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
@@ -96,6 +97,7 @@ class SmoothVideoHostLifecycleTest {
         setField("smoothVideo", true)
         allowStartup()
         val oldController = mock(CarPlayController::class.java)
+        `when`(oldController.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         `when`(oldController.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
         val oldSink = sink(pacingDelayMillis = 0)
         val stop = DeferredStop()
@@ -135,6 +137,7 @@ class SmoothVideoHostLifecycleTest {
             AirPlayPersistence.saveSmoothVideo(activity, smooth)
             setField("smoothVideo", smooth)
             val controller = mock(CarPlayController::class.java)
+            `when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
             `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
             val sink = sink(pacingDelayMillis = if (smooth) smoothVideoDelayMillis(60) else 0)
             val stop = DeferredStop()
@@ -155,6 +158,7 @@ class SmoothVideoHostLifecycleTest {
         setField("smoothVideo", false)
         allowStartup()
         val controller = mock(CarPlayController::class.java)
+        `when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
         val sink = sink(pacingDelayMillis = 0)
         setField("controller", controller)
@@ -201,6 +205,7 @@ class SmoothVideoHostLifecycleTest {
     // its decoders release their codecs it may still render to the SurfaceView being destroyed.
     @Test fun aShutdownDuringARestartKeepsTheRestartsSinkDetachable() {
         val controller = mock(CarPlayController::class.java)
+        `when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
         val restarting = spy(AndroidMediaSink()).also(ownedSinks::add)
         setField("controller", controller)
@@ -247,6 +252,7 @@ class SmoothVideoHostLifecycleTest {
         closing.onVideoFrame(110, byteArrayOf(0, 0, 0, 1, 0x65, 0x88.toByte(), 0x84.toByte(), 0x21))
         assertTrue("The decoder is blocked inside queueInputBuffer", codec.entered.await(5, TimeUnit.SECONDS))
         val controller = mock(CarPlayController::class.java)
+        `when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
         setField("controller", controller)
         setField("sink", closing)

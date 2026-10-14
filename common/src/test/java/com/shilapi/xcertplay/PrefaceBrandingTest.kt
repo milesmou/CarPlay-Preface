@@ -21,14 +21,11 @@ class PrefaceBrandingTest {
         context.getSharedPreferences("xcertplay_airplay", 0).edit().remove("oem_label").commit()
     }
 
-    @Test fun defaultAndLegacyVehicleNamesUseXingrui() {
+    @Test fun defaultVehicleNameUsesXingrui() {
         clearPreferences()
         assertEquals("CarPlay", context.getString(R.string.app_name))
         assertEquals("星瑞", AirPlayPersistence.loadOemLabel(context))
-        for (name in listOf("", "BYD", "Geely", "DiPlay", "xcertplay")) {
-            AirPlayPersistence.saveOemLabel(context, name)
-            assertEquals("星瑞", AirPlayPersistence.loadOemLabel(context))
-        }
+
     }
 
     @Test fun customVehicleNameIsPreserved() {

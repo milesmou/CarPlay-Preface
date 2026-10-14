@@ -11,6 +11,7 @@ object CarPlayDisplayScale {
     const val DEFAULT_TENTHS = MAX_TENTHS
 
     /** Custom resolution percentages accepted by the settings screen and the in-session menu. */
+    const val DEFAULT_PERCENT = 100
     const val MIN_PERCENT = 30
     const val MAX_PERCENT = 160
 

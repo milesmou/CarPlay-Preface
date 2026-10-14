@@ -53,10 +53,7 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name="com.shilapi.xcertplay.network.CarPlayVpnService"
-            android:permission="android.permission.BIND_VPN_SERVICE"
-            android:exported="false" />
+        <service android:name="com.shilapi.xcertplay.network.CarPlaySocketService" android:exported="false" />
 
         <!-- Only Telecom can bind it; it carries no UI or audio, see PhoneAudioRoute. -->
         <service

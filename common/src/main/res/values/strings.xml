@@ -1,11 +1,6 @@
 <resources>
-    <string name="settings_built_in_car_hotspot">Built-in car hotspot</string>
-    <string name="hotspot_hint_manual">Built-in car hotspot · Keep the car hotspot, Bluetooth and your iPhone’s Wi-Fi on.</string>
     <string name="hotspot_hint_local">Open Connection setup to save your built-in car hotspot details.</string>
     <string name="marker_centre_default">Centre · default</string>
-    <string name="hotspot_mode_manual_desc">Connect through the car hotspot. After saving its name and password, CarPlay sends the network details to the iPhone over Bluetooth. Select 5 GHz in the car settings when available.</string>
-    <string name="hotspot_details_off">Hotspot is off · Turn it on in car settings.</string>
-    <string name="hotspot_details_saved">Details saved · Check that the car hotspot is on before connecting.</string>
     <string name="permission_enabled_ready">Permission enabled · ready to use</string>
     <string name="permission_not_enabled">Permission not enabled yet</string>
     <string name="report_clip_label">Diagnostic report</string>
@@ -182,13 +177,7 @@
     <string name="hide_the_navigation_bar">Hide the navigation bar</string>
     <string name="hide_the_status_bar">Hide the status bar</string>
     <string name="hotspot_name">Hotspot name</string>
-    <string name="hotspot_password">Hotspot password</string>
-    <string name="hotspot_password_contains_u_0000">Hotspot password contains U+0000</string>
     <string name="hotspot_setup">Hotspot setup</string>
-    <string name="hotspot_ssid">Hotspot SSID</string>
-    <string name="hotspot_ssid_contains_u_0000">Hotspot SSID contains U+0000</string>
-    <string name="hotspot_ssid_is_required">Hotspot SSID is required</string>
-    <string name="hotspot_ssid_must_be_at_most_32_utf_8_bytes">Hotspot SSID must be at most 32 UTF-8 bytes</string>
     <string name="hotspot_status">Hotspot status</string>
     <string name="i2c">I2C</string>
     <string name="i2c_device">I2C device</string>
@@ -208,7 +197,6 @@
     <string name="looking_for_your_paired_iphone">Looking for your paired iPhone…</string>
     <string name="made_possible_by_open_source">Made possible by open source</string>
     <string name="make_diplay_feel_right_for_your_car">Make CarPlay feel right for your car.</string>
-    <string name="manual_hotspot">Manual hotspot</string>
     <string name="manufacturer">Manufacturer</string>
     <string name="mfi_authentication_ready">MFi authentication ready</string>
     <string name="mfi_certificate_signing_target">MFI certificate &amp; signing target</string>
@@ -218,7 +206,7 @@
     <string name="nearby_devices_connects_your_iphone_microphone_enables_sir">Nearby devices connects your iPhone. Microphone enables Siri and calls. Older Android versions also require Location for wireless setup. USB mode may ask for a local VPN connection.</string>
     <string name="nothing_is_sent_automatically_protocol_payloads_and_creden">Nothing is sent automatically. Protocol payloads and credentials are excluded.</string>
     <string name="oem_label">OEM label</string>
-    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">On your iPhone, open Settings → Bluetooth and pair with the car. Then return to CarPlay and choose Connect phone.</string>
+    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">On your iPhone, open Settings → Bluetooth and pair with the car. Then return to the CarPlay home screen and choose Wireless connection.</string>
     <string name="open">Open</string>
     <string name="open_after_the_car_starts">Open after the car starts</string>
     <string name="open_bluetooth">Open Bluetooth</string>
@@ -314,7 +302,7 @@
     <string name="settings_ready_usb">Connect your iPhone with a USB cable to start CarPlay.</string>
     <string name="settings_connecting_description">CarPlay is starting CarPlay with your iPhone.</string>
     <string name="settings_choose_iphone_title">Choose your iPhone</string>
-    <string name="settings_choose_iphone_description">Wireless CarPlay needs a paired iPhone before it can connect.</string>
+    <string name="settings_choose_iphone_description">Choose your iPhone in the wireless connection card on the home screen. Changing the iPhone takes effect at the next connection.</string>
     <string name="settings_choose_iphone_action">Choose iPhone</string>
     <string name="settings_connection_summary">Phone, cable, wireless and automatic connection</string>
     <string name="settings_display_summary">Appearance, full screen, resolution and frame rate</string>
@@ -327,8 +315,6 @@
     <string name="settings_wheel_keys">Wheel keys</string>
     <string name="settings_experimental_display">Display (experimental)</string>
     <string name="settings_diagnostics_summary">Save a local report when troubleshooting a connection</string>
-    <string name="settings_vehicle_description">Experimental features are grouped in the Experimental menu. Check their requirements before enabling them.</string>
-    <string name="settings_open_advanced">Open experimental settings</string>
     <string name="setup_needs_attention">Setup needs attention</string>
     <string name="share">Share</string>
     <string name="show_on_screen_debug_logs">Show on-screen debug logs</string>
@@ -379,10 +365,6 @@
     <string name="option_size_large">Large</string>
     <string name="option_size_medium">Medium</string>
     <string name="option_size_small">Small</string>
-    <string name="hotspot_error_empty_name">Enter the car hotspot name</string>
-    <string name="hotspot_error_long_name">The hotspot name must be at most 32 bytes</string>
-    <string name="hotspot_error_invalid_character">The name or password contains an invalid character</string>
-    <string name="hotspot_error_password_length">The hotspot password must be 8–63 characters</string>
     <string name="turn_card_info_arrival">Arrive %1$s</string>
     <string name="turn_card_info_duration_hm">%1$dh %2$dmin</string>
     <string name="turn_card_info_duration_m">%1$dmin</string>
@@ -443,15 +425,8 @@
     <string name="settings_gesture_fingers_label">Quick menu · swipe-down fingers</string>
     <string name="settings_gesture_fingers_option">%1$d fingers</string>
     <string name="settings_gesture_fingers_hint">Pick a finger count your head unit does not already use.</string>
-    <string name="auto_car_hotspot_title">Automatically turn on the car hotspot</string>
-    <string name="auto_car_hotspot_description">Starts the saved car hotspot when CarPlay opens. Turning this on automatically requests the required permissions through ADB; allow the prompt on the car screen. Enable “Open after the car starts” for boot startup. Keeps the hotspot name and password and never turns it off.</string>
-    <string name="hotspot_control_missing">Hotspot control permission is missing. Set it up through ADB or open the hotspot in car settings.</string>
     <string name="hotspot_permission_granted">Permission granted.</string>
     <string name="hotspot_permission_failed">The requested permission was not granted. Check the car settings and try again.</string>
-    <string name="hotspot_control_on">The car hotspot is on.</string>
-    <string name="hotspot_control_unsupported">This firmware does not support automatic hotspot startup. Open the hotspot in car settings.</string>
-    <string name="hotspot_control_timeout">Timed out waiting for the car hotspot. Open the hotspot in car settings.</string>
-    <string name="hotspot_control_failed">The car could not start its hotspot. Open the hotspot in car settings.</string>
     <string name="location_reporting_reconnects">Changing this setting reconnects an active CarPlay session.</string>
     <string name="diagnostic_report_saved_in_app">Your report was saved privately in CarPlay because a public save location was unavailable. Share it or view it here. Nothing is sent automatically.</string>
     <string name="diagnostic_report_saved_to_path">Your report was saved to:\n%1$s\n\nYou can also share it or view it here. Nothing is sent automatically.</string>
@@ -478,8 +453,6 @@
     <string name="wheel_zoom_mode_off">Volume keys control the volume again</string>
     <string name="wheel_joystick">CarPlay joystick on the wheel</string>
     <string name="wheel_joystick_description">Assign the joystick toggle, movement, selection and back keys below. These keys control CarPlay while joystick mode is on. During a call, keys keep their normal function.</string>
-    <string name="settings_external_controller">External controller (experimental)</string>
-    <string name="settings_external_controller_description">Keys from a paired Bluetooth keyboard, remote or rotary controller move and select in CarPlay, like a car’s rotary knob. The touchscreen keeps working. Applies at once.</string>
     <string name="settings_usb_connection">USB connection</string>
     <string name="settings_usb_charging">iPhone charging</string>
     <string name="settings_usb_charging_normal">Normal (2.4 A)</string>
@@ -582,18 +555,6 @@
     <string name="backup_import_invalid">This file is not a CarPlay settings backup.</string>
     <string name="settings_background_update_checks">Check for updates in the background</string>
     <string name="settings_background_update_checks_description">Once a day, CarPlay checks GitHub for a new version and shows it on the home screen. It never downloads without your tap.</string>
-    <string name="setup_guide">Setup guide</string>
-    <string name="setup_step_of">STEP %1$d OF %2$d</string>
-    <string name="setup_skip">Skip setup</string>
-    <string name="setup_next">Next</string>
-    <string name="setup_connection_title">Connection</string>
-    <string name="setup_connection_description">Choose how the iPhone connects to Xingrui: the car hotspot or an app-created temporary hotspot. Android assigns the temporary network name, password and band. It does not provide Internet access.</string>
-    <string name="setup_iphone_title">Pair your iPhone</string>
-    <string name="setup_iphone_none">No iPhone chosen yet</string>
-    <string name="setup_features_title">Features</string>
-    <string name="setup_features_description">Choose automatic connection and location sharing with your iPhone.</string>
-    <string name="setup_done_title">You’re ready</string>
-    <string name="setup_done_description">Connect your iPhone now. You can open this guide again from Settings.</string>
     <string name="settings_discard_pending_title">Discard your changes?</string>
     <string name="settings_discard_pending_message">Resolution, frame rate, connection and the other settings you just changed are not saved yet. Save and reconnect applies them.</string>
     <string name="settings_discard_pending_confirm">Discard</string>

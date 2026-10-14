@@ -37,6 +37,28 @@ class AudioFocusAutoYieldTest {
         VolumeTrackingAudioTrack.volumes.clear()
     }
 
+    @Test fun oldUserGainsAreIgnoredAndFocusRestoresFullOutput() {
+        context.getSharedPreferences("carplay_audio_volume", 0).edit()
+            .putInt("media", 0).putInt("navigation", 25).commit()
+        val coordinator = coordinator()
+        val media = track(); val navigation = track()
+        try {
+            coordinator.registerOutput(media, AudioChannel.MEDIA, 3)
+            coordinator.registerOutput(navigation, AudioChannel.NAVIGATION, 12)
+            coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+            assertEquals(listOf(1f), volumes(media))
+            assertEquals(listOf(1f), volumes(navigation))
+            coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+            coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+            assertEquals(listOf(1f, 0.2f, 1f), volumes(media))
+            assertEquals(listOf(1f), volumes(navigation))
+        } finally {
+            CarPlayAudioOutputs.unregister(media)
+            CarPlayAudioOutputs.unregister(navigation)
+            context.getSharedPreferences("carplay_audio_volume", 0).edit().clear().commit()
+        }
+    }
+
     @Test fun transientLossMutesOnlyMediaAndGainPreservesUserStreamVolume() {
         val coordinator = coordinator()
         val media = track(); val phone = track(); val assistant = track(); val navigation = track()

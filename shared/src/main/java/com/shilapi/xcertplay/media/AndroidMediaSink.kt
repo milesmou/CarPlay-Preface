@@ -55,7 +55,8 @@ internal class AudioFocusCoordinator(
     private var currentListener = listenerFor(focusGeneration)
     internal val listener: AudioManager.OnAudioFocusChangeListener get() = currentListener
 
-    fun registerVolume(track: AudioTrack, channel: AudioChannel) = CarPlayAudioVolume.register(context, track, channel)
+    fun registerOutput(track: AudioTrack, channel: AudioChannel, legacyStreamType: Int?) =
+        CarPlayAudioOutputs.register(track, channel, legacyStreamType)
 
     private fun listenerFor(generation: Long) = AudioManager.OnAudioFocusChangeListener { change ->
         synchronized(this) {
@@ -154,8 +155,7 @@ internal class AudioFocusCoordinator(
         // Telephony and assistant speech remain audible, and navigation never enters this map.
         // This changes only the renderer's relative gain, never Android's user stream volume.
         if (entry.channel != AudioChannel.MEDIA || entry.appliedVolume == mediaVolume) return
-        val applied = CarPlayAudioVolume.setFocusGain(track, mediaVolume) ||
-            runCatching { track.setStereoVolume(mediaVolume, mediaVolume) == AudioTrack.SUCCESS }.getOrDefault(false)
+        val applied = runCatching { track.setStereoVolume(mediaVolume, mediaVolume) == AudioTrack.SUCCESS }.getOrDefault(false)
         if (applied) entry.appliedVolume = mediaVolume
     }
 
@@ -1929,7 +1929,11 @@ private class AudioRenderer(
             )
         }
         track = built
-        audioFocusCoordinator.registerVolume(built, selection.channel)
+        if (actualLegacyStreamType == null && Build.VERSION.SDK_INT >= 26) {
+            actualLegacyStreamType = runCatching { built.audioAttributes.volumeControlStream }
+                .getOrNull()?.takeIf { it >= 0 }
+        }
+        audioFocusCoordinator.registerOutput(built, selection.channel, actualLegacyStreamType)
 
         diagnosticStage = "track-attributes"
         trackAttributes = audioTrackAttributesForFocus(built, attributes)
@@ -2321,12 +2325,13 @@ private class AudioRenderer(
     private fun reportNavigationPlayback(track: AudioTrack) {
         if (!running) return
         val priorityVoice = mappedChannel == AudioChannel.PHONE || mappedChannel == AudioChannel.ASSISTANT
-        if (mappedChannel != AudioChannel.NAVIGATION && !priorityVoice) return
+        val media = mappedChannel == AudioChannel.MEDIA
+        if (mappedChannel != AudioChannel.NAVIGATION && !priorityVoice && !media) return
         // The optional key-routing hint must never interrupt audio on unusual vendor ROMs.
         runCatching {
             val pendingFrames = bufferProgress.queuedBytes(track.playbackHeadPosition) / frameBytes
             val bufferedMillis = (pendingFrames * 1000L + format.sampleRate - 1L) / format.sampleRate
-            NavigationPlayback.played(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis, priorityVoice)
+            NavigationPlayback.played(navigationPlaybackToken, actualLegacyStreamType, bufferedMillis, priorityVoice, media)
         }
     }
 
@@ -2456,7 +2461,7 @@ private class AudioRenderer(
         val track = track
         this.track = null
         if (track != null) {
-            CarPlayAudioVolume.unregister(track)
+            CarPlayAudioOutputs.unregister(track)
             try {
                 track.pause()
             } catch (_: Exception) {

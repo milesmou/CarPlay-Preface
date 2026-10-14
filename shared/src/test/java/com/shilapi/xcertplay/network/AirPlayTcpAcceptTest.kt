@@ -15,14 +15,27 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], manifest = Config.NONE)
 class AirPlayTcpAcceptTest {
+    @Test fun usbDirectRejectsUnscopedAddressesBeforeStartingAnyListener() {
+        val service = Robolectric.buildService(CarPlaySocketService::class.java).create().get()
+        assertFalse(android.net.VpnService::class.java.isAssignableFrom(service.javaClass))
+        try {
+            service.attachSystemUsb(java.net.Inet6Address.getByName("fe80::1") as java.net.Inet6Address,
+                AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480), port = 0),
+                AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(), null,
+                object : AirPlaySessionListener {}, object : AirPlayMediaHandler {})
+            fail("Unscoped USB address must not be used")
+        } catch (_: IllegalArgumentException) {
+            assertFalse(service.isAttached())
+        } finally { service.detach() }
+    }
     @Test fun bothAddressFamiliesReportOwnerAndOldCleanupPreservesNewListener() {
-        val service = Robolectric.buildService(CarPlayVpnService::class.java).create().get()
+        val service = Robolectric.buildService(CarPlaySocketService::class.java).create().get()
         val received = LinkedBlockingQueue<AirPlayTcpAccepted>()
         val address = InetAddress.getByName("127.0.0.1")
         val addresses = listOf(address, InetAddress.getByName("::1"))
         val config = AirPlayConfig("test", "test", "", "1", AirPlayDisplayConfig(800, 480), port = 0)
         fun attach(owner: AirPlayListenerIdentity) {
-            assertEquals(CarPlayVpnService.AttachResult.Started, service.attachWireless(address, config,
+            assertEquals(CarPlaySocketService.AttachResult.Started, service.attachWireless(address, config,
                 AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(), null,
                 object : AirPlaySessionListener {
                     override fun onTcpAccepted(event: AirPlayTcpAccepted) { received.add(event) }

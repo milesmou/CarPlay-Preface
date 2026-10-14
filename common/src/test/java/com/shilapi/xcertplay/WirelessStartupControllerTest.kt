@@ -64,7 +64,7 @@ class WirelessStartupControllerTest {
             fail(controller, 0, WirelessStartupException(WirelessStartupFailure.FIRST_TCP_TIMEOUT, "timeout"))
             ReflectionHelpers.getField<AtomicInteger>(controller, "wirelessGeneration").set(1)
             ReflectionHelpers.setField(controller, "hotspot", hotspot)
-            controller.javaClass.getDeclaredMethod("closeWirelessStack", CarPlayVpnService::class.java, Int::class.javaObjectType)
+            controller.javaClass.getDeclaredMethod("closeWirelessStack", CarPlaySocketService::class.java, Int::class.javaObjectType)
                 .apply { isAccessible = true }.invoke(controller, null, 0)
             shadowOf(Looper.getMainLooper()).idle()
             assertTrue(statuses.isEmpty())

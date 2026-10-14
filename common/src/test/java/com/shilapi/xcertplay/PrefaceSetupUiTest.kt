@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.ScrollView
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.setup.SetupGuide
 import java.nio.file.Files
 import java.nio.file.Paths
 import org.junit.Assert.*
@@ -28,15 +27,15 @@ import org.robolectric.util.ReflectionHelpers
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PrefaceSetupUiTest {
     @Test @Config(qualifiers = "zh-rCN-w400dp-h800dp-xhdpi")
-    fun compactSetupStartsAtConnectionWithLargeText() = verifySetup("compact", 400, 800)
+    fun compactHomeAndSettingsWithLargeText() = verifyHomeAndSettings("compact", 400, 800)
 
     @Test @Config(qualifiers = "zh-rCN-w1280dp-h800dp-land-xhdpi")
-    fun fullSetupStartsAtConnectionWithLargeText() = verifySetup("full", 1280, 800)
+    fun fullHomeAndSettingsWithLargeText() = verifyHomeAndSettings("full", 1280, 800)
 
     @Test @Config(qualifiers = "ar-w1280dp-h800dp-land-xhdpi")
-    fun arabicSystemStillShowsChineseWithLargeText() = verifySetup("arabic", 1280, 800)
+    fun arabicSystemStillShowsChineseWithLargeText() = verifyHomeAndSettings("arabic", 1280, 800)
 
-    private fun verifySetup(name: String, widthDp: Int, heightDp: Int) {
+    private fun verifyHomeAndSettings(name: String, widthDp: Int, heightDp: Int) {
         val app = RuntimeEnvironment.getApplication()
         app.getSharedPreferences("diplay", 0).edit().clear().commit()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
@@ -46,32 +45,17 @@ class PrefaceSetupUiTest {
         val screen = Robolectric.buildActivity(DiPlayActivity::class.java).get()
         screen.setTheme(android.R.style.Theme_Material_NoActionBar)
         try {
-            ReflectionHelpers.setField(screen, "page", "setup")
-            ReflectionHelpers.setField(screen, "setupStep", SetupGuide.STEP_CONNECTION)
+            ReflectionHelpers.setField(screen, "page", "home")
             render(screen)
-            val decor = screen.window.decorView
-            assertTrue(labels(decor).any { it.text == screen.getString(R.string.setup_connection_title) })
-            assertTrue(labels(decor).any { it.text == screen.getString(R.string.setup_step_of, 1, 4) })
-            assertFalse(labels(decor).any { it.text.toString().contains("DiLink") })
-            capture(screen, name, widthDp, heightDp)
+            capture(screen, "$name-home", widthDp, heightDp)
 
-            // Advancing from the first page follows the remaining setup pages, with no vehicle step.
-            for ((step, title) in listOf(
-                SetupGuide.STEP_IPHONE to R.string.setup_iphone_title,
-                SetupGuide.STEP_FEATURES to R.string.setup_features_title,
-                SetupGuide.STEP_DONE to R.string.setup_done_title,
-            )) {
-                labels(screen.window.decorView).single { it.text == screen.getString(R.string.setup_next) }.performClick()
-                assertEquals(step, ReflectionHelpers.getField<Int>(screen, "setupStep"))
-                assertTrue(labels(screen.window.decorView).any { it.text == screen.getString(title) })
-                assertFalse(labels(screen.window.decorView).any { it.text.toString().contains("DiLink") })
-            }
             ReflectionHelpers.setField(screen, "page", "settings")
             ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.CONNECTION)
             render(screen)
             assertFalse(labels(screen.window.decorView).any { it.text == screen.getString(R.string.language_section_title) })
             assertEquals("zh-CN", screen.resources.configuration.locales.toLanguageTags())
             capture(screen, "$name-settings", widthDp, heightDp)
+            ReflectionHelpers.setField(screen, "page", "settings")
             for (category in listOf(SettingsCategory.EXPERIMENTAL, SettingsCategory.VEHICLE, SettingsCategory.AUDIO)) {
                 ReflectionHelpers.setField(screen, "settingsCategory", category)
                 render(screen)

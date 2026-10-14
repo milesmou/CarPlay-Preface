@@ -60,15 +60,13 @@ class LauncherIntentTest {
         assertEquals(0, stops)
     }
 
-    @Test fun launcherDeliveredToExistingSettingsOpensProjectionAndClearsReturnNavigation() {
+    @Test fun launcherDeliveredToExistingSettingsOpensProjectionAndReturnsHome() {
         controller = Robolectric.buildActivity(DiPlayActivity::class.java,
             Intent().putExtra("page", "settings")).create()
         val activity = controller!!.get()
-        ReflectionHelpers.setField(activity, "connectionSettingsReturnCategory", SettingsCategory.EXPERIMENTAL)
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onNewIntent",
             ReflectionHelpers.ClassParameter(Intent::class.java, launcher()))
         assertEquals("home", ReflectionHelpers.getField<String>(activity, "page"))
-        assertNull(ReflectionHelpers.getField<SettingsCategory?>(activity, "connectionSettingsReturnCategory"))
         assertEquals(CarPlayHostActivity::class.java.name,
             shadowOf(activity).nextStartedActivity?.component?.className)
         assertEquals(0, stops)

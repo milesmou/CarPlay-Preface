@@ -49,6 +49,84 @@ import org.robolectric.util.ReflectionHelpers
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [29], qualifiers = "en-w600dp-h700dp")
 class AdaptiveSettingsUiTest {
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactAdvancedWithoutHotspotJoinLargeFontScreenshot() = captureAdvancedWithoutHotspotJoin("compact")
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullAdvancedWithoutHotspotJoinLargeFontScreenshot() = captureAdvancedWithoutHotspotJoin("full")
+
+    private fun captureAdvancedWithoutHotspotJoin(size: String) {
+        val config = android.content.res.Configuration(context.resources.configuration).apply { fontScale = 1.5f }
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+        layoutRoot(screen)
+        assertFalse(texts(screen).any { it.text.toString().contains("自动加入热点") })
+        assertFalse(texts(screen).any { it.text.toString().contains("检查热点修复") })
+        val root = screen.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        assertEquals(1920, root.width)
+        assertEquals(720, root.height)
+        val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/remove-hotspot-join").apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w360dp-h800dp-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactAdvancedWithoutExternalControllerLargeFontScreenshot() = captureAdvancedWithoutExternalController("compact")
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1280dp-h720dp-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullAdvancedWithoutExternalControllerLargeFontScreenshot() = captureAdvancedWithoutExternalController("full")
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w360dp-h800dp-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactVolumeWithoutPermissionButtonsLargeFontScreenshot() = captureAdvancedWithoutExternalController("compact", volume = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1280dp-h720dp-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullVolumeWithoutPermissionButtonsLargeFontScreenshot() = captureAdvancedWithoutExternalController("full", volume = true)
+
+    private fun captureAdvancedWithoutExternalController(size: String, volume: Boolean = false) {
+        val config = android.content.res.Configuration(context.resources.configuration).apply { fontScale = 1.5f }
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+        layoutRoot(screen)
+        assertFalse(texts(screen).any { it.text.toString().contains("外接控制器") })
+        if (volume) {
+            assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_navigation_wheel_volume) })
+            for (id in listOf(R.string.wheel_keys_open_settings, R.string.wheel_keys_enable_adb)) {
+                assertFalse(texts(screen).any { it.text == screen.getString(id) })
+            }
+            val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+            scroll.scrollTo(0, scroll.getChildAt(0).height)
+        }
+        val root = screen.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/" +
+            if (volume) "remove-volume-permission-buttons" else "remove-external-controller").apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
     private val context get() = RuntimeEnvironment.getApplication()
     private var activity: DiPlayActivity? = null
 
@@ -95,23 +173,13 @@ class AdaptiveSettingsUiTest {
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_quick_settings) })
     }
 
-    @Test fun mediaAndNavigationVolumeSaveIndependentlyAndCancelPreservesTheValue() {
+    @Test fun audioSettingsHaveNoCarPlayVolumeSliders() {
         val screen = openSettings()
         ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.AUDIO)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
-        fun edit(title: Int, percent: Int, save: Boolean) {
-            texts(screen).single { it.text.startsWith(screen.getString(title) + " · ") }.performClick()
-            val dialog = ShadowAlertDialog.getLatestAlertDialog()
-            descendants(dialog.window!!.decorView).filterIsInstance<android.widget.SeekBar>().single().progress = percent
-            dialog.getButton(if (save) AlertDialog.BUTTON_POSITIVE else AlertDialog.BUTTON_NEGATIVE).performClick()
-            shadowOf(Looper.getMainLooper()).idle()
-        }
-        edit(R.string.settings_carplay_navigation_volume, 35, true)
-        edit(R.string.settings_carplay_media_volume, 65, true)
-        edit(R.string.settings_carplay_navigation_volume, 10, false)
-        assertEquals(35, com.shilapi.xcertplay.media.CarPlayAudioVolume.percent(screen, true))
-        assertEquals(65, com.shilapi.xcertplay.media.CarPlayAudioVolume.percent(screen, false))
-        assertTrue(texts(screen).any { it.text.toString() == screen.getString(R.string.settings_carplay_navigation_volume) + " · 35%" })
+        assertFalse(texts(screen).any { it.text.startsWith("媒体音量 · ") || it.text.startsWith("导航音量 · ") })
+        assertFalse(descendants(screen.window.decorView).any { it is android.widget.SeekBar })
+        assertTrue(texts(screen).any { it.text.contains(screen.getString(R.string.music_buffer)) })
     }
 
     @Test fun savedLightAppearanceThemesTheSettingsCanvasAndSystemBars() {
@@ -282,32 +350,34 @@ class AdaptiveSettingsUiTest {
         })
     }
 
-    @Test fun readinessAsksForAnIphoneBeforeWirelessCanConnect() {
+    @Test fun connectionPreferencesDoNotDuplicateHomePhonePairing() {
         AirPlayPersistence.saveWirelessEnabled(context, true)
         val screen = openSettings()
         // Robolectric has no CarPlay authentication assets, which is a setup error of its own.
         ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_title) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_action) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_title) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_action) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
     }
 
-    @Test fun chosenPhoneWithMissingManualHotspotOffersConnectionSetup() {
+    @Test fun homeOffersTheChosenPhoneAndWirelessWithoutSavedHotspotCredentials() {
         AirPlayPersistence.saveWirelessEnabled(context, true)
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         DiPlayPreferences.savePhone(context, "AA:BB:CC:DD:EE:FF", "My iPhone")
-        val screen = openSettings()
+        val screen = Robolectric.buildActivity(DiPlayActivity::class.java,
+            Intent(context, DiPlayActivity::class.java).putExtra("page", "home"))
+            .setup().get().also { activity = it }
         ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.setup_needs_attention) })
+        assertTrue(texts(screen).any { it.text.toString() == "${screen.getString(R.string.choose_iphone_prefix)}My iPhone" })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_connect_wireless) && it.isEnabled })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_action) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
-        texts(screen).single { it.text == screen.getString(R.string.open_connection_setup) }.performClick()
-        assertEquals("connection", ReflectionHelpers.getField<String>(screen, "page"))
-        screen.onBackPressedDispatcher.onBackPressed()
-        assertEquals("settings", ReflectionHelpers.getField<String>(screen, "page"))
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.setup_needs_attention) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.open_connection_setup) })
+        assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
     }
 
     @Test fun searchOpensTheCategoryThatOwnsTheSetting() {
@@ -447,57 +517,9 @@ class AdaptiveSettingsUiTest {
         assertEquals("settings", ReflectionHelpers.getField<String>(screen, "page"))
     }
 
-    @Test
-    @Config(shadows = [HotspotSearchProbe::class])
-    fun hotspotSearchIndexesItsAsyncCardWithoutStartingAnAdbProbe() {
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
-        HotspotSearchProbe.workers.clear()
-        HotspotSearchProbe.entered = CountDownLatch(1)
-        val screen = openSettings()
-        ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.DISPLAY)
-        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
-        val index = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
-            screen, "buildSettingsSearchIndex")
-        val result = index.single { it.title == screen.getString(R.string.auto_car_hotspot_title) }
 
-        assertEquals(SettingsCategory.CONNECTION, result.category)
-        assertTrue("Building search metadata must not contact ADB", HotspotSearchProbe.workers.isEmpty())
-        assertFalse(texts(screen).any { it.text == screen.getString(R.string.auto_car_hotspot_title) })
 
-        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSearchResult",
-            ReflectionHelpers.ClassParameter(result.javaClass, result))
-        assertTrue(HotspotSearchProbe.entered.await(3, TimeUnit.SECONDS))
-        val worker = HotspotSearchProbe.workers.single()
-        worker.join(3_000)
-        assertFalse(worker.isAlive)
-        shadowOf(Looper.getMainLooper()).idle()
 
-        assertEquals(SettingsCategory.CONNECTION,
-            ReflectionHelpers.getField<SettingsCategory>(screen, "settingsCategory"))
-        assertEquals(1, descendants(screen.window.decorView).filterIsInstance<Switch>().count {
-            it.contentDescription == screen.getString(R.string.auto_car_hotspot_title)
-        })
-    }
-
-    @Test
-    @Config(shadows = [HotspotSearchProbe::class])
-    fun hotspotSearchKeepsTheCarHotspotAudienceGate() {
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
-        HotspotSearchProbe.workers.clear()
-        HotspotSearchProbe.entered = CountDownLatch(1)
-        val screen = openSettings()
-        ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.DISPLAY)
-        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
-        fun index() = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
-            screen, "buildSettingsSearchIndex")
-        val title = screen.getString(R.string.auto_car_hotspot_title)
-
-        assertFalse(index().any { it.title == title })
-        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
-        assertTrue(index().any { it.title == title })
-        assertTrue(HotspotSearchProbe.workers.isEmpty())
-    }
 
     @Test fun cardControlsShareOneHeightAndGap() {
         val screen = openSettings()
@@ -594,32 +616,32 @@ class AdaptiveSettingsUiTest {
         assertEquals(0, detailScroll.scrollY)
     }
 
-    @Test fun systemBackFromConnectionSetupReturnsToConnectionSettings() {
-        val screen = openConnectionSetupFromSettings()
+    @Test fun settingsNoLongerLinksToConnectionSetup() {
+        val screen = openSettings()
+
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.open_connection_setup) })
 
         screen.onBackPressedDispatcher.onBackPressed()
 
-        assertEquals("settings", ReflectionHelpers.getField<String>(screen, "page"))
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.connection_setup) })
+        assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_connect_wireless) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_quick_settings) })
     }
 
-    @Test fun toolbarBackFromConnectionSetupReturnsToConnectionSettings() {
-        val screen = openConnectionSetupFromSettings()
-
-        texts(screen).single { it.text == screen.getString(R.string.back) }.performClick()
-
-        assertEquals("settings", ReflectionHelpers.getField<String>(screen, "page"))
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.connection_setup) })
+    @Test fun unsupportedRestoredPagesUseHome() {
+        val screen = openSettings()
+        for (unsupportedPage in listOf("missing", "unknown")) {
+            ReflectionHelpers.setField(screen, "page", unsupportedPage)
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
+            assertFalse(texts(screen).any { it.text == screen.getString(R.string.connection_setup) })
+        }
     }
-
     @Test fun connectionSetupOpenedDirectlyStillReturnsHome() {
         val screen = Robolectric.buildActivity(
             DiPlayActivity::class.java,
             Intent(context, DiPlayActivity::class.java).putExtra("page", "connection"),
         ).setup().get().also { activity = it }
-
-        screen.onBackPressedDispatcher.onBackPressed()
 
         assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
     }
@@ -638,8 +660,8 @@ class AdaptiveSettingsUiTest {
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_advanced_caution_title) })
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.advanced_vehicle_data) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_external_controller) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.hotspot_join_title) })
+        assertFalse(texts(screen).any { it.text.toString().contains("External controller") || it.text.toString().contains("外接控制器") })
+        assertFalse(texts(screen).any { it.text == "热点加入修复" })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.automatic_connection) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.display_and_performance) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.audio_routing) })
@@ -672,13 +694,6 @@ class AdaptiveSettingsUiTest {
         val vehicle = visibleIn(R.string.settings_vehicle)
         val advanced = visibleIn(R.string.settings_advanced)
         val connection = visibleIn(R.string.connection)
-
-        listOf(R.string.settings_external_controller, R.string.hotspot_join_title).forEach {
-            assertTrue(text(it), text(it) in advanced)
-            listOf(connection, display, audio, vehicle).forEach { ordinary ->
-                assertFalse(text(it), text(it) in ordinary)
-            }
-        }
 
         assertTrue(connection.any { it.startsWith(text(R.string.settings_usb_charging)) })
         assertFalse(advanced.any { it.startsWith(text(R.string.settings_usb_charging)) })
@@ -720,30 +735,7 @@ class AdaptiveSettingsUiTest {
         }
     }
 
-    @Test @Config(sdk = [28, 33])
-    fun temporaryHotspotChoiceIsSavedWithoutDroppingTheActiveSession() {
-        val screen = openConnectionSetupFromSettings()
-        val session = mock(CarPlayController::class.java)
-        var stops = 0
-        CarPlayBackgroundSession.store(session, mock(AndroidMediaSink::class.java), 800, 480, Any(),
-            CarPlaySessionDisplay(800, 480, Surface.ROTATION_0, false, false, 800, 480)) { stops++ }
-        CarPlayBackgroundSession.active = true
-        try {
-            PendingReconnect.clear()
-            val choice = texts(screen).single { it.text.toString() == screen.getString(R.string.settings_temporary_hotspot) }
-            choice.performClick()
-            assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, AirPlayPersistence.loadWirelessHotspotMode(context))
-            assertTrue(PendingReconnect.isPending(session))
-            assertEquals(0, stops)
-            assertSame(session, CarPlayBackgroundSession.snapshot()?.controller)
-            assertTrue(texts(screen).any { it.text.toString() == "✓  " + screen.getString(R.string.settings_temporary_hotspot) })
-            assertFalse(texts(screen).any { it.text.contains("Wi-Fi Direct") || it.text.contains("同一局域网") })
-            assertFalse(texts(screen).any { it.text.toString() == screen.getString(R.string.open_car_hotspot_settings) })
-        } finally {
-            CarPlayBackgroundSession.clear()
-            PendingReconnect.clear()
-        }
-    }
+
 
     @Test fun usbChargingIsSavedForTheNextWiredConnectionWithoutDroppingTheSession() {
         AirPlayPersistence.saveWirelessEnabled(context, false)
@@ -925,7 +917,7 @@ class AdaptiveSettingsUiTest {
                 descendants(it).filterIsInstance<ImageView>().count() == 1
         }
 
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.connection_setup) && isInside(it, categoryScroll) })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.automatic_connection) && isInside(it, categoryScroll) })
         assertFalse(isInside(railDestination, categoryScroll))
     }
 
@@ -1041,6 +1033,7 @@ class AdaptiveSettingsUiTest {
         }
         layout()
         val previousRail = rail()
+        assertTrue("The rail viewport must fit within the settings window", previousRail.height <= Math.round(400 * density))
         previousRail.scrollTo(0, previousRail.getChildAt(0).height)
         assertTrue("This window must require rail scrolling", previousRail.scrollY > 0)
         val destination = advanced(previousRail)
@@ -1082,18 +1075,26 @@ class AdaptiveSettingsUiTest {
             assertEquals(category, ReflectionHelpers.getField<SettingsCategory>(screen, "settingsCategory"))
         }
     }
-    @Implements(CarHotspotSetup::class, isInAndroidSdk = false)
-    class HotspotSearchProbe {
-        @Implementation fun check(context: Context, adb: LocalAdb): LocalAdb.Access {
-            workers += Thread.currentThread()
-            entered.countDown()
-            return LocalAdb.Access.READY
-        }
+    @Test fun diagnosticsOpensThePhonePageAndBackReturnsToDiagnostics() {
+        val screen = openSettings()
+        descendants(screen.window.decorView).first { it.contentDescription ==
+            screen.getString(R.string.settings_open_category, screen.getString(R.string.diagnostics)) }.performClick()
+        texts(screen).first { it.text == screen.getString(R.string.settings_report_on_phone) }.performClick()
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_report_on_phone) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.backup_title) })
+        screen.onBackPressedDispatcher.onBackPressed()
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.save_diagnostic_report) })
+    }
 
-        companion object {
-            val workers = CopyOnWriteArrayList<Thread>()
-            var entered = CountDownLatch(1)
-        }
+
+    @Test fun unsupportedPageEntryUsesHomeConnectionActions() {
+        val screen = openConnectionSetupFromSettings()
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
+        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.settings_connect_wireless) })
+        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.settings_connect_usb) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_temporary_hotspot) })
+        assertFalse(texts(screen).any { it.text.contains("车载热点") || it.text.contains("Wi-Fi Direct") || it.text.contains("同一局域网") })
+        assertFalse(descendants(screen.window.decorView).any { it is EditText })
     }
 
     private fun openSettings(): DiPlayActivity = Robolectric.buildActivity(
@@ -1101,14 +1102,10 @@ class AdaptiveSettingsUiTest {
         Intent(context, DiPlayActivity::class.java).putExtra("page", "settings"),
     ).setup().get().also { activity = it }
 
-    private fun openConnectionSetupFromSettings(): DiPlayActivity = openSettings().also { screen ->
-        descendants(screen.window.decorView)
-            .single { it.contentDescription == screen.getString(R.string.settings_open_category,
-                screen.getString(R.string.connection)) }
-            .performClick()
-        texts(screen).single { it.text == screen.getString(R.string.open_connection_setup) }.performClick()
-        assertEquals("connection", ReflectionHelpers.getField<String>(screen, "page"))
-    }
+    private fun openConnectionSetupFromSettings(): DiPlayActivity = Robolectric.buildActivity(
+        DiPlayActivity::class.java,
+        Intent(context, DiPlayActivity::class.java).putExtra("page", "connection"),
+    ).setup().get().also { activity = it }
 
     private fun layoutRoot(screen: DiPlayActivity) {
         val root = screen.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)

@@ -8,7 +8,6 @@ import android.widget.TextView
 import com.shilapi.xcertplay.DiPlayPalette
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
 import com.shilapi.xcertplay.orchestration.MfiTarget
-import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -139,23 +138,9 @@ class SettingsWidgetsTest {
         )
     }
 
-    @Test @Config(sdk = [28]) fun android9OffersCarAndTemporaryHotspots() {
-        val row = ConnectionSettingsSection.createHotspotModeChoice(context, WirelessHotspotMode.MANUAL,
-            onSelected = {})
-        val options = views(row.container).filterIsInstance<RadioButton>().toList()
-        assertEquals(listOf(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.MANUAL), options.map { it.tag })
-        assertEquals(WirelessHotspotMode.MANUAL, options.first { it.isChecked }.tag)
-    }
 
-    @Test fun temporaryHotspotIsTheFirstAndRecommendedHotspotChoice() {
-        val row = ConnectionSettingsSection.createHotspotModeChoice(context, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT,
-            onSelected = {})
-        val options = views(row.container).filterIsInstance<RadioButton>().toList()
-        assertEquals(listOf(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.MANUAL),
-            options.map { it.tag })
-        assertEquals(context.getString(com.shilapi.xcertplay.host.R.string.settings_temporary_hotspot), options.first().text.toString())
-        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, options.first { it.isChecked }.tag)
-    }
+
+
 
     private fun views(view: View): Sequence<View> = sequence {
         yield(view)

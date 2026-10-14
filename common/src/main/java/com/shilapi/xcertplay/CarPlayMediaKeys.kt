@@ -67,7 +67,35 @@ internal object CarPlayMediaKeys {
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
     private var placeholder: Bitmap? = null
     private var prefaceReceiver: PrefaceMediaButtonReceiver? = null
+    private var trackInterception: PrefaceTrackKeyInterception? = null
+    private var volumeUnavailable = false
+    private val volumePress = PrefaceVolumePress(
+        schedule = { mainHandler.postDelayed(it, 250L) },
+        cancel = { mainHandler.removeCallbacks(it) },
+        adjust = {
+            val context = appContext
+            if (context == null || !volumeKeysEligible(context)) false
+            else CarPlayWheelVolume.adjust(context, it).also { success ->
+                if (!success) {
+                    volumeUnavailable = true
+                    refreshTrackOwnership()
+                }
+            }
+        },
+    )
+    private var prefaceVoiceReceiver: PrefaceVoiceButtonReceiver? = null
+    private var lastPrefaceSiriRequest: Long? = null
     private var foreground: () -> Boolean = { false }
+    // Observe call/Bluetooth/window changes even while paused, without reacquiring audio focus.
+    private val trackOwnershipCheck = object : Runnable {
+        override fun run() {
+            val interception = trackInterception ?: return
+            val volume = appContext?.let(::volumeKeysEligible) == true && !volumeUnavailable
+            if (!volume) volumePress.close()
+            interception.update(trackKeysEligible(), volume)
+            if (trackInterception === interception) mainHandler.postDelayed(this, 250L)
+        }
+    }
 
     @Synchronized
     fun attach(context: Context, next: CarPlayController, foreground: () -> Boolean = { false }) {
@@ -187,6 +215,7 @@ internal object CarPlayMediaKeys {
         mediaAudioActive = active
         if (active && session == null) start(context) else if (active) regainFocusLocked()
         publishPlaybackStateLocked()
+        refreshTrackOwnership()
     }
 
     private fun start(context: Context) {
@@ -254,6 +283,7 @@ internal object CarPlayMediaKeys {
             }
         }
         if (!current) return
+        refreshTrackOwnership()
         Log.i(TAG, "audio focus change=$change")
         // Resolve the matching sink and invoke it outside the media-key monitor. An abandoned
         // request must never mute a newer controller, and these owners must not nest locks.
@@ -262,6 +292,14 @@ internal object CarPlayMediaKeys {
     }
 
     private fun releaseLocked() {
+        volumePress.close()
+        volumeUnavailable = false
+        mainHandler.removeCallbacks(trackOwnershipCheck)
+        trackInterception?.close()
+        trackInterception = null
+        prefaceVoiceReceiver?.let { receiver -> runCatching { appContext?.unregisterReceiver(receiver) } }
+        prefaceVoiceReceiver = null
+        lastPrefaceSiriRequest = null
         prefaceReceiver?.let { receiver -> runCatching { appContext?.unregisterReceiver(receiver) } }
         prefaceReceiver = null
         foreground = { false }
@@ -331,6 +369,29 @@ internal object CarPlayMediaKeys {
 
     private fun registerPrefaceReceiver(context: Context, expected: CarPlayController) {
         if (prefaceReceiver != null) return
+        trackInterception = PrefaceTrackKeyInterception(
+            PrefaceInputInterceptionBackend { task -> mainHandler.post { task() } },
+            siri = { requestPrefaceSiri() },
+            volume = { down, key ->
+                if (appContext?.let(::volumeKeysEligible) == true && !volumeUnavailable) volumePress.onKey(down, key)
+                else { volumePress.close(); refreshTrackOwnership() }
+            },
+        ) { index ->
+            // Recheck on delivery: a call or focus loss can precede the periodic ownership check.
+            if (trackKeysEligible()) dispatchMedia(index, "preface-intercept") else refreshTrackOwnership()
+        }
+        refreshTrackOwnership()
+        if (prefaceVoiceReceiver == null) {
+            val voiceReceiver = PrefaceVoiceButtonReceiver(::requestPrefaceSiri)
+            runCatching {
+                ContextCompat.registerReceiver(context.applicationContext, voiceReceiver,
+                    IntentFilter(PrefaceVoiceButtonReceiver.ACTION).apply {
+                        addCategory(Intent.CATEGORY_DEFAULT)
+                        priority = 1000
+                    }, ContextCompat.RECEIVER_EXPORTED)
+            }.onSuccess { prefaceVoiceReceiver = voiceReceiver }
+                .onFailure { Log.w(TAG, "Preface voice broadcast receiver unavailable", it) }
+        }
         val receiver = PrefaceMediaButtonReceiver(
             eligible = {
                 val ownsKeys = synchronized(this) {
@@ -349,6 +410,39 @@ internal object CarPlayMediaKeys {
             prefaceReceiver = receiver
             Log.i(TAG, "IHU519G media broadcast receiver registered")
         }.onFailure { Log.w(TAG, "IHU519G media broadcast receiver unavailable", it) }
+    }
+
+    private fun refreshTrackOwnership() {
+        mainHandler.removeCallbacks(trackOwnershipCheck)
+        mainHandler.post(trackOwnershipCheck)
+    }
+
+    private fun trackKeysEligible(): Boolean {
+        val context = appContext ?: return false
+        val ownsMedia = synchronized(this) {
+            controller != null && CarPlayBackgroundSession.active &&
+                (focusHeld || (focusRequest == null && foreground()))
+        }
+        return ownsMedia && !AirPlayPersistence.loadCarBluetoothAudio(context) && !inCall(context)
+    }
+
+    internal fun iphoneMediaPlaying(): Boolean? = synchronized(this) { controller }?.mediaPlayingSnapshot()
+
+    internal fun volumeKeysEligible(context: Context): Boolean =
+        NavigationWheelSettings.enabled(context) && trackKeysEligible() &&
+            !WheelKeyService.volumeKeysReserved() &&
+            !com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive &&
+            (lastPrefaceSiriRequest?.let { SystemClock.uptimeMillis() - it < 1500L } != true)
+
+    private fun requestPrefaceSiri(): Boolean {
+        if (!trackKeysEligible()) return false
+        val now = SystemClock.uptimeMillis()
+        val previous = lastPrefaceSiriRequest
+        if (previous != null && now - previous in 0 until WheelSiriKey.REPEAT_GAP_MILLIS) return true
+        val sent = synchronized(this) { controller }?.requestSiri() == true
+        if (sent) lastPrefaceSiriRequest = now
+        Log.i(TAG, "Preface voice key -> Siri sent=$sent")
+        return sent
     }
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */

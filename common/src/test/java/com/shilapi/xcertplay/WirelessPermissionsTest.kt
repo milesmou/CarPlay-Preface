@@ -13,14 +13,14 @@ class WirelessPermissionsTest {
                 Manifest.permission.NEARBY_WIFI_DEVICES,
                 Manifest.permission.ACCESS_LOCAL_NETWORK,
             ),
-            WirelessPermissions.required(WirelessHotspotMode.MANUAL, 37),
+            WirelessPermissions.required(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, 37),
         )
         assertEquals(
             listOf(
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION,
             ),
-            WirelessPermissions.required(WirelessHotspotMode.MANUAL, 29),
+            WirelessPermissions.required(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, 29),
         )
         assertEquals(
             listOf(
@@ -28,7 +28,7 @@ class WirelessPermissionsTest {
                 Manifest.permission.ACCESS_COARSE_LOCATION,
                 Manifest.permission.ACCESS_FINE_LOCATION,
             ),
-            WirelessPermissions.required(WirelessHotspotMode.MANUAL, 31),
+            WirelessPermissions.required(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, 31),
         )
     }
 

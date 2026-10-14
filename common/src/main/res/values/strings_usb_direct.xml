@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connection_help_usb_direct">The iPhone USB network is not ready or the phone did not connect to AirPlay. Unplug and reconnect the USB data cable, then save a diagnostic report if it still fails. This connection uses the system USB network and does not require VPN permission or root.</string>
+</resources>

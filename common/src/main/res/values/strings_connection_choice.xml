@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_iphone_choice_next_connection">Changing the iPhone takes effect at the next connection.</string>
+    <string name="settings_connect_wireless">Wireless connection</string>
+    <string name="settings_connect_usb">USB connection</string>
+    <string name="settings_connection_choice_start">Choose wireless or USB to connect. Choosing a connection restarts CarPlay if it is already running.</string>
+    <string name="settings_connection_choice_next_connection">Choose wireless or USB. Your choice takes effect at the next connection.</string>
+</resources>

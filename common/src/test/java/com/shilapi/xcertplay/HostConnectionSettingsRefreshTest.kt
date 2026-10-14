@@ -21,8 +21,31 @@ import org.robolectric.annotation.Implementation
  * Settings saved while it was in the background must reach the next handshake.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [29], manifest = Config.NONE, shadows = [HostConnectionSettingsRefreshTest.Bootstrap::class])
+@Config(sdk = [29], manifest = Config.NONE, shadows = [HostConnectionSettingsRefreshTest.Bootstrap::class, HostConnectionSettingsRefreshTest.ForbiddenVpn::class])
 class HostConnectionSettingsRefreshTest {
+    @Test fun usbStartupDoesNotRequestVpnConsent() {
+        ForbiddenVpn.prepareCalls = 0
+        val activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).create()
+        try {
+            val host = activity.get()
+            org.robolectric.util.ReflectionHelpers.setField(host, "wirelessEnabled", false)
+            org.robolectric.util.ReflectionHelpers.setField(host, "locationReportingEnabled", false)
+            org.robolectric.util.ReflectionHelpers.setField(host, "activeDisplaySize", null)
+            org.robolectric.util.ReflectionHelpers.callInstanceMethod<Unit>(host, "requestStartupPrerequisites")
+            assertEquals(0, ForbiddenVpn.prepareCalls)
+        } finally { activity.destroy() }
+    }
+
+    @Implements(android.net.VpnService::class)
+    class ForbiddenVpn {
+        companion object {
+            var prepareCalls = 0
+            @JvmStatic @Implementation fun prepare(context: Context): android.content.Intent? {
+                prepareCalls++
+                throw AssertionError("USB must not request VPN authorization")
+            }
+        }
+    }
     private val app get() = RuntimeEnvironment.getApplication()
 
     @Before fun setUp() {
@@ -30,20 +53,20 @@ class HostConnectionSettingsRefreshTest {
     }
 
     @Test fun projectionScreenUsesConnectionSettingsSavedWhileItWasInTheBackground() {
-        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.MANUAL)
-        AirPlayPersistence.saveManualHotspotSsid(app, "Old car")
         val host = Robolectric.buildActivity(CarPlayHostActivity::class.java).setup()
-        assertEquals(WirelessHotspotMode.MANUAL, runtimeConfig(host.get()).wirelessHotspotMode)
+        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, runtimeConfig(host.get()).wirelessHotspotMode)
 
-        // The user switches to a car hotspot with another name while the projection screen lives on.
-        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
-        AirPlayPersistence.saveManualHotspotSsid(app, "New car")
+        // The user opens the connection settings while the projection screen lives on.
+        AirPlayPersistence.saveManualHotspotSsid(app, "Xingrui-CarPlay")
+        AirPlayPersistence.saveManualHotspotPassphrase(app, "test-password")
+        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.MANUAL)
 
         host.pause().resume()
 
         val config = runtimeConfig(host.get())
-        assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, config.wirelessHotspotMode)
-        assertEquals("New car", config.manualHotspotSsid)
+        assertEquals(WirelessHotspotMode.MANUAL, config.wirelessHotspotMode)
+        assertEquals("Xingrui-CarPlay", config.manualHotspotSsid)
+        assertEquals("test-password", config.manualHotspotPassphrase)
     }
 
     private fun runtimeConfig(host: CarPlayHostActivity): CarPlayRuntimeConfig {

@@ -69,6 +69,18 @@ class DiagnosticRedactorTest {
             assertTrue(report.contains(video))
         } finally { folder.deleteRecursively() }
     }
+
+    @Test fun systemUsbNetworkEvidenceSurvivesReportExport() {
+        val lines = listOf(
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB startup event=periodic elapsedMs=15000 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=AirPlay_TCP",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false iface=usb0 ownerMatches=true driver=cdc_ncm advertisedAddressPresent=true",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false ipv6Addresses=1 tentative=1 dadFailed=0 advertisedState=tentative",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false ipv6Neighbors=1 incomplete=0 failed=1 reachable=0 stale=0",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=true sampleAgeMs=5000 rx_packets=42 rx_packetsDelta=10",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false neighbors=unavailable failureClass=IOException",
+        )
+        for (line in lines) assertEquals(line, DiagnosticRedactor.redact(line))
+    }
     @Test fun payloadAndCredentialLinesNeverReachReports() {
         for (line in listOf("TRACE IAP2 tx key", "hotspot passphrase=secret", "token=secret", "certificate bytes=607", "rx body={phone: 'Jane'}", "ok\nsecret", "wifi ssid=Home", "wireless name=Jane Smith’s iPhone")) {
             assertNull(line, DiagnosticRedactor.redact(line))

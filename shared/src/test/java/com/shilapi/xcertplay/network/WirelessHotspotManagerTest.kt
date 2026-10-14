@@ -42,38 +42,4 @@ class WirelessHotspotManagerTest {
         assertNull(legacyHotspotBandToSoftApBand(null))
     }
 
-    @Test
-    fun doesNotReportDesiredChannelWhenAndroidDoesNotExposeOne() {
-        assertEquals(
-            0,
-            observedManualHotspotChannel(
-                apChannel = 0,
-                connectionFrequencyMHz = null,
-                scanFrequencyMHz = null,
-                apFrequencyMHz = null,
-            ),
-        )
-    }
-
-    @Test
-    fun reportsOnlyAnObservedActiveChannel() {
-        assertEquals(
-            36,
-            observedManualHotspotChannel(
-                apChannel = 36,
-                connectionFrequencyMHz = null,
-                scanFrequencyMHz = null,
-                apFrequencyMHz = null,
-            ),
-        )
-        assertEquals(
-            44,
-            observedManualHotspotChannel(
-                apChannel = 0,
-                connectionFrequencyMHz = 5220,
-                scanFrequencyMHz = null,
-                apFrequencyMHz = null,
-            ),
-        )
-    }
 }

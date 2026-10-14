@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_manual_hotspot_title">Manual head unit hotspot</string>
+    <string name="settings_hotspot_password">Hotspot password</string>
+    <string name="settings_hotspot_empty_name">Enter the hotspot SSID.</string>
+    <string name="settings_hotspot_long_name">The SSID must be at most 32 UTF-8 bytes.</string>
+    <string name="settings_hotspot_invalid_character">The SSID or password contains an invalid character.</string>
+    <string name="settings_hotspot_password_length">The hotspot password must contain 8–63 characters. Leave it empty only for an open hotspot.</string>
+    <string name="settings_wireless_hotspot">Wireless connection</string>
+    <string name="settings_manual_hotspot_module">Manual hotspot configuration</string>
+    <string name="settings_hotspot_mode">Hotspot mode</string>
+    <string name="settings_hotspot_next_connection">Mode and credential changes take effect at the next connection. Your current CarPlay session continues.</string>
+    <string name="settings_manual_hotspot_description">Selecting this mode attempts to turn on the head unit hotspot with its saved configuration. Enter the matching SSID and password here. Your iPhone connects to this hotspot. The app does not rename it, change its password, or turn it off.</string>
+    <string name="settings_manual_hotspot_details">Hotspot SSID and password</string>
+    <string name="settings_hotspot_not_configured">Not configured</string>
+    <string name="settings_manual_hotspot_join">Check that the head unit’s hotspot is on and its SSID and password match those saved in Connection settings. On your iPhone, join this hotspot and enable Auto-Join.</string>
+    <string name="settings_hotspot_start">Turn on head unit hotspot</string>
+    <string name="settings_hotspot_starting">Turning on the head unit hotspot…</string>
+    <string name="settings_hotspot_start_ready">Head unit hotspot is on. Its saved name and password were kept.</string>
+    <string name="settings_hotspot_start_permission">Hotspot control permission is missing. Allow modifying system settings and retry; your firmware may require additional system privileges.</string>
+    <string name="settings_hotspot_start_unsupported">This firmware does not expose an available hotspot start interface. Turn on the hotspot in system settings.</string>
+    <string name="settings_hotspot_start_failed">The hotspot could not be confirmed as on. Check the switch in system settings.</string>
+    <string name="settings_hotspot_start_cancelled">Hotspot startup was cancelled.</string>
+    <string name="settings_hotspot_start_session">CarPlay is running. To preserve the connection, the hotspot switch was not changed. Retry after disconnecting.</string>
+    <string name="settings_hotspot_allow_settings">Allow modifying system settings</string>
+</resources>

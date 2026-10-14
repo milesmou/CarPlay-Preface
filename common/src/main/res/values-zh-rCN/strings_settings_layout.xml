@@ -21,8 +21,6 @@
     <string name="settings_wheel_keys">方向盘按键</string>
     <string name="settings_experimental_display">显示（实验性）</string>
     <string name="settings_diagnostics_summary">排查连接问题时保存本地报告</string>
-    <string name="settings_vehicle_description">实验性功能已集中到实验性菜单中，启用前请查看适用条件。</string>
-    <string name="settings_open_advanced">打开实验性设置</string>
     <string name="settings_reconnect_pending">已保存。部分更改将在 CarPlay 重新连接后生效。</string>
     <string name="settings_reconnect_now">立即重新连接</string>
     <string name="settings_search_hint">搜索设置</string>
@@ -31,6 +29,6 @@
     <string name="settings_ready_usb">使用 USB 数据线连接 iPhone 以启动 CarPlay。</string>
     <string name="settings_connecting_description">CarPlay 正在与你的 iPhone 启动 CarPlay。</string>
     <string name="settings_choose_iphone_title">选择你的 iPhone</string>
-    <string name="settings_choose_iphone_description">无线 CarPlay 需要先配对 iPhone 才能连接。</string>
+    <string name="settings_choose_iphone_description">请在首页的无线连接卡片中选择 iPhone。更换 iPhone 将在下次连接时生效。</string>
     <string name="settings_choose_iphone_action">选择 iPhone</string>
 </resources>

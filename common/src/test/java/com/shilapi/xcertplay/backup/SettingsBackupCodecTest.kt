@@ -18,6 +18,39 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun backupUsesCurrentKeysAndSkipsObsoleteConfiguration() {
+        val values = prefs("xcertplay_airplay")
+        values.edit().clear()
+            .putInt("display_scale_percent", 75)
+            .putInt("navigation_audio_channel", 0)
+            .putBoolean("cluster_music_enabled", true)
+            .putInt("cluster_speedometer_size", 100)
+            .putInt("display_scale_tenths", 6)
+            .putInt("navigation_stream_type", 15)
+            .putString("cluster_turn_card_overlay_position", "LEFT")
+            .putInt("cluster_marker_horizontal_step", 2)
+            .commit()
+        val file = JSONObject(SettingsBackupCodec.export(context, "0.1.1").toString(Charsets.UTF_8))
+            .getJSONObject("settings").getJSONObject("xcertplay_airplay")
+        assertEquals(75, file.getInt("display_scale_percent"))
+        assertEquals(0, file.getInt("navigation_audio_channel"))
+        assertTrue(file.getBoolean("cluster_music_enabled"))
+        assertEquals(100, file.getInt("cluster_speedometer_size"))
+        for (key in listOf("display_scale_tenths", "navigation_stream_type",
+            "cluster_turn_card_overlay_position", "cluster_marker_horizontal_step")) {
+            assertFalse(file.has(key))
+        }
+        val obsolete = """{"format":"diplay-settings","version":1,"settings":{
+            "xcertplay_airplay":{"display_scale_tenths":6,"navigation_stream_type":15,
+            "cluster_turn_card_overlay_position":"LEFT","cluster_marker_horizontal_step":2}}}"""
+        values.edit().clear().commit()
+        val outcome = SettingsBackupCodec.import(context, obsolete.toByteArray())
+        assertFalse(outcome.invalid)
+        assertEquals(0, outcome.applied)
+        assertEquals(4, outcome.skipped)
+        assertTrue(values.all.isEmpty())
+    }
+
     @Test
     fun importingAnOlderBackupSkipsRemovedVehicleAdaptersAndKeepsAudioSettings() {
         prefs("xcertplay_airplay").edit().clear()
@@ -115,7 +148,7 @@ class SettingsBackupCodecTest {
         prefs("xcertplay_airplay").edit().putInt("display_fps", 60).putBoolean("hevc_enabled", false).apply()
         val document = """
             {"format": "diplay-settings", "version": 1, "settings": {
-              "xcertplay_airplay": {"display_fps": "48", "hevc_enabled": true, "display_scale_tenths": 85}
+              "xcertplay_airplay": {"display_fps": "48", "hevc_enabled": true, "display_scale_percent": 85}
             }}
         """.trimIndent()
         val outcome = SettingsBackupCodec.import(context, document.toByteArray())
@@ -123,7 +156,7 @@ class SettingsBackupCodecTest {
         assertEquals(1, outcome.skipped)
         assertEquals(60, prefs("xcertplay_airplay").getInt("display_fps", 0))
         assertEquals(true, prefs("xcertplay_airplay").getBoolean("hevc_enabled", true))
-        assertEquals(85, prefs("xcertplay_airplay").getInt("display_scale_tenths", 0))
+        assertEquals(85, prefs("xcertplay_airplay").getInt("display_scale_percent", 0))
     }
 
     @Test
@@ -136,19 +169,19 @@ class SettingsBackupCodecTest {
     @Test
     fun importRejectsOutOfRangeOrFractionalNumbers() {
         prefs("xcertplay_airplay").edit()
-            .putLong("cluster_test_counter", 5L)
+            .putLong("cluster_marker_x_percent", 5L)
             .putFloat("ui_scale_percent", 1f)
             .putInt("display_fps", 60)
             .apply()
         val document = """
             {"format": "diplay-settings", "version": 1, "settings": {
-              "xcertplay_airplay": {"cluster_test_counter": 1.5, "ui_scale_percent": 1e300, "display_fps": 3000000000}
+              "xcertplay_airplay": {"cluster_marker_x_percent": 1.5, "ui_scale_percent": 1e300, "display_fps": 3000000000}
             }}
         """.trimIndent()
         val outcome = SettingsBackupCodec.import(context, document.toByteArray())
         assertEquals(0, outcome.applied)
         assertEquals(3, outcome.skipped)
-        assertEquals(5L, prefs("xcertplay_airplay").getLong("cluster_test_counter", 0L))
+        assertEquals(5L, prefs("xcertplay_airplay").getLong("cluster_marker_x_percent", 0L))
         assertEquals(1f, prefs("xcertplay_airplay").getFloat("ui_scale_percent", 0f))
         assertEquals(60, prefs("xcertplay_airplay").getInt("display_fps", 0))
     }
@@ -178,7 +211,8 @@ class SettingsBackupCodecTest {
         // The car's hotspot name is not part of a backup.
         assertEquals("changed", airplay.getString("manual_hotspot_ssid", ""))
         assertEquals(100f, airplay.getFloat("ui_scale_percent", 0f))
-        assertEquals(true, prefs("diplay_car_hotspot").getBoolean("auto_enable", false))
+        // The removed car-hotspot mode is not restored from a settings backup.
+        assertEquals(false, prefs("diplay_car_hotspot").getBoolean("auto_enable", false))
         assertFalse(airplay.contains("identity_private"))
     }
 }

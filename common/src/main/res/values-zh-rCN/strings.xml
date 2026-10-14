@@ -1,11 +1,6 @@
 <resources>
-    <string name="settings_built_in_car_hotspot">车载热点</string>
-    <string name="hotspot_hint_manual">车载热点 · 保持车载热点、蓝牙和 iPhone 的 Wi-Fi 开启。</string>
     <string name="hotspot_hint_local">打开“连接设置”以保存车载热点信息。</string>
     <string name="marker_centre_default">居中 · 默认</string>
-    <string name="hotspot_mode_manual_desc">使用原车热点连接。保存热点名称和密码后，CarPlay 会通过蓝牙将热点信息发送给 iPhone。如支持 5 GHz，可在原车设置中选择。</string>
-    <string name="hotspot_details_off">热点已关闭 · 请在车机设置中开启。</string>
-    <string name="hotspot_details_saved">详情已保存 · 连接前请确认车载热点已开启。</string>
     <string name="permission_enabled_ready">权限已启用 · 可以使用</string>
     <string name="permission_not_enabled">权限尚未启用</string>
     <string name="report_clip_label">诊断报告</string>
@@ -178,13 +173,7 @@
     <string name="hide_the_navigation_bar">隐藏导航栏</string>
     <string name="hide_the_status_bar">隐藏状态栏</string>
     <string name="hotspot_name">热点名称</string>
-    <string name="hotspot_password">热点密码</string>
-    <string name="hotspot_password_contains_u_0000">热点密码包含 U+0000</string>
     <string name="hotspot_setup">热点设置</string>
-    <string name="hotspot_ssid">热点 SSID</string>
-    <string name="hotspot_ssid_contains_u_0000">热点 SSID 包含 U+0000</string>
-    <string name="hotspot_ssid_is_required">必须填写热点 SSID</string>
-    <string name="hotspot_ssid_must_be_at_most_32_utf_8_bytes">热点 SSID 最多为 32 个 UTF-8 字节</string>
     <string name="hotspot_status">热点状态</string>
     <string name="i2c">I2C</string>
     <string name="i2c_device">I2C 设备</string>
@@ -207,7 +196,6 @@
     <string name="looking_for_your_paired_iphone">正在查找已配对的 iPhone…</string>
     <string name="made_possible_by_open_source">开源项目鸣谢</string>
     <string name="make_diplay_feel_right_for_your_car">按需调整 CarPlay 设置。</string>
-    <string name="manual_hotspot">手动热点</string>
     <string name="manufacturer">制造商</string>
     <string name="mfi_authentication_ready">MFi 认证已就绪</string>
     <string name="mfi_certificate_signing_target">MFi 证书与签名目标</string>
@@ -217,7 +205,7 @@
     <string name="nearby_devices_connects_your_iphone_microphone_enables_sir">“附近的设备”权限用于连接 iPhone；麦克风权限用于 Siri 和通话。较旧的 Android 版本还需要位置权限来设置无线连接。USB 模式可能会请求建立本地 VPN 连接。</string>
     <string name="nothing_is_sent_automatically_protocol_payloads_and_creden">报告不会自动发送，不包含协议数据和凭据。</string>
     <string name="oem_label">OEM 标签</string>
-    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">在 iPhone 上打开“设置 → 蓝牙”并与车机配对。然后返回 CarPlay，点击“连接手机”。</string>
+    <string name="on_your_iphone_open_settings_bluetooth_and_pair_with_the_c">在 iPhone 上打开“设置 → 蓝牙”并与车机配对。然后返回 CarPlay 首页，点击“无线连接”。</string>
     <string name="open">开放</string>
     <string name="open_after_the_car_starts">车机启动后打开</string>
     <string name="open_bluetooth">打开蓝牙</string>
@@ -345,10 +333,6 @@
     <string name="option_size_large">大</string>
     <string name="option_size_medium">中</string>
     <string name="option_size_small">小</string>
-    <string name="hotspot_error_empty_name">请输入车载热点名称</string>
-    <string name="hotspot_error_long_name">热点名称不能超过32字节</string>
-    <string name="hotspot_error_invalid_character">名称或密码包含无效字符</string>
-    <string name="hotspot_error_password_length">热点密码长度必须为8至63个字符</string>
     <string name="turn_card_info_arrival">%1$s到达</string>
     <string name="turn_card_info_duration_hm">%1$d小时%2$d分</string>
     <string name="turn_card_info_duration_m">%1$d分</string>
@@ -410,15 +394,8 @@
     <string name="settings_gesture_fingers_label">快捷菜单 · 下滑手指数</string>
     <string name="settings_gesture_fingers_option">%1$d 指</string>
     <string name="settings_gesture_fingers_hint">选择车机没有占用的手指数。</string>
-    <string name="auto_car_hotspot_title">自动开启热点</string>
-    <string name="auto_car_hotspot_description">CarPlay 启动时开启车机热点。打开开关会自动通过 ADB 申请所需权限，请允许车机上的授权提示。配合“车辆启动后打开”可随开机启动。保留热点名称和密码，不会自动关闭热点。</string>
-    <string name="hotspot_control_missing">缺少热点控制权限。请通过 ADB 授权，或在车机设置中手动开启热点。</string>
     <string name="hotspot_permission_granted">授权成功。</string>
     <string name="hotspot_permission_failed">未获得所请求的权限。请检查车机设置后重试。</string>
-    <string name="hotspot_control_on">车机热点已开启。</string>
-    <string name="hotspot_control_unsupported">当前固件不支持自动开启热点，请在车机设置中开启。</string>
-    <string name="hotspot_control_timeout">等待车机热点开启超时，请在车机设置中开启。</string>
-    <string name="hotspot_control_failed">车机热点开启失败，请在车机设置中开启。</string>
     <string name="location_reporting_reconnects">更改此设置会重新连接当前 CarPlay 会话。</string>
     <string name="diagnostic_report_saved_in_app">由于公共保存位置不可用，报告已私密保存到 CarPlay。您可以在此分享或查看报告。不会自动发送任何内容。</string>
     <string name="diagnostic_report_saved_to_path">报告已保存到：\n%1$s\n\n您也可以在此分享或查看报告。不会自动发送任何内容。</string>
@@ -445,8 +422,6 @@
     <string name="wheel_zoom_mode_off">音量键已恢复调节音量</string>
     <string name="wheel_joystick">方向盘 CarPlay 摇杆</string>
     <string name="wheel_joystick_description">请在下方学习摇杆开关、移动、确认和返回键。开启摇杆模式后，这些按键控制 CarPlay；通话期间保留原有功能。</string>
-    <string name="settings_external_controller">外接控制器（实验性）</string>
-    <string name="settings_external_controller_description">已配对的蓝牙键盘、遥控器或旋钮控制器的按键可在 CarPlay 中移动和确认选择，就像车上的旋钮。触摸屏仍可使用。立即生效。</string>
     <string name="settings_usb_connection">USB 连接</string>
     <string name="settings_usb_charging">iPhone 充电</string>
     <string name="settings_usb_charging_normal">标准（2.4 A）</string>
@@ -545,18 +520,6 @@
     <string name="backup_import_invalid">这不是 CarPlay 设置备份文件。</string>
     <string name="settings_background_update_checks">在后台检查更新</string>
     <string name="settings_background_update_checks_description">CarPlay 每天会在 GitHub 上检查一次新版本，并显示在主屏幕上。未经你点击，绝不会下载。</string>
-    <string name="setup_guide">设置向导</string>
-    <string name="setup_step_of">第 %1$d 步，共 %2$d 步</string>
-    <string name="setup_skip">跳过设置</string>
-    <string name="setup_next">下一步</string>
-    <string name="setup_connection_title">连接</string>
-    <string name="setup_connection_description">选择 iPhone 连接星瑞的方式：使用原车热点，或由应用创建临时热点。临时热点的名称、密码和频段由系统分配，不提供互联网。</string>
-    <string name="setup_iphone_title">配对 iPhone</string>
-    <string name="setup_iphone_none">尚未选择 iPhone</string>
-    <string name="setup_features_title">功能</string>
-    <string name="setup_features_description">选择自动连接以及向 iPhone 共享位置信息。</string>
-    <string name="setup_done_title">准备就绪</string>
-    <string name="setup_done_description">现在连接你的 iPhone。之后可在设置中再次打开本向导。</string>
     <string name="settings_discard_pending_title">要放弃更改吗？</string>
     <string name="settings_discard_pending_message">你刚更改的分辨率、帧率、连接以及其余设置尚未保存。“保存并重新连接”会应用它们。</string>
     <string name="settings_discard_pending_confirm">放弃</string>

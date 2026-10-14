@@ -24,12 +24,12 @@ class SettingsStateTest {
         assertFalse(SettingsReadiness.READY_USB.needsAction)
     }
 
-    @Test fun missingHotspotSetupNeedsActionWithoutHidingAnActiveSession() {
+    @Test fun temporaryHotspotNeedsNoSetupAndDoesNotHideAnActiveSession() {
         fun of(active: Boolean = false, running: Boolean = false, wireless: Boolean = true) =
-            SettingsReadiness.of(false, active, running, wireless, phoneChosen = true, hotspotSetupNeeded = true)
+            SettingsReadiness.of(false, active, running, wireless, phoneChosen = true)
 
-        assertEquals(SettingsReadiness.HOTSPOT_SETUP, of())
-        assertTrue(SettingsReadiness.HOTSPOT_SETUP.needsAction)
+        assertEquals(SettingsReadiness.READY_WIRELESS, of())
+        assertFalse(SettingsReadiness.READY_WIRELESS.needsAction)
         assertEquals(SettingsReadiness.CONNECTED, of(active = true))
         assertEquals(SettingsReadiness.CONNECTING, of(running = true))
         assertEquals(SettingsReadiness.READY_USB, of(wireless = false))

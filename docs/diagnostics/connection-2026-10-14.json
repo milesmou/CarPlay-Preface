@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "analyzedAt": "2026-10-14",
+  "scope": "User-supplied runtime logs only; does not validate the reference OTA or all Xingrui E02 firmware.",
+  "reportedDevice": {
+    "manufacturer": "ecarx",
+    "model": "IHU353G",
+    "board": "IHU353G",
+    "android": "9",
+    "api": 28,
+    "build": "PQ2A.190405.003 dev-keys",
+    "incremental": null,
+    "matchesReferenceOtaIdentity": false
+  },
+  "sources": [
+    { "filename": "diplay-report.txt", "sha256": "94ab43b8a497c023d4dae6a044c2d62bc43c669bfe407051611f73ff61ed6626" },
+    { "filename": "diplay-report 2.txt", "sha256": "f0cf86482b4001af058328be6a37b1b31dc739559028f72bc467e73e68c962be" },
+    { "filename": "diplay-report 3.txt", "sha256": "7108252b2de8d7ce187b3ad7bb00ad8b256007c2432577a2af5edec2d6976327" }
+  ],
+  "localEvidenceRoot": "agent_docs/diagnostics/connection-2026-10-14",
+  "observations": [
+    { "source": "diplay-report 3.txt", "lines": [2618, 2651, 2660, 2672], "fact": "USB StartSession sent while announced IPv6 address was tentative; address later became ready and neighbor reachable, but no AirPlay TCP accepted." },
+    { "source": "diplay-report 3.txt", "timestamps": ["12:30:15.963", "12:34:58.287", "12:35:37.068"], "fact": "Current wireless attempts reached hotspot ready and sent Wi-Fi credentials but did not establish AirPlay; USB fallback VPN consent activity launch failed." },
+    { "source": "diplay-report.txt", "lines": [728, 733, 758, 794, 796], "fact": "Wireless AirPlay session established, first video frame and subsequent rendering recorded." },
+    { "source": "diplay-report.txt", "lines": [798, 810, 811, 889, 890], "fact": "Control connection aborted; replacement began after 4-second teardown timeout, before old Bonjour and hotspot release at about 10 seconds." },
+    { "source": "diplay-report 2.txt", "timestamps": ["11:17:09.578", "11:17:09.997", "11:17:10.074", "11:17:40.158"], "fact": "USB authentication succeeded and system usb0 listener attached, but no AirPlay session before fallback timeout." },
+    { "source": "diplay-report 2.txt", "timestamps": ["11:17:40.166", "11:17:40.428", "11:17:40.435"], "fact": "VPN consent activity launch failed with ActivityNotFoundException; ADB authorization unreachable; connection failed." }
+  ],
+  "pendingValidation": ["Initial wireless abort cause", "Wireless current hotspot visibility and manual/automatic joining", "USB first TCP after address readiness check", "USB packet types, routing and filtering", "VPN authorization component availability"]
+}

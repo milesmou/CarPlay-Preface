@@ -106,4 +106,4 @@ internal fun legacyHotspotInterfaces(tethered: List<String>, wifiRegexes: List<S
 
 internal fun wirelessInterfaceName(name: String): Boolean =
     name.startsWith("wlan") || name.startsWith("swlan") || name.startsWith("ap") ||
-        name.contains("softap", ignoreCase = true) || name.startsWith("wifi") || name.startsWith("p2p")
+        name.contains("softap", ignoreCase = true) || name.startsWith("wifi")

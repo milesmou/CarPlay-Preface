@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
-import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import org.junit.Assert.*
 import org.junit.After
 import org.junit.Before
@@ -42,7 +41,6 @@ class DefaultConnectionModeTest {
     @Test fun initialLaunchUsesTheFixedDefaultInsteadOfTheLastManualTransport() {
         DiPlayPreferences.saveAutoConnect(app, true)
         DiPlayPreferences.savePhone(app, "00:11:22:33:44:55", "Test iPhone")
-        AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         app.getSharedPreferences("diplay", 0).edit().putBoolean("notification_asked", true).commit()
         for (mode in listOf(DefaultConnectionMode.USB, DefaultConnectionMode.WIRELESS)) {
             val expectedWireless = mode == DefaultConnectionMode.WIRELESS

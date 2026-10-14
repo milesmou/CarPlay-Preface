@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_navigation_wheel_volume">导航播报时方控调节导航音量（实验性）</string>
-    <string name="settings_navigation_wheel_volume_description">CarPlay 导航播报期间，标准音量键调节导航音量，其他时候保留车机媒体音量行为。CarPlay 前台可直接使用；后台需要方向盘按键无障碍权限。自动或媒体音频路由调节 CarPlay 导航输出比例，独立音频流使用系统音量。通话、Siri、地图缩放和摇杆优先。星瑞 E02 私有方控仍待实车验证。</string>
-    <string name="settings_navigation_wheel_service_required">请在 Android 设置中允许方向盘按键无障碍服务，或使用现有 ADB 授权按钮。</string>
+    <string name="settings_navigation_wheel_volume">方控按媒体播放状态调节音量（实验性）</string>
+    <string name="settings_navigation_wheel_volume_description">默认启用。CarPlay 媒体播放时调节媒体音量；媒体暂停或未播放时调节导航音量，导航未播报时也可预先调节。音量全部由车机系统控制；独立音频流分别调节，共享音频流同步变化，自动或回退路由按系统映射调节，无法确定时调节车机媒体音量。通话、Siri、原车音源、地图缩放和摇杆优先。私有方控申请系统拦截，失败时保留原车处理；标准音量键后台处理需要无障碍权限。星瑞 E02 实车效果待验证。</string>
 </resources>

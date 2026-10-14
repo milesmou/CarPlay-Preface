@@ -19,6 +19,8 @@ android {
             }
         }
 
+        consumerProguardFiles 'usb-consumer-rules.pro'
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     ndkVersion = '28.2.13676358'

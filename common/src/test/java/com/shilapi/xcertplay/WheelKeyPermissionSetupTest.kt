@@ -119,7 +119,7 @@ class WheelKeyPermissionSetupTest {
 
     @Test fun navigationOnlyRestorationRequiresRecordedAuthorizationAndStopsWhenDisabled() {
         val prefs = context.getSharedPreferences("diplay_navigation_wheel", android.content.Context.MODE_PRIVATE)
-        assertFalse(NavigationWheelSettings.enabled(context))
+        assertTrue(NavigationWheelSettings.enabled(context))
         prefs.edit().putBoolean("enabled", true).commit()
         assertFalse(WheelKeyService.needsRestore(context))
         NavigationWheelSettings.recordAuthorization(context)

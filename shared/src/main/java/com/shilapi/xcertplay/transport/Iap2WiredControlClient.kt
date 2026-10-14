@@ -28,6 +28,7 @@ class Iap2WiredControlClient(
         locationProvider: Iap2LocationProvider? = null,
         onIncoming: (Iap2Frame) -> Unit = {},
         onProgress: (String) -> Unit = {},
+        refreshEndpoint: (() -> Iap2WiredCarPlayEndpoint?)? = null,
     ): Iap2WiredControlResult {
         require(availableCurrentMilliAmps in 0..0xffff) {
             "availableCurrentMilliAmps must be in 0..65535"
@@ -53,15 +54,26 @@ class Iap2WiredControlClient(
         var forwardedFrames = 0
         val rxLog = Iap2RxLog()
         var carPlayStartSessions = 0
+        var currentEndpoint = endpoint
         val location = Iap2LocationReporter(locationProvider, onProgress)
         try {
             while (true) {
+                refreshEndpoint?.invoke()?.let { replacement ->
+                    currentEndpoint = replacement
+                    if (carPlayStartSessions > 0) {
+                        send(carPlayStartSession(currentEndpoint), deadlineNanos)
+                        carPlayStartSessions++
+                        onProgress("iap2 tx=0x4301 carplay-start-session transport-fallback")
+                    }
+                }
                 val remaining = remainingMillis(deadlineNanos)
                 if (remaining == 0L) {
                     return Iap2WiredControlResult(Iap2WiredControlTerminal.TIMED_OUT, stage, forwardedFrames, carPlayStartSessions)
                 }
                 location.tick { send(it, deadlineNanos) }
-                val pollTimeout = location.pollTimeout(remaining)
+                val pollTimeout = location.pollTimeout(remaining).let {
+                    if (refreshEndpoint != null) minOf(it, 250L) else it
+                }
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -89,7 +101,7 @@ class Iap2WiredControlClient(
                         onProgress(carPlayAvailabilitySummary(incoming.payload))
                         // LIVI sends its wired answer on every availability notification; do not gate it on
                         // the phone's advertised availability boolean.
-                        send(carPlayStartSession(endpoint), deadlineNanos)
+                        send(carPlayStartSession(currentEndpoint), deadlineNanos)
                         stage = Iap2WiredControlStage.CARPLAY_START_SENT
                         carPlayStartSessions++
                         onProgress("iap2 tx=0x4301 carplay-start-session")

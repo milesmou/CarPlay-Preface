@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="connection_hotspot_credentials">If your iPhone does not join automatically, open Settings → Wi-Fi and join this current network:\nNetwork: %1$s\nPassword: %2$s\nThe network and password may change when the hotspot restarts.</string>
+</resources>

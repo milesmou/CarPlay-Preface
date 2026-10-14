@@ -17,7 +17,6 @@ import com.shilapi.xcertplay.media.CarPlayVideoLayout
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.orchestration.MfiTarget
-import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
 import java.time.Duration
 import java.util.concurrent.ExecutorService
@@ -53,6 +52,7 @@ class CarPlayHostDisplaySizeTest {
         // Exercise host startup without launching vendor-service workers or real transports.
         controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, _ ->
             org.mockito.Mockito.`when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+            org.mockito.Mockito.`when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         }
         (getField("teardownExecutor") as ExecutorService).shutdownNow()
         setField("teardownExecutor", PausedExecutorService())
@@ -266,7 +266,6 @@ class CarPlayHostDisplaySizeTest {
     }
 
     @Test fun savingMenuBarsPreservesAnIndependentCombination() {
-        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
         invoke("loadPersistedSettings")
         setField("menuOpen", true)
         val controls = invoke("buildFullscreenSection") as ViewGroup
@@ -360,13 +359,52 @@ class CarPlayHostDisplaySizeTest {
         allowStartup()
         startSession()
         applySize(990, 1920)
-        setField("vpnReady", false)
+        setField("microphonePermissionResolved", false)
 
         finishTeardown()
 
         assertNull(getField("controller"))
         assertNull(getField("sessionDisplay"))
         assertFalse(getField("handshakeResetInProgress") as Boolean)
+    }
+
+    @Test @Config(sdk = [30]) fun reconnectWaitsPastTheFirstTeardownTimeout() {
+        allowStartup()
+        invoke("maybeStartCarPlay")
+        val old = getField("controller") as CarPlayController
+        var waits = 0
+        org.mockito.Mockito.`when`(old.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenAnswer {
+            waits++
+            assertTrue(getField("handshakeResetInProgress") as Boolean)
+            assertNull(getField("controller"))
+            assertEquals("Replacement must wait for old resources", 1, controllerConstruction.constructed().size)
+            waits >= 3
+        }
+        activity.javaClass.getDeclaredMethod("restartCarPlay", String::class.java)
+            .apply { isAccessible = true }.invoke(activity, "Test slow Bonjour teardown")
+
+        finishTeardown()
+
+        assertEquals(3, waits)
+        assertEquals(2, controllerConstruction.constructed().size)
+        assertFalse(getField("handshakeResetInProgress") as Boolean)
+    }
+
+    @Test @Config(sdk = [30]) fun shutdownCancelsWaitingWithoutStartingAReplacement() {
+        allowStartup()
+        invoke("maybeStartCarPlay")
+        val old = getField("controller") as CarPlayController
+        org.mockito.Mockito.`when`(old.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenAnswer {
+            (getField("shuttingDown") as AtomicBoolean).set(true)
+            false
+        }
+        activity.javaClass.getDeclaredMethod("restartCarPlay", String::class.java)
+            .apply { isAccessible = true }.invoke(activity, "Test cancelled teardown")
+
+        finishTeardown()
+
+        assertNull(getField("controller"))
+        assertEquals(1, controllerConstruction.constructed().size)
     }
 
     @Test fun initialSizeDetectionKeepsTheNormalStartupPath() {

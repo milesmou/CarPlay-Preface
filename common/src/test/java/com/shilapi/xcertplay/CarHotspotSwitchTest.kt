@@ -228,7 +228,9 @@ class CarHotspotSwitchTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    private fun hotspotSwitch(): Switch = switchFor(R.string.auto_car_hotspot_title)
+    private fun hotspotSwitch(): Switch = switches(controls).single {
+        it.contentDescription == "自动开启车机热点"
+    }
 
     private fun switchFor(title: Int): Switch = switches(controls).single {
         it.contentDescription == activity.getString(title)

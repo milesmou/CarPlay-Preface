@@ -30,6 +30,133 @@
       "vendor_properties"
     ]
   },
+  "hicarUsbTransport": {
+    "verification": "static_hmi_and_nearby_usb_ncm_branch_only_vehicle_validation_pending",
+    "apkSha256": "401d87f13ab1c075d8a3fdb9ad5d1b18810fee0e48993d025202414a3326b294",
+    "sharedUserId": "android.uid.system",
+    "service": "com.huawei.nearby/com.huawei.nearby.NearbyService",
+    "usbChannel": 6,
+    "usbAuthenticationBusinessId": 19,
+    "observedNetworkBranch": "Nearby UsbNcmChannel kernel NIC and socket path",
+    "observedInterfaceNames": ["ncm0_reserved", "wwan0"],
+    "observedAddressFamily": "IPv4",
+    "interfaceConfigurationApi": "INetworkManagementService",
+    "vpnCreationInExaminedNcmBranch": "not_found",
+    "kernelDriverCreation": "not_verified",
+    "setCurrentFunctionGate": "SDK_INT >= 10000; not enabled for reference Android 9",
+    "nearbyApkSha256": "c3ce640924c7e39b6be75d9cadfa53f6e876de8f44c3efd6ae55013fd0579406",
+    "lowerServiceEvidence": [
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/f.java", "lines": [72, 88, 99, 167, 307, 448, 462], "sha256": "1c399587d5f5f177f4250714b8574ade3ec8f5a07df3b560d833c5a2cd75cf39"},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/a.java", "lines": [39, 45, 49, 51, 98, 111, 115], "sha256": "294031cd5f4c854930effc95058153c0bd0accc1232c9af7d7fe50dbc4eac4e6"}
+    ],
+    "evidence": [
+      "catalog/manifests/HiCarHMI.txt",
+      "decompiled/hicar/sources/com/huawei/authagent/service/connect/NearbyConnectControl.java",
+      "decompiled/hicar/sources/com/huawei/nearbysdk/NearbyConfig.java",
+      "decompiled/hicar/sources/com/huawei/nearbysdk/NearbyAdapter.java:139-143"
+    ],
+    "carPlayReuse": "not_established",
+    "thirdPartyAccess": "not_verified"
+  },
+  "hicarWirelessHotspot": {
+    "analyzedAt": "2026-10-14",
+    "verification": "static_nearby_softap_branch_only_vehicle_validation_pending",
+    "scope": "Reference IHU519G/FS11A1 Android 9 build 327 only; reported IHU353G not verified.",
+    "package": "com.huawei.nearby",
+    "versionName": "8.0.0.300",
+    "apkPath": "system/app/HwNearbyCar/HwNearbyCar.apk",
+    "apkSha256": "c3ce640924c7e39b6be75d9cadfa53f6e876de8f44c3efd6ae55013fd0579406",
+    "sharedUserId": "android.uid.system",
+    "android9StartApi": "ConnectivityManager.startTethering",
+    "localOnlyHotspotInExaminedSoftApBranch": false,
+    "ssidPattern": "HiCar-[0-9]{4}",
+    "passphrasePattern": "[0-9]{8}",
+    "credentialsGeneratedBy": "Nearby SecureRandom",
+    "writesSavedHotspotConfiguration": true,
+    "savesPreviousNonHiCarConfiguration": true,
+    "hasConditionalRestorePreviousConfiguration": true,
+    "mayReuseMatchingActiveHiCarHotspot": true,
+    "defaultNearbyWifiConnectMode": 1,
+    "declaredPrivilegedPermissions": ["android.permission.OVERRIDE_WIFI_CONFIG", "android.permission.CONNECTIVITY_INTERNAL", "android.permission.TETHER_PRIVILEGED", "android.permission.WRITE_SECURE_SETTINGS"],
+    "servicePermission": "com.huawei.permission.NEARBY_OPERATOR_FUNCTION",
+    "servicePermissionProtectionLevelRaw": "0x3",
+    "thirdPartyAccess": "not_verified_identity_permission_and_provider_signature_checks_exist",
+    "applicationAdoption": "none_public_local_only_hotspot_policy_retained",
+    "evidence": [
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/d/a.java", "lines": [63, 131, 219, 233, 464, 497, 500, 572, 622], "sha256": "abc723f6ce6aea52edf6217c1b5f0782cb847bd3a5431839db8b58a5c5489b5a"},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/p2p/l.java", "lines": [74, 82, 105], "sha256": "be1c55eef945ddd642cd86b7924a77b438b4ac24d7c17b2026debf40396d63e1"},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/transfertype/resource/j.java", "lines": [110, 120, 124], "sha256": "efb2a448429d24c96af0887966cbb57466081703f56de0c1f92098c448b054d4"},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/controller/NearbyController.java", "lines": [42, 319, 503, 616], "sha256": "50e249464b8674037ae969fa8e4217d6ab64d38be9e9ca0e4a7e7357e0c81645"},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/controller/h.java", "lines": [107, 118, 122]},
+      {"path": "decompiled/nearby/sources/com/huawei/nearby/f.java", "lines": [54, 60]},
+      {"path": "catalog/manifests/HwNearbyCar.txt", "lines": [3, 35, 36, 72, 73]},
+      {"path": "system/etc/permissions/hicar-privapp-permissions-platform.xml", "sha256": "29685b61cf60882dfe122b2f98da204e258a322dd7fa02ae366d79a11aea847a"}
+    ],
+    "pendingValidation": ["Permissions actually granted on device", "HiCar hotspot lifecycle and restore outcomes", "Reported IHU353G firmware and Settings UI behavior"]
+  },
+  "wiredCarPlayNetworkPolicy": {
+    "updatedAt": "2026-10-14",
+    "verification": "implementation_and_targeted_tests_only_vehicle_validation_pending",
+    "primary": "system_usb_ncm_network",
+    "fallback": "application_scoped_ipv6_vpn_ncm_bridge",
+    "systemUsbDriverSupport": "not_verified",
+    "ownershipCheck": "sysfs_busnum_devnum_and_ncm_interface_number",
+    "discoveryTimeoutMillis": 2000,
+    "airPlayStartupTimeoutMillis": 30000,
+    "vpnConsent": "on_fallback_only",
+    "fallbackAfterEstablishedSession": false,
+    "startupDiagnostics": {
+      "verification": "implementation_and_targeted_tests_only_reported_device_validation_pending",
+      "sampleIntervalMillis": 5000,
+      "neighborReadTimeoutMillis": 250,
+      "readOnly": true,
+      "exportsAddressesOrDeviceIdentifiers": false,
+      "fields": ["interface_ownership_driver_and_state", "endpoint_matches_bind", "ipv6_address_flags", "proc_ipv6_routes", "neighbor_state_counts", "tcp_listener_and_handshake_counts", "rx_tx_counters_and_deltas", "iap2_start_to_tcp_and_session_timing"],
+      "unavailableSourceIsNotZero": true,
+      "finalSnapshotIsCachedWithAge": true,
+      "documentation": "docs/USB_SYSTEM_NETWORK_DIAGNOSTICS.md",
+      "implementation": "shared/src/main/java/com/shilapi/xcertplay/network/SystemUsbDiagnostics.kt"
+    },
+    "automaticRetryAfterVpnConsentFailure": false,
+    "implementation": [
+      "shared/src/main/java/com/shilapi/xcertplay/network/SystemUsbNetwork.kt",
+      "shared/src/main/java/com/shilapi/xcertplay/orchestration/CarPlayController.kt",
+      "common/src/main/java/com/shilapi/xcertplay/CarPlayHostActivity.kt"
+    ]
+  },
+  "hicarTrackInterception": {
+    "verification": "static_sdk_implementation_only",
+    "sdkPath": "system/app/ECarXInteractiveService/jar/ecarxinteractivesdk.jar",
+    "sdkSha256": "d076176a3bbcced700b0affcf3676c96c3a62aca4ae0c5d188cd00260914951f",
+    "evidencePath": "decompiled/interactive/sources/com/ecarx/interactive/support/ECarXInteractiveInputManagerServiceUtil.java",
+    "evidenceLine": 31,
+    "interface": "android.hardware.input.IInputManager.requestKeysInterception",
+    "callback": "android.hardware.input.IKeyEventObserver.onKeyEvent(boolean,int)",
+    "hicarRequestedKeys": [298, 85, 86, 87, 88, 89, 90, 5, 6, 19, 20, 21, 22, 23],
+    "applicationRequestedKeys": [85, 87, 88, 298],
+    "thirdPartyAccess": "not_verified",
+    "preventsOriginalPlayerLaunch": "requires_vehicle_validation"
+  },
+  "hicarButtonAudit": {
+    "verification": "static_only_vehicle_validation_pending",
+    "evidence": [
+      "decompiled/hicar/sources/com/ecarx/hmi/v.java",
+      "decompiled/interactive/sources/com/ecarx/interactive/support/ECarxInputKeyCodeUtil.java",
+      "decompiled/interactive/sources/com/ecarx/interactive/support/VrVoiceObserverUtil.java",
+      "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVoiceAssistAction.java",
+      "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVolumeAdjustActionBase.java"
+    ],
+    "mediaPlayPause": { "key": 85, "applicationAction": "CarPlay play/pause HID" },
+    "voiceButton": {
+      "physicalKey": 298,
+      "adapterKey": 200231,
+      "orderedBroadcast": "ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT",
+      "applicationAction": "request Siri once on release; ordered broadcast fallback consumed only on accepted request"
+    },
+    "volume": { "physicalKeys": [301, 302], "applicationAction": "candidate: request volume interception while CarPlay owns media; playing adjusts system media volume, paused or idle adjusts system navigation volume; no application gain control; shared routes share system volume; release on call, assistant, focus loss or failure", "thirdPartyVolumeInterception": "not_verified", "hicarVolumeInterception": "not_requested_in_reference_sdk" },
+    "hotwordObserver": "SDK implementation empty; not ported",
+    "phoneDpadSeekMute": "not intercepted; preserve original vehicle actions"
+  },
   "audio": {
     "verification": "static_constants_and_configuration",
     "streams": {

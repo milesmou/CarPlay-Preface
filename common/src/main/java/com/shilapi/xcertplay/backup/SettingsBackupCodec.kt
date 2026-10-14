@@ -20,11 +20,30 @@ object SettingsBackupCodec {
      * detected screen size, the car's hotspot) and consents (sharing the map with other apps) stay out too.
      */
     private val AIRPLAY_KEYS = setOf(
-        "display_scale_tenths", "ui_scale_percent", "hevc_enabled", "hevc_software_decoder",
+        "cluster_map_enabled",
+        "cluster_map_scale_percent",
+        "cluster_content",
+        "cluster_small_window_mode",
+        "cluster_turn_card_overlay_x_percent",
+        "cluster_turn_card_overlay_y_percent",
+        "cluster_turn_card_overlay_size_percent",
+        "cluster_turn_card_opacity_percent",
+        "cluster_marker_x_percent",
+        "cluster_marker_y_percent",
+        "cluster_small_window_marker_x_percent",
+        "cluster_small_window_marker_y_percent",
+        "cluster_turn_card_theme",
+        "cluster_small_window_card_theme",
+        "cluster_small_window_card_size",
+        "cluster_small_window_card_x",
+        "cluster_small_window_card_y",
+        "cluster_small_window_card_opacity_percent",
+        "cluster_safe_area_1920x720",
+        "display_scale_percent", "ui_scale_percent", "hevc_enabled", "hevc_software_decoder",
         "advanced_audio_channel_mapping", "audio_focus_enabled", "audio_focus_auto_yield",
         "disable_media_key_audio_focus", "media_audio_channel", "navigation_audio_channel",
-        "navigation_stream_type", "wireless_enabled", "wireless_hotspot_mode",
-        "manual_hotspot_band", "manual_hotspot_channel", "manual_hotspot_security", "app_appearance",
+        "wireless_enabled",
+        "app_appearance",
         "ambient_lux_threshold", "display_fps", "media_buffer_ms", "main_buffered_audio",
         "speech_without_8_16_khz", "car_bluetooth_audio", "call_echo_cancellation", "call_voice_filter",
         "smooth_video", "direct_video_output", "low_latency_decoder", "mtk_decoder_tuning", "fps_counter",
@@ -33,11 +52,11 @@ object SettingsBackupCodec {
         "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
         "safe_area_draw_outside", "main_display_disable_safe_area",
         "adapt_pip_resolution", "auto_start_on_boot",
-        "location_reporting_enabled", "external_controller", "usb_charging_current",
+        "location_reporting_enabled", "usb_charging_current",
     )
 
     /** Families of layout settings with many keys and nothing sensitive in them. */
-    private val AIRPLAY_PREFIXES = listOf("cluster_", "carplay_night_")
+    private val AIRPLAY_PREFIXES = listOf("cluster_music_", "cluster_speedometer_", "carplay_night_")
     private val DIPLAY_KEYS = setOf(
         "auto_connect",
         "connect_on_phone_bluetooth",
@@ -51,7 +70,6 @@ object SettingsBackupCodec {
         "xcertplay_airplay" to Policy.Allow(AIRPLAY_KEYS, AIRPLAY_PREFIXES),
         "diplay" to Policy.Allow(DIPLAY_KEYS),
         "carplay_picture" to Policy.All,
-        "diplay_car_hotspot" to Policy.All,
         "diplay_phone_audio" to Policy.All,
     )
 
@@ -91,7 +109,7 @@ object SettingsBackupCodec {
     fun import(context: Context, document: ByteArray): SettingsImportOutcome {
         val root = runCatching { JSONObject(document.toString(Charsets.UTF_8)) }.getOrNull()
             ?: return SettingsImportOutcome(0, 0, invalid = true)
-        if (root.optString("format") != FORMAT || root.optInt("version", Int.MIN_VALUE) !in 1..VERSION) {
+        if (root.optString("format") != FORMAT || root.optInt("version", Int.MIN_VALUE) != VERSION) {
             return SettingsImportOutcome(0, 0, invalid = true)
         }
         val files = root.optJSONObject("settings")
