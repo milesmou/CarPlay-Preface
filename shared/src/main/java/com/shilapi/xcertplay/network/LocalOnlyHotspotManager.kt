@@ -144,22 +144,33 @@ class LocalOnlyHotspotManager(
         deadlineNanos: Long,
     ): LocalOnlyHotspotRadioInfo.Radio? {
         val legacy = LegacyHotspotRadio.Settled()
+        var lastRadioError: String? = null
         val observationDeadline = minOf(deadlineNanos, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2500))
         while (true) {
             ensureStartActive(attempt)
             observer.settledForBssid(ap.bssid ?: configuration.bssid)?.let { return it }
-            if (configuration.channel > 0 && observer.unavailableReason != null) return null
+            if (configuration.channel > 0 && observer.unavailableReason != null) {
+                onDiagnostic("LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}; using configured channel=${configuration.channel}")
+                return null
+            }
             if (Build.VERSION.SDK_INT < 33) {
                 val reading = LegacyHotspotRadio.read(ap.name, configuration.bandLabel)
+                lastRadioError = reading.error
                 val settled = legacy.observe(reading.frequencyMHz, System.nanoTime() / 1_000_000)
                 if (settled != null) {
                     return LocalOnlyHotspotRadioInfo.Radio(ap.bssid ?: configuration.bssid, settled)
                 }
-                // A missing driver query is not proof that the hotspot failed. Keep the channel unknown.
-                if (reading.frequencyMHz == null) return null
-            } else if (observer.unavailableReason != null) return null
+                // The AP address can appear before the driver exposes its frequency. Retry within
+                // the observation deadline; never borrow the station channel or guess an AP channel.
+            } else if (observer.unavailableReason != null) {
+                onDiagnostic("LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}")
+                return null
+            }
             val remaining = observationDeadline - System.nanoTime()
-            if (remaining <= 0) return null
+            if (remaining <= 0) {
+                onDiagnostic("LocalOnlyHotspot radio observation timed out reason=${lastRadioError ?: "frequency not settled"} configuredChannel=${configuration.channel}")
+                return null
+            }
             try {
                 TimeUnit.NANOSECONDS.sleep(minOf(remaining, INTERFACE_POLL_NANOS))
             } catch (interrupted: InterruptedException) {

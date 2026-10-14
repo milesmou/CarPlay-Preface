@@ -13,3 +13,13 @@
 界面截图固定为 1920×720 横屏：常规密度与高密度／窄 dp 窗口均保持同一像素尺寸，字体比例 150%。本地截图目录为 `agent_docs/screenshots/manual-hotspot/`；主车机截图 `head-unit-1920x720-wireless-font150.png`、`head-unit-1920x720-manual-font150.png`，高密度截图 `high-density-1920x720-wireless-font150.png`、`high-density-1920x720-manual-font150.png`。使用已存在的设置行样式及对齐，高密度时新控件按文字内容增高以避免裁字，首页控件不采用这项改动。
 
 定向验证共 36 项通过：ManualHotspotReadinessTest 19 项、ManualHotspotConfigTest 5 项、ManualHotspotValidationTest 3 项、WirelessHotspotSettingsTest 6 项、WirelessHotspotModeSelectionTest 2 项、HostConnectionSettingsRefreshTest 1 项。覆盖两种管理器互斥选择、接口稳定／歧义／取消、凭据验证和精确保留、导出不含密码、已有会话不中断及下一次握手读取新设置。未执行全量 CI、Lint 或 APK 构建，不能替代真车验证。
+
+## 首次接入失败保留临时热点（2026-10-14）
+
+用户指出临时热点已创建但接入失败时反复创建新热点。原路径在首个 AirPlay TCP 超时后释放完整无线栈，页面随后重建控制器，又向 Android 申请新预约。现拆分启动失败清理与断开清理：首次会话尚未建立时保留有效 LocalOnlyHotspot 预约及其实际配置，清理蓝牙 bootstrap、Bonjour 和本轮 AirPlay 监听；重试仍由同一控制器拥有该预约和 MFi provider，不转移到全局缓存。
+
+自动重试、现有“重试连接”按钮和无设置变化的菜单返回恢复优先走此路径。每轮在后台调用 `validateReady()` 检查预约、接口及原地址；有效则复用原名称、密码和系统配置，已停止／接口或地址失效才释放并重新创建。慢速 Bonjour 清理不会阻塞 UI 的重试申请，排队重复申请和旧 generation 清理不能启动额外尝试或关闭新资源。断开、退出、切换连接方式及用户应用需要完整重连的设置仍按连接生命周期释放本应用预约；已建立过的会话不走这条首次启动重试路径，运行中的会话不因排队启动重试被中断。
+
+保留热点的通用控制通道错误也使用现有最多五次自动启动重试预算，不无限循环。次数用尽显示手动重试按钮，预约保留至明确断开；控制链路和监听已清理，此时手动加入 Wi-Fi 后仍须点击重试连接。日志记录预约保留、复用或失效重建的动作，不记录网络凭据，不猜测未知信道。手动车机热点的开启／关闭规则不变。
+
+本轮定向测试 34 项通过（common 21、shared 13），覆盖连续启动失败只创建一次、有效配置精确保留、失效替换、退出释放一次、旧清理与重复重试隔离、慢清理不阻塞、页面采用同一控制器、次数上限及成功会话保护。未运行全量 CI、Lint，未生成新 APK。报告设备仍为 IHU353G，参考固件身份和 SHA-256 仍为上文的 IHU519G/FS11A1 构建 327；这是工程修正，没有新增固件接口或实车验收证据，不能据此保证 iPhone 自动加入成功。

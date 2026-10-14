@@ -91,12 +91,12 @@ class AdaptiveSettingsUiTest {
     fun fullAdvancedWithoutExternalControllerLargeFontScreenshot() = captureAdvancedWithoutExternalController("full")
 
     @Test
-    @Config(sdk = [29], qualifiers = "zh-rCN-w360dp-h800dp-xhdpi")
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun compactVolumeWithoutPermissionButtonsLargeFontScreenshot() = captureAdvancedWithoutExternalController("compact", volume = true)
 
     @Test
-    @Config(sdk = [29], qualifiers = "zh-rCN-w1280dp-h720dp-mdpi")
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun fullVolumeWithoutPermissionButtonsLargeFontScreenshot() = captureAdvancedWithoutExternalController("full", volume = true)
 
@@ -113,12 +113,30 @@ class AdaptiveSettingsUiTest {
             for (id in listOf(R.string.wheel_keys_open_settings, R.string.wheel_keys_enable_adb)) {
                 assertFalse(texts(screen).any { it.text == screen.getString(id) })
             }
-            val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
-            scroll.scrollTo(0, scroll.getChildAt(0).height)
         }
-        val root = screen.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
+        val contentFrame = screen.findViewById<ViewGroup>(android.R.id.content)
+        val root = contentFrame.getChildAt(0)
+        if (volume) {
+            repeat(3) {
+                descendants(contentFrame).forEach { it.forceLayout() }
+                contentFrame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+                contentFrame.layout(0, 0, 1920, 720)
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+            assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+            assertEquals(1920, root.width)
+            assertEquals(720, root.height)
+            val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+            val target = texts(screen).first { it.text == screen.getString(R.string.settings_navigation_wheel_volume) }
+            val rect = android.graphics.Rect(0, 0, target.width, target.height)
+            scroll.offsetDescendantRectToMyCoords(target, rect)
+            scroll.scrollTo(0, rect.top)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
         val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
-        root.draw(android.graphics.Canvas(bitmap))
+        // Draw through the parent so a compact root ScrollView's own scroll is applied.
+        (if (volume) contentFrame else root).draw(android.graphics.Canvas(bitmap))
         val directory = java.io.File("../agent_docs/screenshots/" +
             if (volume) "remove-volume-permission-buttons" else "remove-external-controller").apply { mkdirs() }
         java.io.File(directory, "$size-font150.png").outputStream().use {

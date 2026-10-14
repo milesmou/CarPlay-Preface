@@ -199,6 +199,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     @Volatile private var backupServer: SettingsBackupServer? = null
     @Volatile private var backupEndpoint: SettingsBackupEndpoint? = null
     @Volatile private var backupSummary: String? = null
+    private var backupForReport = false
+    internal var backupAddresses: (String) -> List<String> = SettingsBackupServer::addressCandidates
     @Volatile private var updateGeneration = 0
     @Volatile private var updateProgress: Int? = null
     private var updateRelease: UpdateRelease? = null
@@ -324,6 +326,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             ?: SettingsCategory.CONNECTION
         connectionSettingsReturnCategory = savedInstanceState?.getString("connection_settings_return_category")
             ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
+        backupForReport = savedInstanceState?.getBoolean("backup_for_report") == true
         page = (savedInstanceState?.getString("page") ?: intent.getStringExtra("page"))
             ?.takeIf { it in setOf("home", "settings", "backup", "wireless-recovery") } ?: "home"
         render()
@@ -370,6 +373,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
+        outState.putBoolean("backup_for_report", backupForReport)
         outState.putString("settings_category", settingsCategory.name)
         connectionSettingsReturnCategory?.let { outState.putString("connection_settings_return_category", it.name) }
         outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup)
@@ -704,7 +708,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             page == "backup" -> {
                 stopBackupServer()
                 page = "settings"
-                settingsCategory = SettingsCategory.ABOUT
+                settingsCategory = if (backupForReport) SettingsCategory.DIAGNOSTICS else SettingsCategory.ABOUT
             }
             page == "connection" && returnCategory != null -> {
                 page = "settings"
@@ -1470,6 +1474,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             }.apply { isEnabled = !exportInProgress }
             card.addView(exportButton, matchButton(10, 60))
             card.addView(button(getString(R.string.choose_save_location), false) { chooseReportDestination() }, matchButton(10, 60))
+            card.addView(button(getString(R.string.settings_report_on_phone), false) { openBackup(report = true) }, matchButton(CONTROL_GAP_DP, CONTROL_HEIGHT_DP))
             val destination = getString(R.string.reports_save_to_downloads_diplay)
             card.addView(label(destination + getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden), 14, MUTED).apply { setPadding(0, dp(12), 0, 0) })
             toggle(card, getString(R.string.settings_fps_counter), getString(R.string.settings_fps_counter_description),
@@ -1861,7 +1866,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private enum class UpdateStage { IDLE, CHECKING, AVAILABLE, DOWNLOADING, VERIFYING, READY, FAILED }
 
-    private fun openBackup() {
+    private fun openBackup(report: Boolean = false) {
+        stopBackupServer()
+        backupForReport = report
         page = "backup"
         render()
     }
@@ -1871,10 +1878,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> "ap"
             WirelessHotspotMode.MANUAL -> "wlan"
         }
-        val addresses = SettingsBackupServer.addressCandidates(preferredPrefix)
-        content.addView(label(getString(R.string.backup_title), 40, TEXT, true))
+        val addresses = backupAddresses(preferredPrefix)
+        content.addView(label(getString(if (backupForReport) R.string.settings_report_on_phone else R.string.backup_title), if (isCompactLayout) 20 else 34, TEXT, true))
         var endpoint = backupEndpoint
-        if ((backupServer == null || endpoint == null) && addresses.isEmpty()) {
+        if (addresses.isEmpty()) {
+            stopBackupServer()
             content.addView(space(SETTINGS_BLOCK_GAP_DP))
             content.addView(label(getString(R.string.backup_no_network), 16, MUTED))
             return
@@ -1884,13 +1892,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 page = backupPageHtml(),
                 export = { SettingsBackupCodec.export(this, version()) },
                 import = { SettingsBackupCodec.import(this, it) },
+                report = { buildDiagnosticReport().toByteArray(Charsets.UTF_8) },
+                codePage = assets.open("settings-code.html").use { it.readBytes() },
             )
+            created.landing = if (backupForReport) "#report" else ""
+            created.onCodeEntryClosed = { runOnUiThread { if (backupServer === created && !isFinishing && !isDestroyed) render() } }
             created.onIdle = {
                 runOnUiThread {
                     if (isFinishing || isDestroyed || backupServer !== created) return@runOnUiThread
                     stopBackupServer()
                     page = "settings"
-                    settingsCategory = SettingsCategory.ABOUT
+                    settingsCategory = if (backupForReport) SettingsCategory.DIAGNOSTICS else SettingsCategory.ABOUT
                     render()
                 }
             }
@@ -1915,26 +1927,40 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             backupSummary = null
         }
         val active = endpoint
+        val qrSide = minOf(BACKUP_QR_MAX_DP,
+            (resources.configuration.screenHeightDp - BACKUP_QR_WINDOW_RESERVE_DP).coerceAtLeast(BACKUP_QR_MIN_DP))
         val qr = ImageView(this).apply {
-            val side = dp(240)
-            setImageBitmap(SettingsQrCode.encode(active.url(addresses.first()), side))
+            setImageBitmap(SettingsQrCode.encode(active.url(addresses.first()) + if (backupForReport) "#report" else "", dp(qrSide)))
+            contentDescription = getString(if (backupForReport) R.string.settings_report_on_phone else R.string.backup_title)
             scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        val instructions = column().apply {
+            addView(label(getString(if (backupForReport) R.string.settings_report_on_phone_hint else R.string.backup_page_hint), 16, MUTED))
+            addView(label(if (backupServer?.codeEntryOpen == true)
+                getString(R.string.backup_type_address, active.typedAddress(addresses.first()), active.code)
+                else getString(R.string.backup_code_entry_closed), 16, TEXT).apply {
+                setTextIsSelectable(true)
+                setPadding(0, dp(SETTINGS_BLOCK_GAP_DP), 0, 0)
+            })
+            backupSummary?.let { addView(label(it, 15, TEXT)) }
+            if (addresses.size > 1) addView(label(addresses.drop(1).joinToString("\n") {
+                getString(R.string.backup_other_addresses, it)
+            }, 14, MUTED))
         }
         content.addView(space(SETTINGS_BLOCK_GAP_DP))
         content.addView(card().apply {
-            addView(label(getString(R.string.backup_page_hint), 16, MUTED))
-            addView(qr, LinearLayout.LayoutParams(dp(240) + dp(24), dp(240) + dp(24)).apply {
-                topMargin = dp(SETTINGS_BLOCK_GAP_DP); gravity = Gravity.CENTER_HORIZONTAL
-            })
-            backupSummary?.let {
-                addView(label(it, 15, TEXT).apply { setPadding(0, dp(16), 0, 0) })
-            }
-            if (addresses.size > 1) {
-                addView(label(
-                    addresses.drop(1).joinToString("\n") { getString(R.string.backup_other_addresses, it) },
-                    14,
-                    MUTED,
-                ).apply { setPadding(0, dp(16), 0, 0) })
+            if (isCompactLayout) setPadding(dp(CONTROL_GAP_DP), dp(CONTROL_GAP_DP), dp(CONTROL_GAP_DP), dp(CONTROL_GAP_DP))
+            if (resources.configuration.screenWidthDp >= HOME_COLUMNS_MIN_WIDTH_DP) {
+                addView(row().apply {
+                    gravity = if (isCompactLayout) Gravity.TOP else Gravity.CENTER_VERTICAL
+                    addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)))
+                    addView(instructions, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                        marginStart = dp(SETTINGS_BLOCK_GAP_DP)
+                    })
+                })
+            } else {
+                addView(qr, LinearLayout.LayoutParams(dp(qrSide), dp(qrSide)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+                addView(instructions, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(SETTINGS_BLOCK_GAP_DP) })
             }
         })
     }
@@ -2719,28 +2745,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             .show()
     }
 
-    /** Optional guidance-volume routing through the existing wheel service. */
+    /** E02 volume routing uses the system input observer; accessibility is not a prerequisite. */
     private fun navigationWheelControls(card: LinearLayout) {
         toggle(card, getString(R.string.settings_navigation_wheel_volume), getString(R.string.settings_navigation_wheel_volume_description),
             NavigationWheelSettings.enabled(this)) {
             NavigationWheelSettings.setEnabled(this, it)
             render()
         }
-        if (!NavigationWheelSettings.enabled(this) || WheelKeyService.connected()) return
-        card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
-            if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
-        }, matchButton(10, 56))
-        card.addView(button(getString(R.string.wheel_keys_enable_adb), false) {
-            Thread({
-                val access = WheelKeyService.enableOverAdb(this)
-                runOnUiThread {
-                    if (access != com.shilapi.xcertplay.adb.LocalAdb.Access.READY) {
-                        toast(getString(R.string.wheel_keys_adb_failed, access.name))
-                    }
-                    render()
-                }
-            }, "diplay-navigation-wheel-enable").start()
-        }, matchButton(10, 56))
     }
 
     /** Steering-wheel keys for the dashboard map zoom and the CarPlay joystick: the switches, the key service and the keys. */
@@ -3474,6 +3485,52 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         runCatching { export.launch(reportFileName()) }.onFailure { exportDiagnostics() }
     }
 
+    private fun buildDiagnosticReport(): String {
+        val appContext = applicationContext
+        return buildString {
+            appendLine("DiPlay ${version()} · private beta diagnostic report")
+            appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
+            appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
+            appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")
+            AirPlayPersistence.loadUsbChargingCurrent(appContext).let {
+                appendLine("USB charging offer: ${it.key} (${it.milliAmps} mA)")
+            }
+            appendLine("Authentication: local experimental beta identity; no remote fallback")
+            appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
+            appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
+            appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
+            appendLine(CarPlayMediaKeys.report())
+            appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
+            appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
+            appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
+            appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
+            appendLine(PhoneWakeDiagnostics.report(appContext))
+            appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
+            appendLine()
+            appendLine("--- Last display negotiation (timestamps distinguish it from current settings) ---")
+            appendLine(DisplayDiagnosticSnapshot.report(appContext))
+            appendLine()
+            appendLine("--- Last received boot and app-launch result ---")
+            appendLine(StartupDiagnosticSnapshot.report(appContext))
+            appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
+                "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
+            appendLine(WheelKeyService.report(appContext))
+            appendLine()
+            appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
+            appendLine()
+            appendLine("--- Recent own-app process exits (Android 11+) ---")
+            appendLine(ProcessExitDiagnostics.report(appContext))
+            appendLine()
+            for (name in SessionLogFile.REPORT_NAMES) {
+                val file = File(appContext.filesDir, "logs/$name")
+                if (file.isFile) {
+                    appendLine("--- $name ---")
+                    file.useLines { lines -> lines.forEach { line -> DiagnosticRedactor.redact(line)?.let { appendLine(it) } } }
+                }
+            }
+        }
+    }
+
     private fun exportDiagnostics(uri: Uri? = null) {
         if (exportInProgress) return
         exportInProgress = true
@@ -3482,47 +3539,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val fileName = reportFileName()
         Thread({
             val result = runCatching {
-                val report = buildString {
-                    appendLine("DiPlay ${version()} · private beta diagnostic report")
-                    appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
-                    appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
-                    appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")
-                    AirPlayPersistence.loadUsbChargingCurrent(appContext).let {
-                        appendLine("USB charging offer: ${it.key} (${it.milliAmps} mA)")
-                    }
-                    appendLine("Authentication: local experimental beta identity; no remote fallback")
-                    appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
-                    appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
-                    appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
-                    appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
-                    appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
-                    appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
-                    appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
-                    appendLine(PhoneWakeDiagnostics.report(appContext))
-                    appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
-                    appendLine()
-                    appendLine("--- Last display negotiation (timestamps distinguish it from current settings) ---")
-                    appendLine(DisplayDiagnosticSnapshot.report(appContext))
-                    appendLine()
-                    appendLine("--- Last received boot and app-launch result ---")
-                    appendLine(StartupDiagnosticSnapshot.report(appContext))
-                    appendLine("Startup settings: openAfterBoot=${AirPlayPersistence.loadAutoStartOnBoot(appContext)} " +
-                        "connectWhenOpened=${DiPlayPreferences.autoConnect(appContext)}")
-                    appendLine(WheelKeyService.report(appContext))
-                    appendLine()
-                    appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
-                    appendLine()
-                    appendLine("--- Recent own-app process exits (Android 11+) ---")
-                    appendLine(ProcessExitDiagnostics.report(appContext))
-                    appendLine()
-                    for (name in SessionLogFile.REPORT_NAMES) {
-                        val file = File(appContext.filesDir, "logs/$name")
-                        if (file.isFile) {
-                            appendLine("--- $name ---")
-                            file.useLines { lines -> lines.forEach { line -> DiagnosticRedactor.redact(line)?.let { appendLine(it) } } }
-                        }
-                    }
-                }
+                val report = buildDiagnosticReport()
                 val savedReport = if (uri != null) {
                     DiagnosticExportStore.write(appContext.contentResolver, uri, report)
                     DiagnosticExportStore.SavedReport(uri)
@@ -4198,6 +4215,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         private const val VALUE_SEPARATOR = " · "
         private const val SEARCH_HIGHLIGHT_MILLIS = 900L
         private const val SPACER = "spacer"
+        private const val BACKUP_QR_MAX_DP = 240
+        private const val BACKUP_QR_MIN_DP = 96
+        private const val BACKUP_QR_WINDOW_RESERVE_DP = 144
         private const val HOME_HEADER_GAP_DP = 8
         private const val HOME_COMPACT_CARD_PADDING_DP = 12
         private const val HOME_COLUMNS_MIN_WIDTH_DP = 600

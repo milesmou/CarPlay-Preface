@@ -66,6 +66,10 @@ HiCarHMI 的 `HiCarService` 注册 `ECarXInteractiveListener`，回调 `v.onKeyE
 
 这是基于构建 327 静态证据的修复候选，尚未验证普通第三方 APK 的接口访问权限、系统拦截是否阻止原车播放器启动及实车长按行为。接口请求返回只记录为 requested，不当作按键已到达或实车修复成功。待验证：前台和后台一次切一曲；暂停后仍可切歌；切回收音机后方控归原车；通话和车载蓝牙优先；退出／断开释放；缺少接口时应用不崩溃。
 
+### 2026-10-14 最新报告后的物理切歌拦截候选
+
+IHU353G 用户报告仍出现切歌成功但打开原车多媒体页。工程在原标准键请求中加入物理 304/305，通过同一观察者处理；扩展请求被拒绝时先释放再回退标准集合，最终失败保留广播处理。映射证据为本文件指定 OTA 的 `KeyMapAdapterApi.java:94–97`。这是新的工程候选，HiCar SDK 的原请求没有这两键；不作为第三方权限或阻止原车跳页的确认。申请、收到按键、焦点和播放／暂停命令现在进入会话诊断，详细时序、报告 SHA-256 与验证限制见 [第四份连接报告](CONNECTION_REPORT_2026-10-14.md)。
+
 ### 其他按钮与语音审查
 
 | 按钮／功能 | 同一固件静态证据 | 工程处理 |
@@ -102,6 +106,10 @@ HiCarHMI 的 `HiCarService` 注册 `ECarXInteractiveListener`，回调 `v.onKeyE
 证据仍为本文件指定 SHA-256 的 IHU519G/FS11A1 构建 327：`decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVolumeAdjustActionBase.java:46–62`、`ECarXKeyActionBase.java:34–57` 和 `decompiled/interactive/sources/com/ecarx/interactive/support/ECarXInteractiveInputManagerServiceUtil.java:26–34`。HiCar SDK 的请求列表没有音量键；301/302 是本项目新增的请求候选，不能描述为 HiCar 已确认的音量拦截用法。
 
 定向测试覆盖播放／暂停选择、未知状态、无播报预调、实际路由、长按及排队回调、拒绝访问后保留媒体键、开关与无障碍服务按键配对。尚待真车验证：第三方能否获得 301/302，拦截是否阻止原厂同步调节，音量 3/12 的独立效果，以及长按、Siri、通话、切回收音机和断开后的交接。申请成功仅记为 requested，不代表实车成功。
+
+2026-10-14 设置说明修正：星瑞方控音量路径使用上述系统输入观察者，ADB 与无障碍服务不是该功能的前提。删除这张音量卡片中的无障碍设置和 ADB 启用按钮，说明只保留播放／暂停选流、系统音量、优先交接与接口拒绝时原车处理。标准音量键的可选无障碍后台路径及其他自定义按键功能不作为星瑞方控音量的授权要求；原系统输入接口及其访问检查未变，实车拦截效果仍待验证。
+
+本轮 3 项定向检查通过：普通／紧凑布局均以 1920×720 横屏、字体比例 150% 渲染，并确认此卡片没有两个授权入口；现存中文资源同步与占位符检查通过。截图位于本地忽略目录 `agent_docs/screenshots/remove-volume-permission-buttons/{compact,full}-font150.png`，已视觉核对。没有运行全量 CI 或生成新 APK。
 
 ## 可复核的本地证据
 

@@ -5,7 +5,7 @@ import android.view.KeyEvent
 /**
  * Hardware media keys → CarPlay media HID presses (indices into [AirPlayHid]'s media report).
  *
- * Hardware play and pause keys map to the toggle; media controllers use explicit [PLAY] and [PAUSE].
+ * Explicit play and pause keep their intent; only combined play/pause keys toggle.
  */
 object CarPlayMediaButton {
     const val PLAY = 1
@@ -21,8 +21,8 @@ object CarPlayMediaButton {
     fun forKeyCode(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_MEDIA_NEXT -> NEXT
         KeyEvent.KEYCODE_MEDIA_PREVIOUS -> PREVIOUS
-        KeyEvent.KEYCODE_MEDIA_PLAY,
-        KeyEvent.KEYCODE_MEDIA_PAUSE,
+        KeyEvent.KEYCODE_MEDIA_PLAY -> PLAY
+        KeyEvent.KEYCODE_MEDIA_PAUSE -> PAUSE
         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
         KeyEvent.KEYCODE_HEADSETHOOK -> PLAY_PAUSE
         else -> null

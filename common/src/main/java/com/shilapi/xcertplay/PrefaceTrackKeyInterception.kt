@@ -12,6 +12,7 @@ internal class PrefaceTrackKeyInterception(
     private val backend: Backend,
     private val siri: () -> Unit = {},
     private val volume: (Boolean, Int) -> Unit = { _, _ -> },
+    private val diagnostic: (String) -> Unit = {},
     private val send: (Int) -> Unit,
 ) {
     internal interface Backend {
@@ -26,6 +27,8 @@ internal class PrefaceTrackKeyInterception(
     private var requestedVolume = false
     private var generation = 0L
     private val held = mutableSetOf<Int>()
+
+    fun report(): String = "Track interception requested=$requested volumeRequested=$requestedVolume unavailable=$failed volumeUnavailable=$volumeFailed"
 
     fun update(eligible: Boolean, volumeKeys: Boolean = false) {
         val withVolume = eligible && volumeKeys && !volumeFailed
@@ -55,7 +58,10 @@ internal class PrefaceTrackKeyInterception(
                             else -> return@request
                         }
                         if (down) {
-                            if (held.add(index)) send(index)
+                            if (held.add(index)) {
+                                diagnostic("Wheel interception received key=$key down=true")
+                                send(index)
+                            }
                         } else held.remove(index)
                     }
                 }, withVolume)
@@ -65,11 +71,13 @@ internal class PrefaceTrackKeyInterception(
                 if (withVolume) {
                     volumeFailed = true
                     Log.w("DiPlay-MediaKeys", "Volume interception unavailable; retaining vehicle volume and retrying media/voice keys", error)
+                    diagnostic("Wheel volume interception unavailable failureClass=${error.cause?.javaClass?.simpleName ?: error.javaClass.simpleName}; retrying media keys")
                     update(eligible, false)
                     return
                 }
                 failed = true
                 Log.w("DiPlay-MediaKeys", "Preface track interception unavailable; using media broadcasts", error)
+                diagnostic("Wheel interception unavailable failureClass=${error.cause?.javaClass?.simpleName ?: error.javaClass.simpleName}; using media broadcasts")
             }
         } else close()
     }
@@ -80,8 +88,13 @@ internal class PrefaceTrackKeyInterception(
         requestedVolume = false
         generation++
         held.clear()
+        diagnostic("Wheel interception release requested")
         runCatching { backend.release() }
-            .onFailure { Log.w("DiPlay-MediaKeys", "Preface track interception release failed", it) }
+            .onSuccess { diagnostic("Wheel interception released") }
+            .onFailure {
+                Log.w("DiPlay-MediaKeys", "Preface track interception release failed", it)
+                diagnostic("Wheel interception release failed failureClass=${it.cause?.javaClass?.simpleName ?: it.javaClass.simpleName}")
+            }
     }
 }
 
@@ -92,6 +105,7 @@ internal class PrefaceTrackKeyInterception(
  */
 internal class PrefaceInputInterceptionBackend(
     private val deliver: (() -> Unit) -> Unit,
+    private val diagnostic: (String) -> Unit = {},
 ) : PrefaceTrackKeyInterception.Backend {
     private var release: (() -> Unit)? = null
 
@@ -132,12 +146,18 @@ internal class PrefaceInputInterceptionBackend(
             ?: error("System input interface unavailable")
         val abandon = inputType.getMethod("abandonKeysInterception", observerType)
         release = { abandon.invoke(manager, observer) }
-        val keys = intArrayOf(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+        val standardKeys = intArrayOf(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 298) +
             if (volumeKeys) intArrayOf(301, 302) else intArrayOf()
-        inputType.getMethod("requestKeysInterception", IntArray::class.java, observerType)
-            .invoke(manager, keys, observer)
+        // 304/305 precede the OEM's ordinary media broadcast. Receiving that broadcast cannot
+        // prevent the OEM player from opening. Request both physical and standard track codes
+        // through the same observer; firmware that rejects the expanded request keeps the SDK set.
+        val request = inputType.getMethod("requestKeysInterception", IntArray::class.java, observerType)
+        val keys = requestPrefaceTrackKeys(standardKeys,
+            request = { request.invoke(manager, it, observer) },
+            abandon = { abandon.invoke(manager, observer) }, diagnostic = diagnostic)
         Log.i("DiPlay-MediaKeys", "Preface interception requested (${keys.joinToString()}); vehicle validation pending")
+        diagnostic("Wheel interception requested keys=${keys.joinToString(",")} receiptNotYetConfirmed=true")
     }
 
     override fun release() {
@@ -145,5 +165,20 @@ internal class PrefaceInputInterceptionBackend(
         action()
         release = null
         Log.i("DiPlay-MediaKeys", "Preface track interception released")
+    }
+}
+
+/** A rejected expanded request is released before retrying the reference SDK's key set. */
+internal fun requestPrefaceTrackKeys(standardKeys: IntArray, request: (IntArray) -> Unit,
+    abandon: () -> Unit, diagnostic: (String) -> Unit): IntArray {
+    val expanded = standardKeys + intArrayOf(304, 305)
+    try {
+        request(expanded)
+        return expanded
+    } catch (error: java.lang.reflect.InvocationTargetException) {
+        abandon()
+        diagnostic("Wheel physical interception request rejected failureClass=${error.cause?.javaClass?.simpleName}; retrying standard keys")
+        request(standardKeys)
+        return standardKeys
     }
 }

@@ -6,6 +6,10 @@ import android.view.View
 import android.widget.Button
 import com.shilapi.xcertplay.network.WirelessStartupFailure
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
+import com.shilapi.xcertplay.orchestration.CarPlayController
+import com.shilapi.xcertplay.airplay.AirPlaySession
+import org.mockito.Mockito.*
+import java.time.Duration
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -13,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
@@ -100,5 +105,46 @@ class WirelessStartupRecoveryTest {
         ReflectionHelpers.setField(CarPlayBackgroundSession, "owner", Any())
         report()
         assertEquals(0, budget().retries)
+    }
+
+    @Test fun timeoutRetriesOnTheSameControllerWithoutClosingItAndAllowsNextFailure() {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        `when`(controller.retryWirelessStartup()).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        report()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        verify(controller).retryWirelessStartup()
+        verify(controller, never()).close()
+        assertSame(controller, ReflectionHelpers.getField(activity, "controller"))
+        assertEquals(-1, ReflectionHelpers.getField<Int>(activity, "startupFailureGeneration"))
+        report()
+        assertEquals(2, budget().retries)
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+    }
+
+    @Test fun genericControlFailuresWithRetainedHotspotAlsoStopAtTheStartupBudget() {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        repeat(6) {
+            ReflectionHelpers.setField(activity, "reconnectScheduled", false)
+            report(status = CarPlayStatus.Failed("control channel closed"))
+        }
+        assertEquals(5, budget().retries)
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        verify(controller, never()).close()
+    }
+
+    @Test fun aSessionThatConnectsBeforeQueuedStartupRetryIsNotInterrupted() {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        report()
+        ReflectionHelpers.setField(activity, "activeAirPlaySession", mock(AirPlaySession::class.java))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        verify(controller, never()).retryWirelessStartup()
+        verify(controller, never()).close()
     }
 }

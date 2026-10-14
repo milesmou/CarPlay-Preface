@@ -1228,7 +1228,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 startupRetryStopped = false
                 reconnectAttempts = 0
                 visibility = View.GONE
-                restartCarPlay(getString(R.string.connecting_to_your_iphone))
+                retryStartupOrRestart(getString(R.string.connecting_to_your_iphone))
             }
             startupRetryButton = this
         }
@@ -3973,6 +3973,7 @@ class CarPlayHostActivity : ComponentActivity() {
         videoWidth: Int,
         videoHeight: Int,
         controllerGeneration: Int,
+        mediaOwner: Any,
     ): AndroidMediaSink {
         // Capture this session's log: late decoder shutdown must not write into a new session.
         val diagnosticLog = sessionLog
@@ -3999,7 +4000,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     diagnosticLog?.append(formattedLogLine(message, System.currentTimeMillis()))
                 }
             },
-            onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
+            onMediaAudioChanged = { active -> CarPlayMediaKeys.onMediaAudioChanged(active, mediaOwner) },
             callEchoCancellation = AirPlayPersistence.loadCallEchoCancellation(this),
             callVoiceFilter = AirPlayPersistence.loadCallVoiceFilter(this),
             // Only a SurfaceView honours release timestamps; smooth video always selects one.
@@ -4160,6 +4161,10 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.currentAttempt(this)
         controller = snapshot.controller
+        val adoptedMediaLog = sessionLog
+        CarPlayMediaKeys.updateForeground(snapshot.controller, diagnostic = { AsyncDiagnosticLog.append(adoptedMediaLog, it) }) {
+            hasWindowFocus() && activeAirPlaySession != null && !menuOpen
+        }
         updateClusterMapShown()
         sink = snapshot.sink
         sessionDisplay = snapshot.display
@@ -4261,10 +4266,12 @@ class CarPlayHostActivity : ComponentActivity() {
                 "location=${config.locationReportingEnabled} " +
                 "mfi=${config.mfiTarget}",
         )
+        val mediaOwner = Any()
         val renderer = createMediaSink(
             videoWidth = airPlayConfig.main.widthPixels,
             videoHeight = airPlayConfig.main.heightPixels,
             controllerGeneration = controllerGeneration,
+            mediaOwner = mediaOwner,
         )
         sink = renderer
         currentSurface?.let(::attachSurface)
@@ -4290,7 +4297,10 @@ class CarPlayHostActivity : ComponentActivity() {
         controller = next
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
-        CarPlayMediaKeys.attach(this, next) { hasWindowFocus() && activeAirPlaySession != null && !menuOpen }
+        val mediaDiagnosticLog = sessionLog
+        CarPlayMediaKeys.attach(this, next, diagnostic = { AsyncDiagnosticLog.append(mediaDiagnosticLog, it) }, mediaOwner = mediaOwner) {
+            hasWindowFocus() && activeAirPlaySession != null && !menuOpen
+        }
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
@@ -4627,12 +4637,13 @@ class CarPlayHostActivity : ComponentActivity() {
         if (menuOpen) recoveryPendingAfterMenu = true
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || startupRetryStopped) return
         if (reconnectScheduled) return
-        val startupDelay = if (startupFailure != null && startupFailure.retryable)
+        val retainedStartup = startupFailure?.retryable != false && controller?.canRetryWirelessStartup() == true
+        val startupDelay = if ((startupFailure != null && startupFailure.retryable) || retainedStartup)
             startupRetryBudget.nextDelayMillis() else null
-        if (startupFailure != null && startupDelay == null) {
+        if ((startupFailure != null || retainedStartup) && startupDelay == null) {
             startupRetryStopped = true
             startupRetryButton?.visibility = View.VISIBLE
-            if (!startupFailure.retryable) {
+            if (startupFailure?.retryable == false) {
                 setConnectionStage(reason, englishReason)
             } else {
                 setConnectionStage("$reason\n${getString(R.string.wireless_startup_retries_exhausted)}",
@@ -4664,10 +4675,21 @@ class CarPlayHostActivity : ComponentActivity() {
                 ) {
                     return@postDelayed
                 }
-                restartCarPlay("Reconnecting after $reason")
+                if ((retainedStartup || startupFailure != null) && activeAirPlaySession != null) return@postDelayed
+                retryStartupOrRestart("Reconnecting after $reason")
             },
             delayMillis,
         )
+    }
+
+    private fun retryStartupOrRestart(reason: String) {
+        if (!CarPlayBackgroundSession.isOwner(this) || shuttingDown.get() || menuOpen || handshakeResetInProgress) return
+        if (controller?.retryWirelessStartup() == true) {
+            startupFailureGeneration = -1
+            startupRetryButton?.visibility = View.GONE
+            setConnectionStage(reason)
+            appendLog("$reason; retrying wireless startup with the same temporary hotspot")
+        } else restartCarPlay(reason)
     }
 
     /** Full-stack fallback when an AirPlay-only reconnect is unavailable. */
@@ -4855,7 +4877,8 @@ class CarPlayHostActivity : ComponentActivity() {
         } else if (handshakeResetInProgress) {
             startAfterHandshakeReset = true
         } else if ((reconnect || recoveryPending) && controller != null) {
-            restartCarPlay(if (reconnect) "Settings saved; reconnecting" else "Connection lost while settings were open; reconnecting")
+            if (reconnect) restartCarPlay("Settings saved; reconnecting")
+            else retryStartupOrRestart("Connection lost while settings were open; reconnecting")
         } else {
             maybeStartCarPlay()
         }

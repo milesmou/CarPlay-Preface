@@ -133,7 +133,15 @@
     "interface": "android.hardware.input.IInputManager.requestKeysInterception",
     "callback": "android.hardware.input.IKeyEventObserver.onKeyEvent(boolean,int)",
     "hicarRequestedKeys": [298, 85, 86, 87, 88, 89, 90, 5, 6, 19, 20, 21, 22, 23],
-    "applicationRequestedKeys": [85, 87, 88, 298],
+    "applicationRequestedKeys": [85, 87, 88, 298, 304, 305],
+    "applicationPhysicalTrackRequest": {
+      "updatedAt": "2026-10-14",
+      "verification": "implementation_candidate_only_vehicle_validation_pending",
+      "standardOnlyFallbackOnRejection": [85, 87, 88, 298],
+      "physicalKeyMappingEvidence": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/impl/KeyMapAdapterApi.java:94-97",
+      "hicarSdkRequestsPhysicalTrackKeys": false,
+      "blocksOemMediaBroadcastOnReportedIhu353g": "not_verified"
+    },
     "thirdPartyAccess": "not_verified",
     "preventsOriginalPlayerLaunch": "requires_vehicle_validation"
   },

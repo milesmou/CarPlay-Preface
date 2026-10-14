@@ -37,12 +37,19 @@ class CarPlayMediaCallbackTest {
     }
 
     @Test
-    fun hardwarePlayAndPauseKeysToggle() {
+    fun hardwarePlayAndPauseKeepTheirExplicitIntent() {
         press(KeyEvent.KEYCODE_MEDIA_PLAY)
         press(KeyEvent.KEYCODE_MEDIA_PAUSE)
         press(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
 
-        assertEquals(List(3) { CarPlayMediaButton.PLAY_PAUSE }, sent)
+        assertEquals(listOf(CarPlayMediaButton.PLAY, CarPlayMediaButton.PAUSE, CarPlayMediaButton.PLAY_PAUSE), sent)
+    }
+
+    @Test fun repeatedExplicitPlayRequestsNeverBecomePauseToggles() {
+        press(KeyEvent.KEYCODE_MEDIA_PLAY)
+        callback.onPlay()
+        press(KeyEvent.KEYCODE_MEDIA_PLAY)
+        assertEquals(List(3) { CarPlayMediaButton.PLAY }, sent)
     }
 
     @Test

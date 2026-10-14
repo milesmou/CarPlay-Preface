@@ -15,10 +15,39 @@
   "sources": [
     { "filename": "diplay-report.txt", "sha256": "94ab43b8a497c023d4dae6a044c2d62bc43c669bfe407051611f73ff61ed6626" },
     { "filename": "diplay-report 2.txt", "sha256": "f0cf86482b4001af058328be6a37b1b31dc739559028f72bc467e73e68c962be" },
-    { "filename": "diplay-report 3.txt", "sha256": "7108252b2de8d7ce187b3ad7bb00ad8b256007c2432577a2af5edec2d6976327" }
+    { "filename": "diplay-report 3.txt", "sha256": "7108252b2de8d7ce187b3ad7bb00ad8b256007c2432577a2af5edec2d6976327" },
+    { "filename": "DiPlay-20261014-161345-239.txt", "sha256": "1eb37e53ac96a75c1fc2e7416998168e337d6b6db76ea3d8f6bfed8156678514" }
   ],
   "localEvidenceRoot": "agent_docs/diagnostics/connection-2026-10-14",
+  "codeAuditAfterBuild56": {
+    "verification": "code_and_targeted_regression_tests_only_no_new_vehicle_report",
+    "includedInApkBuild56": false,
+    "hardwarePlayPauseMapping": "Explicit PLAY and PAUSE retain separate HID intents; OEM combined key remains a toggle",
+    "retiredMediaSessionCallbacks": "Rejected before reaching replacement controller or receiver",
+    "retiredAudioNotifications": "Per-renderer owner checked again at main-thread delivery",
+    "backgroundAdoption": "Refreshes foreground ownership and media diagnostic destination while retaining audio owner",
+    "transportCommandCaller": "System-reported package only on API 28+; no PID or UID",
+    "automaticPauseRootCause": "unconfirmed"
+  },
+  "temporaryHotspotStartupRecovery": {
+    "updatedAt": "2026-10-14",
+    "verification": "implementation_and_targeted_tests_only_vehicle_validation_pending",
+    "includedInApkBuild56": false,
+    "reservationOwner": "same CarPlayController across pre-session startup retries",
+    "validReservation": "retained with exact system-assigned credentials",
+    "invalidReservation": "released and recreated only after readiness validation fails",
+    "automaticStartupRetryLimit": 5,
+    "afterRetryExhaustion": "reservation retained until disconnect; user must retry connection after joining Wi-Fi",
+    "disconnect": "releases only the application's reservation",
+    "establishedSession": "excluded from pre-session retry path",
+    "documentation": "docs/MANUAL_HOTSPOT.md",
+    "iphoneAutomaticJoining": "not_verified"
+  },
   "observations": [
+    { "source": "DiPlay-20261014-161345-239.txt", "lines": [1772, 1789, 1820, 1860, 1872, 1900, 1903], "fact": "LocalOnlyHotspot session authenticated and accepted first TCP 28570 ms after StartSession; video rendered at requested decoder operating rate 30. User reports manually joining this hotspot." },
+    { "source": "DiPlay-20261014-161345-239.txt", "lines": [2589, 2637, 2832, 2860], "fact": "Later manual hotspot session used requested rate and decoder operating rate 60; channel remained unknown. This disproves a universal 30 fps cap but is not a measured sustained 60 fps claim." },
+    { "source": "DiPlay-20261014-161345-239.txt", "lines": [1911, 1915, 2872, 2873], "fact": "Both established sessions completed tunneled iAP2 authentication and released Bluetooth RFCOMM bootstrap; this says nothing about A2DP/HFP disconnection." },
+    { "source": "DiPlay-20261014-161345-239.txt", "fact": "Report does not contain media-key focus owner transitions, interception success/failure or outbound pause command origins; wheel-driven OEM page launch and automatic pause are user observations with cause unconfirmed." },
     { "source": "diplay-report 3.txt", "lines": [2618, 2651, 2660, 2672], "fact": "USB StartSession sent while announced IPv6 address was tentative; address later became ready and neighbor reachable, but no AirPlay TCP accepted." },
     { "source": "diplay-report 3.txt", "timestamps": ["12:30:15.963", "12:34:58.287", "12:35:37.068"], "fact": "Current wireless attempts reached hotspot ready and sent Wi-Fi credentials but did not establish AirPlay; USB fallback VPN consent activity launch failed." },
     { "source": "diplay-report.txt", "lines": [728, 733, 758, 794, 796], "fact": "Wireless AirPlay session established, first video frame and subsequent rendering recorded." },
@@ -26,5 +55,5 @@
     { "source": "diplay-report 2.txt", "timestamps": ["11:17:09.578", "11:17:09.997", "11:17:10.074", "11:17:40.158"], "fact": "USB authentication succeeded and system usb0 listener attached, but no AirPlay session before fallback timeout." },
     { "source": "diplay-report 2.txt", "timestamps": ["11:17:40.166", "11:17:40.428", "11:17:40.435"], "fact": "VPN consent activity launch failed with ActivityNotFoundException; ADB authorization unreachable; connection failed." }
   ],
-  "pendingValidation": ["Initial wireless abort cause", "Wireless current hotspot visibility and manual/automatic joining", "USB first TCP after address readiness check", "USB packet types, routing and filtering", "VPN authorization component availability"]
+  "pendingValidation": ["Initial wireless abort cause", "Wireless current hotspot visibility and manual/automatic joining", "AP driver frequency query result after bounded retry", "Physical track interception permission and OEM page suppression", "Automatic pause source and audio focus / Bluetooth interaction", "Saved versus active frame rate after changing settings", "USB first TCP after address readiness check", "USB packet types, routing and filtering", "Historical VPN authorization component availability; current application has no VPN fallback"]
 }
