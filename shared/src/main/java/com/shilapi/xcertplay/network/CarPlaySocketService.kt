@@ -106,9 +106,11 @@ class CarPlaySocketService : Service() {
         mfi: MfiAuthenticator?,
         listener: AirPlaySessionListener,
         media: AirPlayMediaHandler,
+        listenerIdentity: AirPlayListenerIdentity? = null,
     ): AttachResult {
         require(bindAddress.isLinkLocalAddress && bindAddress.scopeId > 0)
-        return attachWireless(bindAddress, config, identity, pairings, mfi, listener, media)
+        return attachWireless(bindAddress, config, identity, pairings, mfi, listener, media,
+            listenerIdentity = listenerIdentity)
     }
 
     /** Releases the active AirPlay listener and its sessions. */

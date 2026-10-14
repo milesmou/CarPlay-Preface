@@ -78,6 +78,7 @@ class DiagnosticRedactorTest {
             "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false ipv6Neighbors=1 incomplete=0 failed=1 reachable=0 stale=0",
             "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=true sampleAgeMs=5000 rx_packets=42 rx_packetsDelta=10",
             "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB snapshot cached=false neighbors=unavailable failureClass=IOException",
+            "CONNECTION_DIAGNOSTIC attempt=22 run=1 phase=CONTROL system USB endpoint announcementMatchesBind=true portMatchesBind=true announcedPort=7000 scopedBind=true",
         )
         for (line in lines) assertEquals(line, DiagnosticRedactor.redact(line))
     }

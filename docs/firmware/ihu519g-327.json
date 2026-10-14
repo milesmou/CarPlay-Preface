@@ -98,12 +98,12 @@
     "updatedAt": "2026-10-14",
     "verification": "implementation_and_targeted_tests_only_vehicle_validation_pending",
     "primary": "system_usb_ncm_network",
-    "fallback": "application_scoped_ipv6_vpn_ncm_bridge",
+    "fallback": "none",
     "systemUsbDriverSupport": "not_verified",
     "ownershipCheck": "sysfs_busnum_devnum_and_ncm_interface_number",
     "discoveryTimeoutMillis": 2000,
     "airPlayStartupTimeoutMillis": 30000,
-    "vpnConsent": "on_fallback_only",
+    "vpnConsent": "not_requested",
     "fallbackAfterEstablishedSession": false,
     "startupDiagnostics": {
       "verification": "implementation_and_targeted_tests_only_reported_device_validation_pending",
@@ -114,6 +114,7 @@
       "fields": ["interface_ownership_driver_and_state", "endpoint_matches_bind", "ipv6_address_flags", "proc_ipv6_routes", "neighbor_state_counts", "tcp_listener_and_handshake_counts", "rx_tx_counters_and_deltas", "iap2_start_to_tcp_and_session_timing"],
       "unavailableSourceIsNotZero": true,
       "finalSnapshotIsCachedWithAge": true,
+      "afterBuild57IntegrationFix": "Controller uses asynchronous per-line snapshots and USB listener TCP identity; host honors nonretryable failure",
       "documentation": "docs/USB_SYSTEM_NETWORK_DIAGNOSTICS.md",
       "implementation": "shared/src/main/java/com/shilapi/xcertplay/network/SystemUsbDiagnostics.kt"
     },
@@ -145,6 +146,28 @@
     "thirdPartyAccess": "not_verified",
     "preventsOriginalPlayerLaunch": "requires_vehicle_validation"
   },
+  "inputObserverDispatchAudit": {
+    "analyzedAt": "2026-10-14",
+    "verification": "five_unquickened_compact_dex_methods_inspected_at_instruction_boundaries_only",
+    "scope": "IHU519G/FS11A1 build 327; not proof of IHU353G implementation identity",
+    "sourceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "path": "system/framework/oat/arm64/services.vdex",
+    "bytes": 10114868,
+    "sha256": "5d19a5aa3f1c4f8b7f90ea18ee44b52e1e3b32ef748d6d9af5c86a1546506571",
+    "methods": [
+      {"name": "InputManagerService.requestKeysInterception", "absoluteCodeOffset": 4701750, "registrationInstructionUnit": 9},
+      {"name": "KeyEventDispatcherUtil.dispatcherAllEvent", "absoluteCodeOffset": 4705458, "broadcastInstructionUnits": [2, 9, 15, 23]},
+      {"name": "KeyEventDispatcherUtil.dispatcherAllEventIgnoreIaService", "absoluteCodeOffset": 4705530},
+      {"name": "KeyEventDispatcherUtil.dispatcherMediaKey", "absoluteCodeOffset": 4705772},
+      {"name": "KeyEventDispatcherUtil.isLinkCarAppMediaFocus", "absoluteCodeOffset": 4704426}
+    ],
+    "ordinaryObserverRegistrationGuaranteesExclusiveHandling": false,
+    "dispatchBehavior": "Callback list broadcast plus OEM interactive-service and selected-link-app media-focus branches",
+    "localEvidence": "input-dispatch-evidence.txt",
+    "localRecheckCommand": "python agent_docs/firmware/inspect_input_methods.py",
+    "applicationDecision": "Deduplicate physical/media-broadcast echoes; stop private observer volume writes; retain OEM volume handling",
+    "applicationWritesLinkAppSystemProperties": false
+  },
   "hicarButtonAudit": {
     "verification": "static_only_vehicle_validation_pending",
     "evidence": [
@@ -161,7 +184,7 @@
       "orderedBroadcast": "ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT",
       "applicationAction": "request Siri once on release; ordered broadcast fallback consumed only on accepted request"
     },
-    "volume": { "physicalKeys": [301, 302], "applicationAction": "candidate: request volume interception while CarPlay owns media; playing adjusts system media volume, paused or idle adjusts system navigation volume; no application gain control; shared routes share system volume; release on call, assistant, focus loss or failure", "thirdPartyVolumeInterception": "not_verified", "hicarVolumeInterception": "not_requested_in_reference_sdk" },
+    "volume": { "physicalKeys": [301, 302], "applicationAction": "Private observer volume writes withdrawn after build 57: preserve vehicle handling; consumable standard keys choose system media/navigation stream by iPhone playing state, including idle guidance preadjustment; shared routes share system volume", "thirdPartyVolumeInterception": "exclusive_handling_not_established", "hicarVolumeInterception": "not_requested_in_reference_sdk" },
     "hotwordObserver": "SDK implementation empty; not ported",
     "phoneDpadSeekMute": "not intercepted; preserve original vehicle actions"
   },

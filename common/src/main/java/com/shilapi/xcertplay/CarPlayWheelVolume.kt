@@ -27,6 +27,10 @@ internal object CarPlayWheelVolume {
         if (systemStream !in 1..20) return false
         val audio = context.getSystemService(AudioManager::class.java) ?: return false
         return try {
+            fun readVolume(stream: Int): Int? = if (stream in 1..20) runCatching { audio.getStreamVolume(stream) }.getOrNull() else null
+            val mediaBefore = readVolume(mediaStream)
+            val navigationStream = AirPlayPersistence.loadNavigationAudioChannel(context)
+            val navigationBefore = readVolume(navigationStream)
             val minimum = navigationWheelMinimum(systemStream, android.os.Build.VERSION.SDK_INT) {
                 if (android.os.Build.VERSION.SDK_INT >= 28) audio.getStreamMinVolume(it) else 0
             }
@@ -35,10 +39,15 @@ internal object CarPlayWheelVolume {
             if (!CarPlayMediaKeys.volumeKeysEligible(context)) return false
             audio.setStreamVolume(systemStream, target, AudioManager.FLAG_SHOW_UI)
             (audio.getStreamVolume(systemStream) == target).also {
-                Log.d("DiPlay-MediaKeys", "wheel volume navigation=$navigation stream=$systemStream target=$target applied=$it")
+                val message = "Wheel volume navigation=$navigation stream=$systemStream target=$target applied=$it " +
+                    "mediaStream=$mediaStream mediaBefore=$mediaBefore mediaAfter=${readVolume(mediaStream)} " +
+                    "navigationStream=$navigationStream navigationBefore=$navigationBefore navigationAfter=${readVolume(navigationStream)}"
+                Log.i("DiPlay-MediaKeys", message)
+                CarPlayMediaKeys.reportWheelVolume(message)
             }
         } catch (error: Exception) {
             Log.w("DiPlay-MediaKeys", "wheel volume stream=$systemStream unavailable; retaining vehicle handling", error)
+            CarPlayMediaKeys.reportWheelVolume("Wheel volume stream=$systemStream unavailable failureClass=${error.javaClass.simpleName}")
             false
         }
     }

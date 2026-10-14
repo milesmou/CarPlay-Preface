@@ -45,6 +45,9 @@ import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlaySocketService
 import com.shilapi.xcertplay.network.SystemUsbNetwork
 import com.shilapi.xcertplay.network.SystemUsbFallback
+import com.shilapi.xcertplay.network.SystemUsbSnapshot
+import com.shilapi.xcertplay.network.SystemUsbStartupDiagnostics
+import com.shilapi.xcertplay.network.systemUsbStartupListener
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
 import com.shilapi.xcertplay.network.HotspotAddressPolicy
 import com.shilapi.xcertplay.network.HotspotAddressRecovery
@@ -281,6 +284,7 @@ class CarPlayController(
         Thread(task, "diplay-first-tcp-timeout").apply { isDaemon = true }
     }.apply { removeOnCancelPolicy = true }
     @Volatile private var wirelessDiagnostics: WirelessStartupDiagnostics? = null
+    @Volatile private var usbDiagnostics: SystemUsbStartupDiagnostics? = null
     @Volatile private var bluetoothSocket: BluetoothSocket? = null
     @Volatile private var bluetoothStream: BluetoothRfcommDuplexStream? = null
     @Volatile private var wirelessTunnelChannel: Iap2Session? = null
@@ -654,6 +658,7 @@ class CarPlayController(
             dashboardMapOutputVisible = false
         }
         firstTcpWatchdog?.terminate()
+        usbDiagnostics?.close()
         startupTimer.shutdownNow()
         val teardownStarted = System.nanoTime()
         connectionDiagnostic("teardown begin transport=${config.transport}")
@@ -2192,6 +2197,7 @@ class CarPlayController(
             val network = attachWiredNetwork(device)
             networkAttached = true
             if (closed) {
+                network.diagnostics.close()
                 socketService?.detach()
                 return
             }
@@ -2219,16 +2225,20 @@ class CarPlayController(
                 onIncoming = ::onRouteFrame,
                 onProgress = { message ->
                     debugLog("wired $message")
-                    if (message == "iap2 tx=0x4301 carplay-start-session") network.systemFallback?.startSessionSent()
+                    if (message == "iap2 tx=0x4301 carplay-start-session") {
+                        network.systemFallback?.startSessionSent()
+                        network.diagnostics.startSessionSent()
+                    }
                 },
                 refreshEndpoint = {
                     if (!closed && network.systemFallback?.claimFallback() == true) {
                         debugLog("wired system USB did not establish AirPlay; terminating without VPN fallback")
-                        network.systemLink?.let { debugLog("wired system USB snapshot phase=timeout ${com.shilapi.xcertplay.network.SystemUsbSnapshot(it).sample()}") }
+                        network.diagnostics.finish("startup_timeout")
                         throw SystemUsbUnavailable("iPhone did not establish AirPlay over the system USB network within 30 seconds. Check the USB network diagnostics; VPN fallback is disabled.")
                     } else null
                 },
             )
+            network.diagnostics.finish("control_ended")
             onStatus(
                 when (result.terminal) {
                     Iap2WiredControlTerminal.TIMED_OUT -> CarPlayStatus.ControlEnded
@@ -2237,6 +2247,7 @@ class CarPlayController(
                 },
             )
         } catch (error: Throwable) {
+            usbDiagnostics?.finish("bringup_failed")
             debugLog("wired bring-up failed", error)
             if (networkAttached) socketService?.detach()
             fail(error)
@@ -2248,35 +2259,38 @@ class CarPlayController(
         val hostMac: ByteArray,
         val systemFallback: SystemUsbFallback? = null,
         val systemLink: SystemUsbNetwork.Link? = null,
+        val diagnostics: SystemUsbStartupDiagnostics,
     )
 
     private fun attachWiredNetwork(device: UsbDevice): WiredNetwork {
         onStatus(CarPlayStatus.AttachingNetwork)
         run {
             val deadline = System.nanoTime() + SYSTEM_USB_DISCOVERY_TIMEOUT_MILLIS * 1_000_000L
+            val discoveryMessages = mutableSetOf<String>()
             do {
                 if (closed) throw IOException("CarPlay connection closed")
-                val link = SystemUsbNetwork.find(device)
+                val link = SystemUsbNetwork.find(device) {
+                    if (discoveryMessages.add(it)) connectionDiagnostic(it)
+                }
                 if (link != null) {
                     val fallback = SystemUsbFallback()
-                    val listener = object : AirPlaySessionListener by sessionListener {
-                        override fun onSessionActive(session: AirPlaySession) {
-                            if (fallback.sessionEstablished()) sessionListener.onSessionActive(session)
-                            else session.close()
-                        }
-                        override fun onSessionEnded(session: AirPlaySession) {
-                            if (fallback.hasEstablishedSession()) sessionListener.onSessionEnded(session)
-                        }
-                    }
                     val service = awaitSocketService()
+                    val snapshot = SystemUsbSnapshot(link, listenerPort = { service?.boundPort() })
+                    val diagnostics = SystemUsbStartupDiagnostics(snapshot::sample, ::connectionDiagnostic)
+                    usbDiagnostics = diagnostics
+                    val owner = AirPlayListenerIdentity(diagnosticRun.get())
+                    val listener = systemUsbStartupListener(owner, fallback, diagnostics, sessionListener)
                     val result = service?.attachSystemUsb(link.address, airPlayConfig, identity, pairings,
-                        mfiSession?.client, listener, media)
+                        mfiSession?.client, listener, media, owner)
                     if (result == CarPlaySocketService.AttachResult.Started) {
                         debugLog("wired system USB network attached iface=${link.name}; no VPN established")
-                        debugLog("wired system USB snapshot phase=attached listenerPort=${service.boundPort()} ${com.shilapi.xcertplay.network.SystemUsbSnapshot(link).sample()}")
+                        connectionDiagnostic("system USB endpoint announcementMatchesBind=true " +
+                            "portMatchesBind=true announcedPort=${service.boundPort()} scopedBind=${link.address.scopeId > 0}")
+                        diagnostics.start()
                         return WiredNetwork(Inet6Address.getByAddress(null, link.address.address).hostAddress!!,
-                            link.mac, fallback, link)
+                            link.mac, fallback, link, diagnostics)
                     }
+                    diagnostics.finish("listener_failed")
                     throw SystemUsbUnavailable("System USB AirPlay listener could not start: $result; ${service?.lastAttachFailure.orEmpty()}")
                 }
                 Thread.sleep(100)

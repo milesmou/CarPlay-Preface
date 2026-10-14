@@ -197,6 +197,48 @@ class PrefaceFirmwareIntegrationTest {
         assertEquals(1, releases)
     }
 
+    @Test fun physicalCallbackAndOemBroadcastForwardTheReportedTapOnlyOnce() {
+        val active = mock(CarPlayController::class.java).also { controller = it }
+        `when`(active.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        `when`(active.sendMediaButton(CarPlayMediaButton.NEXT)).thenReturn(true)
+        val diagnostics = mutableListOf<String>()
+        CarPlayMediaKeys.attach(context, active, diagnostic = diagnostics::add) { true }
+        CarPlayBackgroundSession.active = true
+        ReflectionHelpers.callInstanceMethod<Boolean>(CarPlayMediaKeys, "dispatchMedia",
+            ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, CarPlayMediaButton.NEXT),
+            ReflectionHelpers.ClassParameter.from(String::class.java, "preface-intercept"))
+        val event = KeyEvent(100, 246, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
+        assertTrue(CarPlayMediaKeys.onWindowMediaKey(event) == true)
+        verify(active, times(1)).sendMediaButton(CarPlayMediaButton.NEXT)
+        assertTrue(diagnostics.any { it.contains("suppressed=paired-wheel-echo") })
+    }
+
+    @Test fun privateObserverNeverRequestsOrAdjustsVolumeAlongsideTheVehicle() {
+        val active = mock(CarPlayController::class.java).also { controller = it }
+        `when`(active.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        CarPlayMediaKeys.attach(context, active) { true }
+        CarPlayBackgroundSession.active = true
+        val requests = mutableListOf<Boolean>()
+        lateinit var callback: (Boolean, Int) -> Unit
+        val input = object : PrefaceTrackKeyInterception.Backend {
+            override fun request(next: (Boolean, Int) -> Unit) = request(next, false)
+            override fun request(next: (Boolean, Int) -> Unit, volumeKeys: Boolean) {
+                requests += volumeKeys
+                callback = next
+            }
+            override fun release() = Unit
+        }
+        var adjustments = 0
+        ReflectionHelpers.setField(CarPlayMediaKeys, "trackInterception",
+            PrefaceTrackKeyInterception(input, volume = { _, _ -> adjustments++ }) {})
+        ReflectionHelpers.callInstanceMethod<Unit>(CarPlayMediaKeys, "refreshTrackOwnership")
+        shadowOf(Looper.getMainLooper()).idle()
+        callback(true, 301)
+        callback(false, 301)
+        assertEquals(listOf(false), requests)
+        assertEquals(0, adjustments)
+    }
+
     @Test fun receiverExistsOnlyDuringOwnershipAndBluetoothDoesNotDoubleForward() {
         val active = mock(CarPlayController::class.java).also { controller = it }
         `when`(active.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())

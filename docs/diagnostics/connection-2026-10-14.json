@@ -16,9 +16,60 @@
     { "filename": "diplay-report.txt", "sha256": "94ab43b8a497c023d4dae6a044c2d62bc43c669bfe407051611f73ff61ed6626" },
     { "filename": "diplay-report 2.txt", "sha256": "f0cf86482b4001af058328be6a37b1b31dc739559028f72bc467e73e68c962be" },
     { "filename": "diplay-report 3.txt", "sha256": "7108252b2de8d7ce187b3ad7bb00ad8b256007c2432577a2af5edec2d6976327" },
-    { "filename": "DiPlay-20261014-161345-239.txt", "sha256": "1eb37e53ac96a75c1fc2e7416998168e337d6b6db76ea3d8f6bfed8156678514" }
+    { "filename": "DiPlay-20261014-161345-239.txt", "sha256": "1eb37e53ac96a75c1fc2e7416998168e337d6b6db76ea3d8f6bfed8156678514" },
+    { "filename": "DiPlay-20261014-175036-680.txt", "sha256": "d233106fa72945c4175c88343fcfd3ca90b535f31bda7f3ef34681248581add0" }
   ],
   "localEvidenceRoot": "agent_docs/diagnostics/connection-2026-10-14",
+  "fifthReportFollowup": {
+    "source": "DiPlay-20261014-175036-680.txt",
+    "userClarification": {"volumeInput": "steering_wheel", "firstConnection": "automatic", "secondConnection": "manual_phone_action", "secondActionTimestamp": "not_identified"},
+    "wirelessStartToFirstTcpMillis": 12039,
+    "wirelessSessionEstablishedAt": "17:45:01.619",
+    "startupResize": {"at": "17:44:39.013", "from": [1760, 720], "to": [1920, 720], "effect": "full_controller_restart_during_hotspot_preparation"},
+    "nextHotspotCreationFailureAt": "17:44:39.350",
+    "wheelTrackPairs": [
+      {"physicalKey": 305, "interceptedNextAt": "17:46:34.084", "broadcastNextAt": "17:46:34.230", "differenceMillis": 146},
+      {"physicalKey": 305, "interceptedNextAt": "17:46:42.648", "broadcastNextAt": "17:46:42.801", "differenceMillis": 153}
+    ],
+    "volumeWritesPresentInReport": false,
+    "volumeDoubleAdjustmentRootCause": "parallel_oem_and_observer_handling_supported_by_reference_code_but_exact_runtime_writes_unrecorded",
+    "oemMediaPageOpening": "user_confirmed_page_stop_and_broadcast_observed_target_activity_not_logged",
+    "changesAfterBuild57": ["paired_wheel_echo_deduplication", "private_volume_observer_writes_removed", "standard_window_volume_keys_allow_idle_guidance", "volume_before_after_diagnostics", "wireless_startup_resize_retains_controller", "pending_hotspot_reservation_released_immediately_once", "full_restart_waits_for_previous_teardown"],
+    "independentIdleNavigationVolumeOnPrivateWheel": "not_reliably_taken_over_vehicle_handling_retained",
+    "oemPageSuppression": "unresolved",
+    "automaticReconnectReliability": "unresolved",
+    "newApkBuilt": true,
+    "includedInApkBuild": 58
+  },
+  "fifthReportUsbFollowup": {
+    "source": "DiPlay-20261014-175036-680.txt",
+    "userConfirmation": "USB still cannot connect",
+    "completedTimeoutAttempts": [4, 5, 6, 7],
+    "attemptInProgressAtExport": 8,
+    "authenticated": true,
+    "boundInterface": "usb0",
+    "boundFamily": "IPv6",
+    "boundPort": 7000,
+    "firstStartSessionAt": "17:47:54.241",
+    "firstTimeoutAt": "17:48:24.335",
+    "usbAirPlayTcpAcceptedInReport": 0,
+    "controlExchangeContinues": "now_playing_and_artwork",
+    "networkEvidenceMissingBecause": "Controller emitted multiline snapshots rejected by DiagnosticRedactor; existing async sampler was not wired in",
+    "hostRetryBug": "Failed.retryable=false ignored; repeated full restarts at 2/4/8/16 second delays",
+    "changesAfterBuild57": ["connect_async_network_sampler_to_controller", "emit_each_snapshot_line_separately", "record_actual_port_and_listener_identity", "count_external_usb_tcp_only", "finish_cached_snapshot_without_blocking_protocol", "honor_nonretryable_failure_in_host_and_settings"],
+    "targetedTestsPassed": 50,
+    "networkRootCause": "unconfirmed_requires_new_network_evidence",
+    "vehicleRepairVerified": false
+  },
+  "latestDiagnosticTestApk": {
+    "versionName": "0.1.1",
+    "versionCode": 58,
+    "filename": "CarPlay-Preface-0.1.1-58-debug.apk",
+    "sha256": "586934e628094e1f663106362fa6e60d5e68743b90afaf03ba7970ee6f86ed5f",
+    "certificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
+    "installedTo": "local_emulator_only",
+    "vehicleResult": "pending"
+  },
   "codeAuditAfterBuild56": {
     "verification": "code_and_targeted_regression_tests_only_no_new_vehicle_report",
     "includedInApkBuild56": false,

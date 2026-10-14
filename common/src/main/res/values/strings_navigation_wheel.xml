@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_navigation_wheel_volume">方控按媒体播放状态调节音量（实验性）</string>
-    <string name="settings_navigation_wheel_volume_description">默认启用，连接 CarPlay 后生效。媒体播放时调节媒体音量；暂停或未播放时调节导航音量，未播报时也可预先调节。音量由车机系统控制，共用音频流时同步变化。通话、Siri、原车音源、地图缩放和摇杆优先。系统不允许接管方控时保留原车处理。星瑞 E02 实车效果待验证。</string>
+    <string name="settings_navigation_wheel_volume_description">默认启用，连接 CarPlay 后生效。应用能接管音量键时，媒体播放调节媒体音量；暂停或未播放调节导航音量，未播报时也可预先调节。音量由车机系统控制，共用音频流时同步变化。原车仍处理的私有方控音量键保留原车调节，避免同时改变两路音量。通话、Siri、原车音源、地图缩放和摇杆优先。星瑞 E02 实车效果待验证。</string>
 </resources>

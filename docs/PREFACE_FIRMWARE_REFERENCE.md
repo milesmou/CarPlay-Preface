@@ -38,6 +38,8 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 首次接入失败的临时热点重试现保留同一有效 LocalOnlyHotspot 预约与控制器，失效才重建，断开仍释放本应用预约；定向验证及重试预算见 [热点生命周期](MANUAL_HOTSPOT.md)。这是应用实现，不是参考固件或报告设备的自动接入可用性证据。
 
+第五份 17:50 报告确认私有 305 和标准媒体广播双路发送；用户补充首次自动连接成功、第二次手动点击连接。参考 OTA 底层 `services.vdex` 的五个 CompactDex 方法显示观察者多路分发及原厂互联应用条件，详见 [输入观察者证据](PREFACE_FIRMWARE_327.md#输入观察者不是第三方独占接口2026-10-14)。工程撤回私有音量回调并行写入，补上跨路径去重、无线启动窗口变化保留及待准备预约即时释放；不能据此宣称原车跳页或间歇性自动接入已修复。
+
 ## 后续工程可复用的信息
 
 ### 方控与原车媒体
@@ -48,7 +50,7 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 - 原厂对媒体键发 `android.intent.action.MEDIA_BUTTON` 广播，带 DEFAULT category 和 `android.intent.extra.KEY_EVENT`。同一短按产生 DOWN/UP，对广播和 MediaSession 双路送达需要去重。
 - 自定义按键 `soft_key_function=7` 对应媒体暂停动作。语音、电话和音量有原车专用处理，不应把全部私有按键直接转成 CarPlay 按键。
 - 原车音乐包 `com.ecarx.multimedia`（4.0.0 / versionCode 40001095），媒体中心包 `ecarx.xsf.mediacenter`。媒体中心服务 action 为 `ecarx.xsf.MEDIA_CENTER_SERVICE`；其 Binder 协议及应用准入尚未分析，不能仅凭 action 接入桌面媒体卡片。
-- HiCar 配套 SDK 静态实现显示通过定制 `IInputManager.requestKeysInterception` 接管媒体／语音键；工程请求 85/87/88/298，并为语音按钮接入有序广播回退。HiCar 音量沿用原车；本项目新增按媒体播放状态申请音量键拦截的候选实现，第三方拦截效果待验证。电话、方向键、快进快退和唤醒词的处理边界见 [HiCar 对照与按钮审查](PREFACE_FIRMWARE_327.md) 及事实索引 `hicarTrackInterception`、`hicarButtonAudit`。接口权限和效果待实车验证。
+- HiCar 配套 SDK 静态实现通过定制 `IInputManager.requestKeysInterception` 登记媒体／语音按键观察者；工程请求标准 85/87/88/298 及物理 304/305，并为语音按钮接入有序广播回退。HiCar 音量沿用原车；本项目曾申请私有音量键并写导航音量，该候选在第五份报告与底层分发复核后撤回，不能把收到回调当独占。电话、方向键、快进快退和唤醒词的处理边界见 [HiCar 对照与按钮审查](PREFACE_FIRMWARE_327.md) 及事实索引 `hicarTrackInterception`、`hicarButtonAudit`。权限与原车页面抑制效果分别待验证。
 
 证据：`decompiled/input/sources/ecarx/xsf/inputservice/{key,util,factory}/`、`decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/`、`catalog/apk-manifests.json`。
 

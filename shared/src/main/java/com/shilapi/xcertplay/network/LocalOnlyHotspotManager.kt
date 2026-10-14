@@ -201,7 +201,10 @@ class LocalOnlyHotspotManager(
             closed = true
             startAttempt?.stopped = true
             stateLock.notifyAll()
-            activeReservation = reservation
+            // onStarted already owns a reservation while interface/radio discovery is still
+            // running. Release it now so a replacement cannot overlap that pending hotspot.
+            activeReservation = reservation ?: startAttempt?.reservation
+            startAttempt?.reservation = null
             activeMulticastLock = multicastLock
             activeObserver = radioObserver
             radioObserver = null
@@ -539,6 +542,7 @@ class LocalOnlyHotspotManager(
             attempt.stopped = true
             stateLock.notifyAll()
             failedReservation = attempt.reservation
+            attempt.reservation = null
         }
         releaseMulticastLock(multicastLock)
         failedReservation?.close()

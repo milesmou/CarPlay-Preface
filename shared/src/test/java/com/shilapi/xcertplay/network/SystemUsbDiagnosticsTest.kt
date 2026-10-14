@@ -1,6 +1,9 @@
 package com.shilapi.xcertplay.network
 
 import java.io.IOException
+import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
+import com.shilapi.xcertplay.airplay.AirPlaySessionListener
+import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.util.concurrent.CopyOnWriteArrayList
@@ -10,6 +13,44 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SystemUsbDiagnosticsTest {
+    @Test fun wiredListenerCountsOnlyItsExternalTcpAndForwardsTransportFailure() {
+        val lines = CopyOnWriteArrayList<String>()
+        val diagnostics = SystemUsbStartupDiagnostics({ "iface=usb0" }, lines::add)
+        val owner = AirPlayListenerIdentity(1)
+        val events = mutableListOf<AirPlayTcpAccepted>()
+        var transportFailure: String? = null
+        val listener = systemUsbStartupListener(owner, SystemUsbFallback(), diagnostics,
+            object : AirPlaySessionListener {
+                override fun onTcpAccepted(event: AirPlayTcpAccepted) { events += event }
+                override fun onTransportError(message: String) { transportFailure = message }
+            })
+        diagnostics.startSessionSent()
+        listener.onTcpAccepted(AirPlayTcpAccepted(AirPlayListenerIdentity(1), false, 1L))
+        listener.onTcpAccepted(AirPlayTcpAccepted(owner, true, 2L))
+        assertTrue(diagnostics.summary("test").contains("tcpAccepted=0"))
+        listener.onTcpAccepted(AirPlayTcpAccepted(owner, false, 3L))
+        assertTrue(diagnostics.summary("test").contains("tcpAccepted=1"))
+        assertEquals(2, events.size)
+        listener.onTransportError("control disconnected")
+        assertEquals("control disconnected", transportFailure)
+        diagnostics.close()
+        assertEquals(1, lines.count { it.contains("observation=ended") })
+    }
+
+    @Test fun periodicSnapshotsSplitIntoBoundedReportLinesAndKeepCounterDeltas() {
+        val lines = CopyOnWriteArrayList<String>()
+        val sampled = CountDownLatch(1)
+        val diagnostics = SystemUsbStartupDiagnostics({ "iface=usb0\nrx_packets=5 rx_packetsDelta=2\nneighbors=unavailable failureClass=IOException" }, {
+            lines += it
+            if (it.contains("neighbors=unavailable")) sampled.countDown()
+        })
+        try {
+            diagnostics.start()
+            assertTrue(sampled.await(2, TimeUnit.SECONDS))
+            assertTrue(lines.any { it.contains("rx_packetsDelta=2") })
+            assertTrue(lines.none { '\n' in it || '\r' in it || it.length > 700 })
+        } finally { diagnostics.close() }
+    }
     private val address = InetAddress.getByName("fe80::1234:5678:9abc:def0").address
     private val hex = "fe80000000000000123456789abcdef0"
     private val link get() = SystemUsbNetwork.Link("usb0", Inet6Address.getByAddress(null, address, 3),

@@ -1,6 +1,10 @@
 package com.shilapi.xcertplay.network
 
 import android.os.Build
+import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
+import com.shilapi.xcertplay.airplay.AirPlaySession
+import com.shilapi.xcertplay.airplay.AirPlaySessionListener
+import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
@@ -246,4 +250,35 @@ internal class SystemUsbStartupDiagnostics(
         snapshot.lineSequence().filter { it.isNotBlank() }.take(8).forEach { emit("system USB snapshot $flags $it") }
     }
     private fun emit(message: String) { try { log(message) } catch (_: RuntimeException) { /* Diagnostics cannot fail connection. */ } }
+}
+
+/** Preserve normal session callbacks while recording only TCP events belonging to this USB listener. */
+internal fun systemUsbStartupListener(
+    owner: AirPlayListenerIdentity,
+    startup: SystemUsbFallback,
+    diagnostics: SystemUsbStartupDiagnostics,
+    delegate: AirPlaySessionListener,
+): AirPlaySessionListener = object : AirPlaySessionListener by delegate {
+    override fun onTcpAccepted(event: AirPlayTcpAccepted) {
+        if (event.listener !== owner) return
+        diagnostics.tcpAccepted(event.internal)
+        delegate.onTcpAccepted(event)
+    }
+
+    override fun onSessionActive(session: AirPlaySession) {
+        if (startup.sessionEstablished()) {
+            diagnostics.sessionActive()
+            delegate.onSessionActive(session)
+        } else session.close()
+    }
+
+    override fun onSessionEnded(session: AirPlaySession) {
+        diagnostics.finish("session_ended")
+        if (startup.hasEstablishedSession()) delegate.onSessionEnded(session)
+    }
+
+    override fun onTransportError(message: String) {
+        diagnostics.finish("transport_error")
+        delegate.onTransportError(message)
+    }
 }

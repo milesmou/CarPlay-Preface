@@ -70,21 +70,7 @@ internal object CarPlayMediaKeys {
     private var placeholder: Bitmap? = null
     private var prefaceReceiver: PrefaceMediaButtonReceiver? = null
     private var trackInterception: PrefaceTrackKeyInterception? = null
-    private var volumeUnavailable = false
-    private val volumePress = PrefaceVolumePress(
-        schedule = { mainHandler.postDelayed(it, 250L) },
-        cancel = { mainHandler.removeCallbacks(it) },
-        adjust = {
-            val context = appContext
-            if (context == null || !volumeKeysEligible(context)) false
-            else CarPlayWheelVolume.adjust(context, it).also { success ->
-                if (!success) {
-                    volumeUnavailable = true
-                    refreshTrackOwnership()
-                }
-            }
-        },
-    )
+    private val wheelMediaEchoes = PrefaceMediaKeyEchoes()
     private var prefaceVoiceReceiver: PrefaceVoiceButtonReceiver? = null
     private var lastPrefaceSiriRequest: Long? = null
     private var foreground: () -> Boolean = { false }
@@ -93,9 +79,9 @@ internal object CarPlayMediaKeys {
     private val trackOwnershipCheck = object : Runnable {
         override fun run() {
             val interception = trackInterception ?: return
-            val volume = appContext?.let(::volumeKeysEligible) == true && !volumeUnavailable
-            if (!volume) volumePress.close()
-            interception.update(trackKeysEligible(), volume)
+            // The OEM observer also delivers the press to its input service. It cannot consume
+            // volume events, so writing another stream here would adjust both media and guidance.
+            interception.update(trackKeysEligible())
             if (trackInterception === interception) mainHandler.postDelayed(this, 250L)
         }
     }
@@ -326,8 +312,7 @@ internal object CarPlayMediaKeys {
     private fun releaseLocked() {
         mediaAudioOwner = null
         callback = null
-        volumePress.close()
-        volumeUnavailable = false
+        wheelMediaEchoes.clear()
         mainHandler.removeCallbacks(trackOwnershipCheck)
         trackInterception?.close()
         trackInterception = null
@@ -357,6 +342,8 @@ internal object CarPlayMediaKeys {
     }
 
     private fun reportDiagnostic(message: String) { runCatching { diagnostic(message) } }
+
+    internal fun reportWheelVolume(message: String) = reportDiagnostic(message)
 
     @Synchronized
     fun report(): String = "Media keys controllerAttached=${controller != null} mediaSessionActive=${session?.isActive == true} " +
@@ -395,6 +382,19 @@ internal object CarPlayMediaKeys {
     } else "unavailable"
 
     private fun dispatchMedia(index: Int, source: String): Boolean {
+        if (source == "preface-intercept" || source == "preface-wheel") {
+            var forwarded = false
+            val result = wheelMediaEchoes.dispatch(index, source == "preface-intercept") {
+                forwarded = true
+                sendMediaCommand(index, source)
+            }
+            if (!forwarded) reportDiagnostic("Media command source=$source index=$index suppressed=paired-wheel-echo")
+            return result
+        }
+        return sendMediaCommand(index, source)
+    }
+
+    private fun sendMediaCommand(index: Int, source: String): Boolean {
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
         if (CarPlayVideo.onMediaKey(index)) {
@@ -420,10 +420,6 @@ internal object CarPlayMediaKeys {
             PrefaceInputInterceptionBackend(deliver = { task -> mainHandler.post { task() } }, diagnostic = ::reportDiagnostic),
             diagnostic = ::reportDiagnostic,
             siri = { requestPrefaceSiri() },
-            volume = { down, key ->
-                if (appContext?.let(::volumeKeysEligible) == true && !volumeUnavailable) volumePress.onKey(down, key)
-                else { volumePress.close(); refreshTrackOwnership() }
-            },
         ) { index ->
             // Recheck on delivery: a call or focus loss can precede the periodic ownership check.
             if (trackKeysEligible()) dispatchMedia(index, "preface-intercept") else refreshTrackOwnership()

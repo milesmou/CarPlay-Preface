@@ -1,6 +1,10 @@
 # 系统 USB 网卡启动诊断
 
-2026-10-14 为星瑞 E02 USB 直连排查加入只读日志。用户报告设备为 IHU353G，参考固件为 IHU519G/FS11A1 构建 327，范围分别见 [连接报告](CONNECTION_REPORT_2026-10-14.md) 和 [固件参考](PREFACE_FIRMWARE_REFERENCE.md)。日志实现不代表新的实车验证；本次不修改网络配置、USB 选择规则、启动期限或 VPN 回退策略。
+2026-10-14 为星瑞 E02 USB 直连排查加入只读日志。用户报告设备为 IHU353G，参考固件为 IHU519G/FS11A1 构建 327，范围分别见 [连接报告](CONNECTION_REPORT_2026-10-14.md) 和 [固件参考](PREFACE_FIRMWARE_REFERENCE.md)。日志实现不代表新的实车验证；本次不修改网络配置、USB 选择规则或启动期限，USB 无 VPN 回退。
+
+17:50 报告复核：控制器尚未调用已写好的异步采样器，而直接传入多行 snapshot；`DiagnosticRedactor` 拒绝含换行的日志，导致实际报告完全没有网卡快照。后续改为接入 `SystemUsbStartupDiagnostics` 的逐行输出，发现阶段去重记录候选原因；普通 socket 服务同时携带当前 USB listener 身份，TCP 回调排除旧监听和本机探针。监听、StartSession、会话、超时、控制循环结束与关闭都有接入，采样在后台进行，终止不重新阻塞读取。
+
+修正已包含在 0.1.1-58 测试包，50 项相关定向测试通过（shared 18、common 32）；仅安装本地模拟器，尚待车机 USB 失败后的新报告，不代表 USB 接入已修复。
 
 ## 报告入口
 

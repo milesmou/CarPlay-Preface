@@ -142,6 +142,28 @@ class CarPlayHostDisplaySizeTest {
         assertNull(getField("sessionDisplay"))
     }
 
+    @Test fun wirelessStartupWidthGrowthKeepsTheControllerAndItsHotspot() {
+        val display = startSession(windowWidth = 1760, windowHeight = 720)
+        val controller = org.mockito.Mockito.mock(CarPlayController::class.java)
+        setField("controller", controller)
+        setField("wirelessEnabled", true)
+        applySize(1920, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertSame(controller, getField("controller"))
+        assertEquals(0, getField("restartGeneration"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+    }
+
+    @Test fun establishedWirelessSessionStillRenegotiatesWhenTheOriginalWindowGrows() {
+        startSession(windowWidth = 1760, windowHeight = 720)
+        setField("controller", org.mockito.Mockito.mock(CarPlayController::class.java))
+        setField("wirelessEnabled", true)
+        setField("activeAirPlaySession", org.mockito.Mockito.mock(AirPlaySession::class.java))
+        applySize(1920, 720)
+        assertEquals(1, getField("restartGeneration"))
+        assertNull(getField("sessionDisplay"))
+    }
+
     @Test fun connectingInAReducedHeightWindowRebuildsWhenTheCameraCloses() {
         startSession(windowHeight = 942)
         applySize(1920, 990)
@@ -505,7 +527,6 @@ class CarPlayHostDisplaySizeTest {
     private fun allowStartup() {
         setField("airPlayIdentity", AirPlayIdentity.generate())
         setField("mfiTarget", MfiTarget.LOCAL)
-        setField("vpnReady", true)
         setField("microphonePermissionResolved", true)
     }
 

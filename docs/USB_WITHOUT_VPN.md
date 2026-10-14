@@ -4,7 +4,13 @@
 
 ## 当前失败位置
 
-用户报告已经显示 USB 设备授权、lockdown carkit、iAP2 及 MFi 认证成功；应用发现归属当前 iPhone NCM 的 `usb0` 并绑定 IPv6 端口 7000。这条路径本身不建立 VPN，但 StartSession 后 30 秒没有建立 AirPlay 会话，随后 VPN 回退因授权 Activity 无法启动而失败。报告中的授权页异常不能独立证明整个 VPN 框架被删除；这里按用户要求，以不能依赖 VPN 为前提评估。
+最新 `DiPlay-20261014-175036-680.txt` 已运行无 VPN 路径：四轮完整 USB 尝试都通过 lockdown、iAP2 和 MFi 认证，IPv6 监听 7000 已建立，StartSession 后约 30 秒没有 AirPlay TCP／会话，第五轮在导出时仍连接中。控制通道期间还能交换媒体状态及封面，不能把无新控制数据时的 100 ms READ TIMED_OUT 当作 USBMUX 中断，也不能据此证明 NCM 数据通路可达。
+
+构建 57 的网络快照作为多行字符串交给 `debugLog`，被报告过滤器整行拒绝；已有异步采样器没有接入实际控制器，缺少 RX/TX、邻居和路由证据。同时主机页面忽略 `Failed.retryable=false`，不停完整重连。后续工程接入真实 USB 监听身份的 TCP 回调和 5 秒异步采样，逐行写入脱敏报告，记录实际监听端口及终止时的缓存年龄；页面尊重不可重试标记并保留手动按钮，菜单中失败也不能触发旧排队重试。授权、系统网卡归属及 IPv6 检查继续保留。
+
+这些修正解决诊断丢失和无效重试，没有确认或修复 iPhone 不建立 AirPlay TCP 的网络根因。下一次实车报告需要区分 NCM 完全无流量、邻居发现失败、TCP SYN 未到达或协议握手失败；当前报告不能给出该结论。
+
+历史报告已经显示 USB 设备授权、lockdown carkit、iAP2 及 MFi 认证成功；应用发现归属当前 iPhone NCM 的 `usb0` 并绑定 IPv6 端口 7000。当时 StartSession 后 30 秒没有建立 AirPlay，旧 VPN 回退因授权 Activity 无法启动而失败。历史授权页异常不能独立证明整个 VPN 框架被删除；现有应用按不依赖 VPN 的约束实现。
 
 证据与原始报告校验值见 [连接排查](CONNECTION_REPORT_2026-10-14.md)。仅删除 VPN 调用不能补齐系统网卡未建立会话的问题。
 

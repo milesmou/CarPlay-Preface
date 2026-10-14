@@ -52,6 +52,34 @@ class WirelessStartupRecoveryTest {
     }
     private fun budget() = ReflectionHelpers.getField<WirelessStartupRetryBudget>(activity, "startupRetryBudget")
 
+    @Test fun unavailableUsbStopsAutomaticRetriesAndExposesManualRetry() {
+        val stage = android.widget.TextView(activity)
+        ReflectionHelpers.setField(activity, "stageStatusView", stage)
+        report(status = CarPlayStatus.Failed("USB AirPlay did not connect", retryable = false, usbDirectUnavailable = true))
+        assertEquals(activity.getString(com.shilapi.xcertplay.host.R.string.wireless_startup_retries_exhausted), stage.text.toString())
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        assertEquals(0, ReflectionHelpers.getField<Int>(activity, "reconnectAttempts"))
+        assertEquals(View.VISIBLE, retry.visibility)
+        report(status = CarPlayStatus.Failed("cleanup socket closed"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+    }
+
+    @Test fun unavailableUsbInvalidatesAnAlreadyQueuedRetryEvenDuringSettings() {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        report()
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        ReflectionHelpers.setField(activity, "menuOpen", true)
+        report(status = CarPlayStatus.Failed("USB unavailable", retryable = false, usbDirectUnavailable = true))
+        ReflectionHelpers.setField(activity, "menuOpen", false)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
+        verify(controller, never()).retryWirelessStartup()
+        verify(controller, never()).close()
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+    }
+
     @Test fun duplicateFailureAndCleanupErrorScheduleOnlyOneRetry() {
         report()
         report()

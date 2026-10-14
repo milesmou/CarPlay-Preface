@@ -42,6 +42,7 @@ internal class PrefaceTrackKeyInterception(
                 backend.request({ down, key ->
                     if (requested && owner == generation) {
                         if (key == 301 || key == 302) {
+                            diagnostic("Wheel volume observed key=$key down=$down adjustment=${if (requestedVolume) "application" else "vehicle"}")
                             if (requestedVolume) volume(down, key)
                             return@request
                         }
@@ -149,15 +150,14 @@ internal class PrefaceInputInterceptionBackend(
         val standardKeys = intArrayOf(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
             KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 298) +
             if (volumeKeys) intArrayOf(301, 302) else intArrayOf()
-        // 304/305 precede the OEM's ordinary media broadcast. Receiving that broadcast cannot
-        // prevent the OEM player from opening. Request both physical and standard track codes
-        // through the same observer; firmware that rejects the expanded request keeps the SDK set.
+        // The API registers an observer; it does not promise exclusive handling. Physical 304/305
+        // may be followed by the OEM's synthetic 87/88 broadcast, which must share deduplication.
         val request = inputType.getMethod("requestKeysInterception", IntArray::class.java, observerType)
         val keys = requestPrefaceTrackKeys(standardKeys,
             request = { request.invoke(manager, it, observer) },
             abandon = { abandon.invoke(manager, observer) }, diagnostic = diagnostic)
         Log.i("DiPlay-MediaKeys", "Preface interception requested (${keys.joinToString()}); vehicle validation pending")
-        diagnostic("Wheel interception requested keys=${keys.joinToString(",")} receiptNotYetConfirmed=true")
+        diagnostic("Wheel interception requested keys=${keys.joinToString(",")} receiptNotYetConfirmed=true exclusiveHandling=unconfirmed")
     }
 
     override fun release() {

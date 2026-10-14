@@ -980,10 +980,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (assignedAction != WheelZoomKeys.Action.PASS) return true
         if (downOrUp && assignedKey) return super.dispatchKeyEvent(event)
 
-        val navigation = com.shilapi.xcertplay.media.NavigationPlayback.snapshot()
         if (navigationVolumeKeys.onKey(event.action, event.keyCode, event.deviceId, event.downTime, event.repeatCount,
-            eligible = !menuOpen && activeAirPlaySession != null && !inCall(this) &&
-                NavigationWheelSettings.enabled(this) && navigation.active && !navigation.priorityVoiceActive,
+            eligible = !menuOpen && activeAirPlaySession != null && CarPlayMediaKeys.volumeKeysEligible(this),
         ) { delta -> CarPlayWheelVolume.adjust(this, delta) }) return true
 
         // Standard wheel media keys can reach this window without an accessibility service.
@@ -4116,7 +4114,11 @@ class CarPlayHostActivity : ComponentActivity() {
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = report@{ status ->
         if (controllerGeneration != restartGeneration) return@report
-        if (status is CarPlayStatus.Failed || status is CarPlayStatus.ControlEnded) {
+        if (status is CarPlayStatus.Failed && !status.retryable) {
+            startupRetryStopped = true
+            reconnectScheduled = false
+            startupRetryButton?.visibility = View.VISIBLE
+            appendLog("Connection recovery stopped retryable=false usbDirectUnavailable=${status.usbDirectUnavailable}")
         }
         if (menuOpen) {
             if (status is CarPlayStatus.Failed) failurePendingAfterMenu = status
@@ -4126,6 +4128,9 @@ class CarPlayHostActivity : ComponentActivity() {
         val description = status.describe()
         val englishDescription = status.describe(englishResources)
         setConnectionStage(description, englishDescription)
+        if (status is CarPlayStatus.Failed && !status.retryable) {
+            stageStatusView?.text = getString(R.string.wireless_startup_retries_exhausted)
+        }
         // Keep the actionable tip readable while automatic retries are in progress.
         // Only a working AirPlay session, or a new failure, replaces it.
         if (status is CarPlayStatus.Failed) showConnectionHelp(status)
@@ -4134,6 +4139,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 wifiRecoveryButton?.visibility = View.VISIBLE
             } else {
                 wifiRecoveryButton?.visibility = View.GONE
+                if (!status.retryable) return@report
                 if (status.startupFailure != null) {
                     if (startupFailureGeneration == controllerGeneration) return@report
                     startupFailureGeneration = controllerGeneration
@@ -4437,6 +4443,15 @@ class CarPlayHostActivity : ComponentActivity() {
                     "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
             )
             maybeStartCarPlay()
+        } else if (display != null && controller != null && wirelessEnabled && activeAirPlaySession == null &&
+            !layoutChanged) {
+            // Startup bars can disappear while the LocalOnlyHotspot reservation is being prepared.
+            // Keep that connection and its original canvas; fit it to the new window as usual.
+            val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
+                "keeping wireless startup canvas=${display.width}x${display.height}"
+            appendLog(message)
+            Log.i(TAG, message)
+            videoView?.let { updateVideoLayout(it.width, it.height) }
         } else if (display != null && !layoutChanged &&
             statusBarHiddenByAnotherWindow(display, size.width, size.height, statusBarShown())) {
             val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height} " +
@@ -4718,16 +4733,19 @@ class CarPlayHostActivity : ComponentActivity() {
         teardownExecutor.execute {
             val started = System.nanoTime()
             oldController?.close()
-            val completed = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
-            AsyncDiagnosticLog.append(
-                diagnosticLog,
-                "${CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX} generation=$generation " +
-                    "restart teardownWaitCompleted=$completed " +
-                    "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}",
-            )
+            var completed: Boolean
+            do {
+                completed = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
+                AsyncDiagnosticLog.append(
+                    diagnosticLog,
+                    "${CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX} generation=$generation " +
+                        "restart teardownWaitCompleted=$completed " +
+                        "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}",
+                )
+            } while (!completed && !shuttingDown.get() && !Thread.currentThread().isInterrupted)
             oldSink?.let(::closeRetiringSink)
             runOnUiThread {
-                if (!shuttingDown.get() && generation == restartGeneration) {
+                if (completed && !shuttingDown.get() && generation == restartGeneration) {
                     handshakeResetInProgress = false
                     // The display can rotate again while the old stack is closing. Use the
                     // latest accepted size, and wait for any pending resize to settle first.
@@ -4870,7 +4888,7 @@ class CarPlayHostActivity : ComponentActivity() {
             startupRetryBudget.manualRetry()
             startupRetryStopped = false
         }
-        if (failure?.startupFailure != null && !reconnect) {
+        if (failure != null && (!failure.retryable || failure.startupFailure != null) && !reconnect) {
             createStatusReporter(restartGeneration)(failure)
         } else if (failure?.wifiResetRequired == true && (!reconnect || wirelessEnabled)) {
             createStatusReporter(restartGeneration)(failure)
