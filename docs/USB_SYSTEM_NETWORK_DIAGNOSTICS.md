@@ -1,5 +1,7 @@
 # 系统 USB 网卡启动诊断
 
+2026-10-15 后续补充 outgoing NS／NA 等接口计数、同端口其它本地地址的 TCP 表行数及 USB 阶段耗时，字段限制和定向验证见 [诊断日志补充](MEDIA_USB_DIAGNOSTICS_2026-10-15.md)。其它地址的行数不证明属于本应用；没有读取／输出地址或修改路由。
+
 2026-10-14 为星瑞 E02 USB 直连排查加入只读日志。用户报告设备为 IHU353G，参考固件为 IHU519G/FS11A1 构建 327，范围分别见 [连接报告](CONNECTION_REPORT_2026-10-14.md) 和 [固件参考](PREFACE_FIRMWARE_REFERENCE.md)。日志实现不代表新的实车验证；本次不修改网络配置、USB 选择规则或启动期限，USB 无 VPN 回退。
 
 17:50 报告复核：控制器尚未调用已写好的异步采样器，而直接传入多行 snapshot；`DiagnosticRedactor` 拒绝含换行的日志，导致实际报告完全没有网卡快照。后续改为接入 `SystemUsbStartupDiagnostics` 的逐行输出，发现阶段去重记录候选原因；普通 socket 服务同时携带当前 USB listener 身份，TCP 回调排除旧监听和本机探针。监听、StartSession、会话、超时、控制循环结束与关闭都有接入，采样在后台进行，终止不重新阻塞读取。
@@ -11,6 +13,8 @@
 新增行带 `CONNECTION_DIAGNOSTIC ... system USB` 前缀，沿现有会话日志进入导出的 DiPlay 报告。使用系统 USB 网卡路径时自动记录，无须额外开关。
 
 发现阶段记录候选接口在线状态、iPhone NCM 归属、IPv6 链路本地地址数量与选择／拒绝原因，相同消息在一次发现等待中去重。监听启动后由独立线程采样，正常间隔 5 秒；发送 StartSession、接受外部 AirPlay TCP 时唤醒采样。协议回调不执行文件或命令读取，内部／本机探针不计入 iPhone TCP 接入次数。
+
+2026-10-15 补充：读取选中网卡的 `/proc/net/dev_snmp6/<接口>`，核对 `ifIndex` 与原选中接口索引一致，仅导出固定白名单中的 IPv6 接收、头错误、地址错误、丢弃、投递、发送／无路由、ICMPv6 和邻居发现计数及增量。计数减少标 reset，字段缺失不补零；索引不符、文件不可读或没有有效字段时报告 unavailable，不改读全设备计数。单次快照最多 16 行，足够保留原有 8 行与新增协议计数；仍受原 64 KiB 文件读取限制。字段与接口输出结构核对 [Linux IPv6 proc 实现](https://github.com/torvalds/linux/blob/master/net/ipv6/proc.c)。这些计数不证明具体 TCP SYN 到达，也不能识别系统过滤规则的实际决策。
 
 会话建立、启动超时、传输错误、控制循环结束或控制器关闭时停止采样，输出最后缓存快照及 `sampleAgeMs`。结束快照不是结束瞬间重新读取，必须结合采样年龄判断。
 

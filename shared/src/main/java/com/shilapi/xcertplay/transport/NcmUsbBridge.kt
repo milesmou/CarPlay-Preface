@@ -51,6 +51,20 @@ class NcmUsbBridge internal constructor(
     private var resyncCount = 0
     private var resyncReason: String? = null
     private var resyncSkipped = 0
+    @Volatile private var bulkInTransfers = 0L
+    @Volatile private var bulkInBytes = 0L
+    @Volatile private var ntb16Blocks = 0L
+    @Volatile private var emptyNtb16Blocks = 0L
+    @Volatile private var frameDiagnostics = false
+    private var outCalls = 0L
+    private var outFull = 0L
+    private var outNegative = 0L
+    private var outZero = 0L
+    private var outPartial = 0L
+    private var outExceptions = 0L
+    private var outMaxMicros = 0L
+    @Volatile private var outSummary = ""
+    private val statusDiagnostics = NcmStatusDiagnostics()
     private val readBuffer = ByteArray(READ_CHUNK_BYTES)
     // Bulk IN uses one persistent async request: bulkTransfer() pins its byte[] in a JNI critical
     // section for the whole wait, which blocks ART's GC thread flip and, with it, every other USB
@@ -70,7 +84,12 @@ class NcmUsbBridge internal constructor(
     }
 
     /** Wraps one Ethernet frame in one NTB16 block and writes it to bulk OUT. */
-    fun send(frame: ByteArray, timeoutMillis: Int) = synchronized(writeLock) {
+    fun send(frame: ByteArray, timeoutMillis: Int) {
+        sendAccepted(frame, timeoutMillis)
+    }
+
+    /** True only when USB accepted the entire NTB; this does not prove peer reception. */
+    fun sendAccepted(frame: ByteArray, timeoutMillis: Int): Boolean = synchronized(writeLock) {
         checkOpen()
         require(timeoutMillis > 0) { "timeoutMillis must be positive" }
         val sequence = synchronized(stateLock) {
@@ -83,12 +102,15 @@ class NcmUsbBridge internal constructor(
         // timeout, and each USBMUX write of the iAP2 handshake finished only when one expired:
         // ~2 s per step on Android 8.1–14 (#634, #335, #301). Until the phone takes its first
         // frame, a frame that cannot go out at once is dropped, as it was after the full timeout.
-        val transferred = connection.bulkTransfer(
-            outEndpoint,
-            block,
-            block.size,
-            if (bulkOutAccepted) timeoutMillis else minOf(timeoutMillis, NOT_READY_WRITE_TIMEOUT_MILLIS),
-        )
+        val effectiveTimeout = if (bulkOutAccepted) timeoutMillis else minOf(timeoutMillis, NOT_READY_WRITE_TIMEOUT_MILLIS)
+        val started = if (frameDiagnostics) System.nanoTime() else 0L
+        val transferred = try {
+            connection.bulkTransfer(outEndpoint, block, block.size, effectiveTimeout)
+        } catch (error: RuntimeException) {
+            recordWrite(frame.size, block.size, timeoutMillis, effectiveTimeout, started, null, error.javaClass.simpleName)
+            throw error
+        }
+        recordWrite(frame.size, block.size, timeoutMillis, effectiveTimeout, started, transferred)
         // Before StartCarPlaySession the phone keeps the NCM data path NAKed. Android reports the
         // resulting timeout as -1; it is not a detach and later packets must be allowed to retry.
         if (transferred <= 0) {
@@ -97,21 +119,22 @@ class NcmUsbBridge internal constructor(
                 loggedWriteTimeout = true
                 Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out not ready; retaining bridge for retry")
             }
-            return@synchronized
-        }
-        if (!bulkOutAccepted) {
-            bulkOutAccepted = true
-            runCatching { onDiagnostic("NCM bulk-out ready after $notReadyFrames dropped frames") }
+            return@synchronized false
         }
         if (transferred != block.size) {
             throw IphoneUsbException.DeviceUnavailable(
                 "NCM write transferred $transferred of ${block.size} bytes",
             )
         }
+        if (!bulkOutAccepted) {
+            bulkOutAccepted = true
+            runCatching { onDiagnostic("NCM bulk-out ready after $notReadyFrames dropped frames") }
+        }
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
             Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
         }
+        true
     }
 
     /**
@@ -133,9 +156,77 @@ class NcmUsbBridge internal constructor(
                 val chunkLength =
                     readChunk((remainingNanos + NANOS_PER_MILLISECOND - 1) / NANOS_PER_MILLISECOND)
                         ?: continue
+                bulkInTransfers++
+                bulkInBytes += chunkLength
                 appendBuffered(readBuffer, chunkLength)
             }
         }
+    }
+
+    internal fun readDiagnosticSummary(): String = "usbInTransfers=$bulkInTransfers " +
+        "usbInBytes=$bulkInBytes ntb16Blocks=$ntb16Blocks emptyNtb16Blocks=$emptyNtb16Blocks" +
+        if (frameDiagnostics) "\n$outSummary\n${statusDiagnostics.summary()} statusEndpointPresent=${statusEndpoint != null}" else ""
+
+    /** Called under writeLock; report numeric API results without guessing errno, NAK or peer receipt. */
+    private fun recordWrite(frameBytes: Int, ntbBytes: Int, requested: Int, effective: Int, started: Long,
+        result: Int?, failureClass: String? = null) {
+        if (!frameDiagnostics) return
+        outCalls++
+        val elapsedUs = (System.nanoTime() - started).coerceAtLeast(0) / 1_000
+        outMaxMicros = maxOf(outMaxMicros, elapsedUs)
+        val outcome = when {
+            failureClass != null -> { outExceptions++; "exception" }
+            result == ntbBytes -> { outFull++; "full" }
+            result == 0 -> { outZero++; "zero" }
+            result != null && result < 0 -> { outNegative++; "negative_api_result" }
+            else -> { outPartial++; "partial" }
+        }
+        outSummary = "usbOutCalls=$outCalls full=$outFull negative=$outNegative zero=$outZero partial=$outPartial " +
+            "exceptions=$outExceptions maxOutUs=$outMaxMicros lastReturn=${result ?: "exception"} " +
+            "lastOutcome=$outcome"
+        // NDP replies can be frequent; retain aggregate counts after a bounded number of details.
+        if (outCalls <= 12) runCatching {
+            onDiagnostic("NCM frame test write attempt=$outCalls ep=0x${outEndpoint.address.toString(16)} " +
+                "frameBytes=$frameBytes ntbBytes=$ntbBytes requestedTimeoutMs=$requested effectiveTimeoutMs=$effective " +
+                "elapsedUs=$elapsedUs return=${result ?: "exception"} outcome=$outcome" +
+                (failureClass?.let { " failureClass=$it" } ?: ""))
+        }
+    }
+
+    /** Diagnostic setup on an already claimed interface; never resets USB configuration/format. */
+    internal fun prepareFrameDiagnostics(controlInterfaceId: Int) {
+        checkOpen()
+        frameDiagnostics = true
+        outSummary = "usbOutCalls=0 full=0 negative=0 zero=0 partial=0 exceptions=0 maxOutUs=0 lastReturn=none lastOutcome=none"
+        runCatching {
+            onDiagnostic("NCM frame test endpoints in=0x${inEndpoint.address.toString(16)} " +
+                "out=0x${outEndpoint.address.toString(16)} inPacket=${inEndpoint.maxPacketSize} " +
+                "outPacket=${outEndpoint.maxPacketSize} inType=${inEndpoint.type} outType=${outEndpoint.type} " +
+                "control=$controlInterfaceId diagnosticOnly=true")
+        }
+        fun readWord(request: Int): Int? {
+            val value = ByteArray(2)
+            val started = System.nanoTime()
+            val size = connection.controlTransfer(0xa1, request, 0, controlInterfaceId,
+                value, value.size, 1000)
+            runCatching { onDiagnostic("NCM frame test control request=0x${request.toString(16)} " +
+                "return=$size expectedBytes=2 elapsedUs=${(System.nanoTime() - started).coerceAtLeast(0) / 1_000}") }
+            return if (size == 2) (value[0].toInt() and 255) or
+                ((value[1].toInt() and 255) shl 8) else null
+        }
+        val format = readWord(0x83) // GET_NTB_FORMAT: 0 = NTB16, 1 = NTB32.
+        val crc = readWord(0x89) // GET_CRC_MODE; the existing codec emits NCM0 without CRC.
+        runCatching { onDiagnostic("NCM frame test setup ntbFormat=${format ?: "unavailable"} " +
+            "crcMode=${crc ?: "unavailable"} codec=NTB16_no_crc") }
+        if (format != null && format != 0 || crc != null && crc != 0) {
+            throw IphoneUsbException.DeviceUnavailable("NCM diagnostic codec does not support the active NTB format or CRC mode")
+        }
+        // Enable directed, broadcast and all multicast reception on this failed, claimed path.
+        // Some devices do not implement Ethernet filters: report that rather than calling it zero RX.
+        val filter = connection.controlTransfer(0x21, 0x43, 0x0e, controlInterfaceId,
+            null, 0, 1000)
+        runCatching { onDiagnostic("NCM frame test setup receiveFilterAccepted=${filter == 0} " +
+            "unknownFormatOrCrc=${format == null || crc == null}") }
     }
 
     override fun close() {
@@ -186,11 +277,12 @@ class NcmUsbBridge internal constructor(
                 }
                 continue
             }
+            statusDiagnostics.receive(buffer, transferred)
             if (!loggedFirst) {
                 loggedFirst = true
                 Log.i(
                     IphoneCarPlayConfiguration.TAG,
-                    "ncm status notification bytes=$transferred data=${buffer.copyOf(transferred).hex(32)}",
+                    "ncm ${statusDiagnostics.summary()}",
                 )
             }
         }
@@ -224,7 +316,10 @@ class NcmUsbBridge internal constructor(
                 continue
             }
             if (bufferedSize < blockLength) return
-            for (frame in Ntb16Codec.parse(buffered, 0, blockLength)) enqueueFrame(frame)
+            val parsed = Ntb16Codec.parse(buffered, 0, blockLength)
+            ntb16Blocks++
+            if (parsed.isEmpty()) emptyNtb16Blocks++
+            for (frame in parsed) enqueueFrame(frame)
             discard(blockLength)
             optionalShortPacketPad = blockLength % usbPacketSize == 0
             finishResync()
@@ -444,6 +539,8 @@ class NcmUsbBridge internal constructor(
                 val sameInterface = function.control.id == function.data.id
                 val first = if (sameInterface) function.data else function.control
                 val firstClaimed = retryUsbSetup { connection.claimInterface(first, true) }
+                runCatching { onDiagnostic("NCM frame test claim role=control id=${first.id} alternate=${first.alternateSetting} " +
+                    "accepted=${firstClaimed != null} attempts=${firstClaimed ?: USB_SETUP_ATTEMPTS} force=true") }
                 Log.i(
                     IphoneCarPlayConfiguration.TAG,
                     "claim iface=${first.id}/${first.alternateSetting} class=${first.interfaceClass}" +
@@ -458,6 +555,8 @@ class NcmUsbBridge internal constructor(
                 claimed.add(first)
                 if (!sameInterface) {
                     val dataClaimed = retryUsbSetup { connection.claimInterface(function.data, true) }
+                    runCatching { onDiagnostic("NCM frame test claim role=data id=${function.data.id} alternate=${function.data.alternateSetting} " +
+                        "accepted=${dataClaimed != null} attempts=${dataClaimed ?: USB_SETUP_ATTEMPTS} force=true") }
                     Log.i(
                         IphoneCarPlayConfiguration.TAG,
                         "claim iface=${function.data.id}/${function.data.alternateSetting}" +
@@ -472,6 +571,8 @@ class NcmUsbBridge internal constructor(
                     claimed.add(function.data)
                 }
                 val altSelected = retryUsbSetup { connection.setInterface(function.data) }
+                runCatching { onDiagnostic("NCM frame test selectDataAlternate id=${function.data.id} alternate=${function.data.alternateSetting} " +
+                    "accepted=${altSelected != null} attempts=${altSelected ?: USB_SETUP_ATTEMPTS}") }
                 Log.i(
                     IphoneCarPlayConfiguration.TAG,
                     "setInterface iface=${function.data.id}/${function.data.alternateSetting} ok=${altSelected != null}" +

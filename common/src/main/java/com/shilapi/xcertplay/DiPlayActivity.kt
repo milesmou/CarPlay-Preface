@@ -90,17 +90,13 @@ internal enum class SettingsSection {
     AUTOMATIC_CONNECTION,
     USB_CONNECTION,
     HOTSPOT_AUTOMATION,
-    MANUAL_HOTSPOT,
     DISPLAY_AND_PERFORMANCE,
-    EXPERIMENTAL_DISPLAY,
     ADVANCED_MEDIA,
     CAR_BUTTON,
     AUDIO_ROUTING,
     NAVIGATION_WHEEL,
     LOCATION,
-    CLUSTER_MAP,
     EXTERNAL_CONTROLLER,
-    PERMISSIONS_AND_HELP,
 }
 
 internal object SettingsInformationArchitecture {
@@ -111,8 +107,6 @@ internal object SettingsInformationArchitecture {
             SettingsSection.AUTOMATIC_CONNECTION,
             SettingsSection.USB_CONNECTION,
             SettingsSection.HOTSPOT_AUTOMATION,
-            SettingsSection.MANUAL_HOTSPOT,
-            SettingsSection.PERMISSIONS_AND_HELP,
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
@@ -124,8 +118,6 @@ internal object SettingsInformationArchitecture {
         ),
         SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
         SettingsCategory.EXPERIMENTAL to setOf(
-            SettingsSection.CLUSTER_MAP,
-            SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
             SettingsSection.NAVIGATION_WHEEL,
             SettingsSection.EXTERNAL_CONTROLLER,
@@ -150,23 +142,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var settingsCategory = SettingsCategory.CONNECTION
     private var connectionSettingsReturnCategory: SettingsCategory? = null
     private var settingsSectionFilter: Set<SettingsSection>? = null
-    private var clusterSafeAreaDialog: Dialog? = null
-    private var clusterContentRequestVersion = 0L
     private var pendingCarHotspotSetup = false
     private var setupError: String? = null
     private var status: TextView? = null
     private var connectButton: Button? = null
     private var disconnectButton: Button? = null
+    private var phonePickerDialog: PhonePickerDialog? = null
+    private var hotspotCredentialsDialog: HotspotCredentialsDialog? = null
     private var lastRunning: Boolean? = null
     private var pendingWireless = false
     private var initialLaunch = true
     private var notificationTransport = true
     private var exportInProgress = false
-    private var usbPermissionOperation: UsbPermissionSetup.Operation? = null
-    private var usbPermissionDialog: AlertDialog? = null
-    internal var usbPermissionOperationFactory: (Context) -> UsbPermissionSetup.Operation = {
-        UsbPermissionSetup.Operation(it.applicationContext)
-    }
     internal var selectedMtkDecoderName: (String) -> String? = MtkDecoderTuning::selectedDecoderName
     private var navigationStreamType = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
     private var testToneTrack: AudioTrack? = null
@@ -404,26 +391,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         interfaceOverride = next
         return false
     }
-    private fun openOverlayPermission() {
-        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-        if (runCatching { startActivity(intent) }.isFailure) {
-            android.widget.Toast.makeText(this, R.string.center_map_no_permission_screen, android.widget.Toast.LENGTH_LONG).show()
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         // Results from the image picker and crop screens arrive before onResume.
         enforceInterfaceSize()
-        CenterMapOverlay.onDiPlayScreenShown()
     }
 
     override fun onStop() {
-        cancelUsbPermissionSetup()
-        clusterSafeAreaDialog?.dismiss()
+        phonePickerDialog?.cancel()
+        phonePickerDialog = null
         startupHotspotCancelled = true
         super.onStop()
-        if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.scheduleShow()
     }
 
     override fun onResume() {
@@ -460,11 +438,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     override fun onDestroy() {
+        hotspotCredentialsDialog?.dismiss()
+        hotspotCredentialsDialog = null
         settingsSearchPopup?.dismiss()
         appearanceObserverRemoval?.invoke()
         appearanceObserverRemoval = null
         handler.removeCallbacks(appearancePoll)
-        cancelUsbPermissionSetup()
         cancelKeyLearning()
         stopBackupServer()
         super.onDestroy()
@@ -817,22 +796,19 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         val body = column()
         val card = card().apply { setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding)) }
-        card.addView(label(getString(R.string.wireless_carplay), 12, ACCENT, true).apply { letterSpacing = .12f })
-        status = label(getString(R.string.ready_when_you_are), titleSize, TEXT, true).apply {
-            maxLines = if (compact) 1 else 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, dp(HOME_TITLE_GAP_DP))
+        card.addView(label(getString(R.string.wireless_carplay), titleSize, TEXT, true))
+        connectButton = homeButton(getString(R.string.settings_connect_wireless), true) {
+            if (canResumeWirelessSession()) {
+                AirPlayPersistence.saveWirelessEnabled(this, true)
+                openProjection()
+            } else connect(true)
+        }
+        card.addView(connectButton, homeButtonParams(HOME_TITLE_GAP_DP))
+        status = label("", 15, MUTED).apply {
+            visibility = View.GONE
+            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
         }
         card.addView(status)
-        connectButton = homeButton(getString(R.string.settings_connect_wireless), true) {
-            if (CarPlayBackgroundSession.hasSession()) openProjection()
-            else connect(true)
-        }
-        card.addView(connectButton, homeButtonParams())
-        val connectionHint = when (AirPlayPersistence.loadWirelessHotspotMode(this)) {
-            WirelessHotspotMode.MANUAL -> getString(R.string.wireless_carplay_transport)
-            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> getString(R.string.settings_temporary_hotspot_hint)
-        }
         val startupProblem = hotspotStartupResult?.takeIf {
             it != CarHotspotTethering.Result.READY && it != CarHotspotTethering.Result.CANCELLED &&
                 CarHotspotSettings.shouldEnable(this, true, AirPlayPersistence.loadWirelessHotspotMode(this)) &&
@@ -851,18 +827,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             CarPlayBackgroundSession.stop { runOnUiThread { refreshStatus() } }
         }.apply { visibility = View.GONE }
         card.addView(disconnectButton, homeButtonParams(CONTROL_GAP_DP))
-        if (!compact) card.addView(label(connectionHint, 15, MUTED).apply { setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0) })
         val right = card().apply { setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding)) }
-        right.addView(label(getString(R.string.usb_carplay), 12, ACCENT, true).apply { letterSpacing = .12f })
-        right.addView(label(getString(R.string.connect_with_usb), titleSize, TEXT, true).apply {
-            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, dp(HOME_TITLE_GAP_DP))
-        })
-        right.addView(homeButton(getString(R.string.settings_connect_usb), true) { connect(false) }, homeButtonParams())
+        right.addView(label(getString(R.string.usb_carplay), titleSize, TEXT, true))
+        right.addView(homeButton(getString(R.string.settings_connect_usb), true) { connect(false) }, homeButtonParams(HOME_TITLE_GAP_DP))
         right.addView(homeButton(getString(R.string.settings), false) { page = "settings"; render() }, homeButtonParams(CONTROL_GAP_DP))
         if (!compact) right.addView(label(getString(R.string.plug_your_iphone_into_a_usb_data_port_allow_carplay_when_y), 15, MUTED).apply {
-            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
-        })
-        right.addView(label(getString(R.string.home_public_preview, version()), 12, MUTED).apply {
             setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
         })
         availableUpdate?.let { release ->
@@ -1024,7 +993,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         active = CarPlayBackgroundSession.active,
         running = CarPlayBackgroundSession.hasSession(),
         wireless = AirPlayPersistence.loadWirelessEnabled(this),
-        phoneChosen = DiPlayPreferences.phoneAddress(this) != null,
         hotspotSetupNeeded = AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL &&
             (pendingCarHotspotSetup || hotspotError(storedSsid(), storedPassword()) != null),
     )
@@ -1042,7 +1010,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsReadiness.SETUP_ERROR, SettingsReadiness.HOTSPOT_SETUP -> R.string.setup_needs_attention
             SettingsReadiness.CONNECTED -> R.string.carplay_connected
             SettingsReadiness.CONNECTING -> R.string.connecting_to_your_iphone
-            SettingsReadiness.CHOOSE_IPHONE -> R.string.settings_choose_iphone_title
             SettingsReadiness.READY_WIRELESS, SettingsReadiness.READY_USB -> R.string.ready
         })
         val detail = when (state) {
@@ -1050,7 +1017,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsReadiness.HOTSPOT_SETUP -> getString(R.string.save_the_name_and_password_from_the_car_s_hotspot_settings)
             SettingsReadiness.CONNECTED -> getString(R.string.settings_ready_connected)
             SettingsReadiness.CONNECTING -> getString(R.string.settings_connecting_description)
-            SettingsReadiness.CHOOSE_IPHONE -> getString(R.string.settings_choose_iphone_description)
             SettingsReadiness.READY_WIRELESS -> getString(R.string.settings_ready_wireless, DiPlayPreferences.phoneName(this))
             SettingsReadiness.READY_USB -> getString(R.string.settings_ready_usb)
         }
@@ -1061,14 +1027,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         card.addView(label(title, 22, tint, true))
         card.addView(label(detail, 15, MUTED).apply { setPadding(0, dp(6), 0, 0) })
-        when (state) {
-            SettingsReadiness.CHOOSE_IPHONE -> card.addView(button(getString(R.string.settings_choose_iphone_action), true) {
-                choosePhone()
-            }, matchButton(12, 56))
-            // The connection setup card directly below already owns this action.
-            SettingsReadiness.SETUP_ERROR, SettingsReadiness.HOTSPOT_SETUP -> Unit
-            else -> Unit
-        }
     }
 
     private fun settingsCategoryPicker(content: LinearLayout) {
@@ -1105,7 +1063,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun connectionSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.connection), getString(R.string.settings_connection_summary))
-        val hotspotSections = setOf(SettingsSection.HOTSPOT_AUTOMATION, SettingsSection.MANUAL_HOTSPOT)
+        val hotspotSections = setOf(SettingsSection.HOTSPOT_AUTOMATION)
         renderSections(content, hotspotSections)
         val readiness = card()
         readinessCard = readiness
@@ -1508,34 +1466,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 permissions = { listOf(CarHotspotSetup.Permission.BOOT_LAUNCH) }) {
                 AirPlayPersistence.saveAutoStartOnBoot(this, it)
             }
-            val autoConfirmActive = UsbPermissionSetup.Permission.ACCESSIBILITY.granted(this)
-            toggle(
-                card,
-                getString(R.string.usb_auto_confirm_title),
-                getString(R.string.usb_auto_confirm_subtitle),
-                autoConfirmActive,
-            ) { enabled ->
-                if (enabled) promptEnableUsbAutoConfirm()
-                else {
-                    if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
-                    render()
-                }
-            }
-            if (!autoConfirmActive) {
-                card.addView(
-                    button(
-                        getString(R.string.btn_auto_apply_permissions),
-                        true,
-                    ) {
-                        autoApplyPermissions()
-                    },
-                    matchButton(8, 54),
-                )
-            } else {
-                card.addView(label(getString(R.string.usb_auto_confirm_active_hint), 14, READY).apply {
-                    setPadding(0, dp(4), 0, dp(8))
-                })
-            }
             card.addView(button("${getString(R.string.choose_iphone_prefix)}${DiPlayPreferences.phoneName(this)}", false) { choosePhone() }, matchButton(12, 60))
         }
         filteredSection(content, SettingsSection.USB_CONNECTION,
@@ -1554,10 +1484,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         filteredSection(content, SettingsSection.HOTSPOT_AUTOMATION,
             getString(R.string.settings_wireless_hotspot), R.drawable.ic_dp_connection) { card ->
             wirelessLinkControls(card)
-        }
-        if (AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL || searchIndexSink != null) {
-            filteredSection(content, SettingsSection.MANUAL_HOTSPOT,
-                getString(R.string.settings_manual_hotspot_module), R.drawable.ic_dp_connection) { card ->
+            if (AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL || searchIndexSink != null) {
                 manualHotspotControls(card)
             }
         }
@@ -1641,9 +1568,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             ) { label, checked, onChanged ->
                 toggle(card, getString(label), getString(R.string.hide_the_car_s_system_bars_while_carplay_is_open), checked, save = onChanged)
             }
-            toggle(card, getString(R.string.adapt_pip_resolution), getString(R.string.adapt_pip_resolution_description), AirPlayPersistence.loadAdaptPipResolution(this)) {
-                AirPlayPersistence.saveAdaptPipResolution(this, it)
-            }
             card.addView(button("${getString(R.string.settings_interface_size)} · ${InterfaceSize.displayName(this, InterfaceSize.preference(this))}", false) {
                 InterfaceSize.showPicker(this)
             }, matchButton(12, 60))
@@ -1652,34 +1576,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 getString(R.string.settings_force_full_settings_hint), SettingsLayoutPreferences.forceFull(this)) {
                 SettingsLayoutPreferences.saveForceFull(this, it)
                 render()
-            }
-        }
-        filteredSection(content, SettingsSection.EXPERIMENTAL_DISPLAY,
-            getString(R.string.settings_experimental_display), R.drawable.ic_dp_display) { card ->
-            toggle(card, getString(R.string.split_screen_areas), getString(R.string.split_screen_areas_description),
-                SplitScreenSettings.enabled(this)) {
-                SplitScreenSettings.setEnabled(this, it)
-                markReconnectNeeded()
-            }
-            toggle(card, getString(R.string.carplay_rotation), getString(R.string.carplay_rotation_description),
-                CarPlayRotation.enabled(this)) {
-                CarPlayRotation.setEnabled(this, it)
-                render()
-                markReconnectNeeded()
-            }
-            toggle(card, getString(R.string.side_panel), getString(R.string.side_panel_description), SidePanelSettings.enabled(this)) {
-                SidePanelSettings.setEnabled(this, it)
-                markReconnectNeeded()
-            }
-            if (CarPlayRotation.enabled(this)) {
-                val pictures = CarPlayRotation.Picture.entries
-                choice(card, getString(R.string.carplay_rotation_picture), listOf(
-                    getString(R.string.carplay_rotation_smoother),
-                    getString(R.string.carplay_rotation_sharper),
-                ), pictures.indexOf(CarPlayRotation.picture(this)), reconnects = false) {
-                    CarPlayRotation.setPicture(this, pictures[it])
-                    markReconnectNeeded()
-                }
             }
         }
         // Opt-in controls that can cost sound or video on some head units.
@@ -1793,56 +1689,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 getString(R.string.sends_precise_android_location_as_carplay_gps_data_when_th),
                 AirPlayPersistence.loadLocationReportingEnabled(this), save = ::onLocationReportingChanged)
             card.addView(label(getString(R.string.location_reporting_reconnects), 14, MUTED))
-        }
-        filteredSection(content, SettingsSection.CLUSTER_MAP,
-            getString(R.string.carplay_map_on_instrument_cluster_experimental), R.drawable.ic_dp_dashboard) { card ->
-            reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
-                getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
-                AirPlayPersistence.loadClusterMapEnabled(this)) {
-                AirPlayPersistence.saveClusterMapEnabled(this, it)
-                render()
-            }
-            if (AirPlayPersistence.loadClusterMapEnabled(this)) {
-                toggle(card, getString(R.string.center_map_card),
-                    getString(R.string.center_map_card_virtual_description),
-                    AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    AirPlayPersistence.saveCenterMapOverlay(this, it)
-                    if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
-                    render()
-                }
-                if (AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    toggle(card, getString(R.string.center_map_follows_dashboard), getString(R.string.center_map_follows_dashboard_description),
-                        AirPlayPersistence.loadCenterMapFollowsDashboard(this)) {
-                        AirPlayPersistence.saveCenterMapFollowsDashboard(this, it)
-                    }
-                    toggle(card, getString(R.string.center_map_auto_hide), getString(R.string.center_map_auto_hide_description),
-                        AirPlayPersistence.loadCenterMapAutoHide(this)) {
-                        AirPlayPersistence.saveCenterMapAutoHide(this, it)
-                    }
-                }
-                toggle(card, getString(R.string.launcher_map_sharing), getString(R.string.launcher_map_sharing_description),
-                    AirPlayPersistence.loadLauncherMapSharing(this)) {
-                    AirPlayPersistence.saveLauncherMapSharing(this, it)
-                }
-                if (AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    val overlay = CenterMapOverlay.permitted(this)
-                    card.addView(label(if (overlay) getString(R.string.center_map_overlay_allowed)
-                        else getString(R.string.center_map_overlay_missing, packageName), 14, if (overlay) MUTED else WARNING))
-                    val usage = HomeScreenMonitor.hasAccess(this)
-                    card.addView(label(if (usage) getString(R.string.center_map_auto_hide_active)
-                        else getString(R.string.center_map_auto_hide_needed), 14, if (usage) MUTED else WARNING))
-                    if (!usage) {
-                        card.addView(button(getString(R.string.btn_auto_apply_permissions), false) { autoApplyPermissions() }, matchButton(8, 54))
-                    }
-                }
-            }
-        }
-        filteredSection(content, SettingsSection.PERMISSIONS_AND_HELP,
-            getString(R.string.permissions_and_connection_help), R.drawable.ic_dp_permissions) { card ->
-            card.addView(label(getString(R.string.nearby_devices_connects_your_iphone_microphone_enables_sir), 16, MUTED))
-            card.addView(button(getString(R.string.app_permissions), false) { openSystem(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }, matchButton(16, 60))
-            card.addView(button(getString(R.string.bluetooth_settings), false) { openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }, matchButton(10, 60))
-            card.addView(button(getString(R.string.wireless_connection_help), false) { wirelessHelp() }, matchButton(10, 60))
         }
     }
 
@@ -2324,8 +2170,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun manualHotspotControls(parent: LinearLayout) {
             parent.addView(label(getString(R.string.settings_manual_hotspot_description), 15, MUTED),
                 LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
-            parent.addView(button(getString(R.string.settings_hotspot_start), false) { enableManualCarHotspot() }
-                .apply { wrapContentHeight = true }, matchButton(0, 60))
             if (manualHotspotStartPending) parent.addView(label(getString(R.string.settings_hotspot_starting), 15, MUTED))
             hotspotStartupResult?.let { result ->
                 parent.addView(label(hotspotResultText(result), 15,
@@ -2336,8 +2180,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     }.apply { wrapContentHeight = true }, matchButton(SETTINGS_BLOCK_GAP_DP, 60))
                 }
             }
-            parent.addView(button(getString(R.string.open_car_hotspot_settings), false) { openCarWifiSettings() }
-                .apply { wrapContentHeight = true }, matchButton(SETTINGS_BLOCK_GAP_DP, 60))
             parent.addView(button("${getString(R.string.settings_manual_hotspot_details)} · ${storedSsid().ifEmpty { getString(R.string.settings_hotspot_not_configured) }}", false) {
                 askHotspotCredentials { ssid, password, security ->
                     saveHotspotCredentials(ssid, password, security)
@@ -2435,106 +2277,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun askHotspotCredentials(done: (String, String, ManualHotspotSecurity) -> Unit) {
-        val dialogContext = appDialogContext()
-        val fields = column().apply { setPadding(dp(SETTINGS_BLOCK_GAP_DP), dp(SETTINGS_BLOCK_GAP_DP), dp(SETTINGS_BLOCK_GAP_DP), dp(SETTINGS_BLOCK_GAP_DP)) }
-        fields.addView(label(getString(R.string.settings_manual_hotspot_description), 16, MUTED))
-        val ssid = EditText(dialogContext).apply {
-            hint = getString(R.string.hotspot_name)
-            setText(storedSsid())
-            setSingleLine()
-        }
-        val password = EditText(dialogContext).apply {
-            hint = getString(R.string.settings_hotspot_password)
-            setText(storedPassword())
-            setSingleLine()
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-        }
-        ssid.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_NEXT or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
-        password.imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE or android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
-        fun hideKeyboard() {
-            val token = password.windowToken ?: ssid.windowToken
-            (this.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager)
-                .hideSoftInputFromWindow(token, 0)
-            ssid.clearFocus(); password.clearFocus()
-        }
-        ssid.setOnEditorActionListener { _, action, _ ->
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_NEXT) { password.requestFocus(); true } else false
-        }
-        password.setOnEditorActionListener { _, action, _ ->
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) { hideKeyboard(); true } else false
-        }
-        val nameWarning = label(getString(R.string.settings_hotspot_name_non_english), 14, WARNING)
-        fun updateNameWarning() {
-            nameWarning.visibility = if (com.shilapi.xcertplay.orchestration.ManualHotspotValidation.nameMayNotReachIphone(ssid.text.toString())
-            ) View.VISIBLE else View.GONE
-        }
-        updateNameWarning()
-        ssid.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: android.text.Editable?) = updateNameWarning()
-        })
-        fields.addView(ssid); fields.addView(nameWarning); fields.addView(password)
-        fields.addView(CheckBox(dialogContext).apply {
-            text = getString(R.string.show_password)
-            setOnCheckedChangeListener { _, checked ->
-                password.transformationMethod = if (checked) null else android.text.method.PasswordTransformationMethod.getInstance()
-                password.setSelection(password.text.length)
-            }
-        })
-        val securityModes = listOf(ManualHotspotSecurity.WPA2, ManualHotspotSecurity.WPA3_TRANSITION, ManualHotspotSecurity.WPA3)
-        val securityTitles = listOf(getString(R.string.wpa2), getString(R.string.wpa3_transition), getString(R.string.wpa3))
-        var protectedSecurity = AirPlayPersistence.loadManualHotspotSecurity(this)
-            .takeIf { it in securityModes } ?: ManualHotspotSecurity.WPA2
-        run {
-            lateinit var securityControl: Button
-            fun updateSecurityControl() {
-                val hasPassword = password.text.isNotEmpty()
-                val title = if (hasPassword) securityTitles[securityModes.indexOf(protectedSecurity)] else getString(R.string.open)
-                securityControl.text = "${getString(R.string.security)} · $title"
-                securityControl.isEnabled = hasPassword
-            }
-            securityControl = button("", false) {
-                var pendingSecurity = protectedSecurity
-                appDialogBuilder().setTitle(getString(R.string.security))
-                    .setSingleChoiceItems(securityTitles.toTypedArray(), securityModes.indexOf(protectedSecurity)) { _, index ->
-                        pendingSecurity = securityModes[index]
-                    }
-                    .setPositiveButton(getString(R.string.save)) { _, _ ->
-                        protectedSecurity = pendingSecurity
-                        updateSecurityControl()
-                    }.setNegativeButton(getString(R.string.cancel), null).show()
-            }
-            updateSecurityControl()
-            password.addTextChangedListener(object : android.text.TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                override fun afterTextChanged(s: android.text.Editable?) = updateSecurityControl()
-            })
-            fields.addView(securityControl, matchButton(12, 60))
-            fields.addView(label(getString(R.string.saved_for_your_next_connection), 15, MUTED))
-        }
-        val error = label("", 14, WARNING)
-        error.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        fields.addView(error)
-        val dialog = appDialogBuilder().setTitle(getString(R.string.car_hotspot_details))
-            .setView(ScrollView(dialogContext).apply { addView(fields) })
-            .setPositiveButton(getString(R.string.save_details), null).setNegativeButton(getString(R.string.cancel)) { _, _ -> hideKeyboard() }
-            .setNeutralButton(getString(R.string.hide_keyboard), null).create()
-        dialog.setOnShowListener {
-            dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener { hideKeyboard() }
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = ssid.text.toString()
-                val secret = password.text.toString()
-                val problem = hotspotError(name, secret)
-                if (problem != null) error.text = problem
-                else {
-                    val security = if (secret.isEmpty()) ManualHotspotSecurity.OPEN else protectedSecurity
-                    hideKeyboard(); dialog.dismiss(); done(name, secret, security)
-                }
-            }
-        }
+        hotspotCredentialsDialog?.dismiss()
+        val dialog = HotspotCredentialsDialog(this, palette, storedSsid(), storedPassword(),
+            AirPlayPersistence.loadManualHotspotSecurity(this), done)
+        hotspotCredentialsDialog = dialog
+        dialog.setOnDismissListener { if (hotspotCredentialsDialog === dialog) hotspotCredentialsDialog = null }
         dialog.show()
     }
 
@@ -2624,127 +2371,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
-    private fun promptEnableUsbAutoConfirm() {
-        if (UsbPermissionSetup.Permission.ACCESSIBILITY.granted(this)) {
-            toast(getString(R.string.usb_auto_confirm_status_on))
-            return
-        }
-        appDialogBuilder()
-            .setTitle(getString(R.string.usb_auto_confirm_title))
-            .setMessage(getString(R.string.usb_auto_confirm_dialog_msg))
-            .setPositiveButton(getString(R.string.btn_auto_apply_permissions)) { _, _ ->
-                autoApplyPermissions()
-            }
-            .setNeutralButton(getString(R.string.btn_open_accessibility_setting)) { _, _ ->
-                if (!UsbAutoConfirmService.openSettings(this)) {
-                    toast(getString(R.string.wheel_keys_no_settings))
-                }
-            }
-            .setNegativeButton(getString(R.string.cancel)) { _, _ ->
-                render()
-            }
-            .setOnCancelListener {
-                render()
-            }
-            .show()
-    }
-
-    private fun cancelUsbPermissionSetup() {
-        val operation = usbPermissionOperation
-        usbPermissionOperation = null
-        operation?.cancel()
-        val dialog = usbPermissionDialog
-        usbPermissionDialog = null
-        dialog?.dismiss()
-    }
-
-    private fun autoApplyPermissions() {
-        if (usbPermissionOperation != null || isFinishing || isDestroyed) return
-        val operation = usbPermissionOperationFactory(applicationContext)
-        usbPermissionOperation = operation
-        val progress = appDialogBuilder()
-            .setTitle(R.string.auto_grant_title)
-            .setMessage(R.string.auto_grant_msg)
-            .setNegativeButton(R.string.cancel) { _, _ -> cancelUsbPermissionSetup() }
-            .create()
-        usbPermissionDialog = progress
-        progress.setOnCancelListener { cancelUsbPermissionSetup() }
-        progress.setOnDismissListener {
-            if (usbPermissionDialog === progress) cancelUsbPermissionSetup()
-        }
-        progress.show()
-        Thread({
-            val result = operation.run()
-            handler.post {
-                if (usbPermissionOperation !== operation || operation.isCancelled || isFinishing || isDestroyed) {
-                    return@post
-                }
-                usbPermissionOperation = null
-                usbPermissionDialog = null
-                progress.dismiss()
-                render()
-                if (result.complete) {
-                    appDialogBuilder()
-                        .setTitle(R.string.auto_grant_success_title)
-                        .setMessage(R.string.auto_grant_success_msg)
-                        .setPositiveButton(R.string.close, null)
-                        .show()
-                } else {
-                    val reason = when (result.access) {
-                        LocalAdb.Access.NOT_APPROVED -> getString(R.string.auto_grant_confirm_msg)
-                        LocalAdb.Access.UNSUPPORTED -> getString(R.string.adb_pairing_only)
-                        else -> getString(R.string.auto_grant_incomplete)
-                    }
-                    showManualPermissionDialog(reason)
-                }
-            }
-        }, "diplay-auto-permission").start()
-    }
-
-    private fun showManualPermissionDialog(reason: String) {
-        val body = column().apply { setPadding(dp(20), dp(10), dp(20), dp(10)) }
-        body.addView(label(reason, 15, MUTED).apply { setPadding(0, 0, 0, dp(12)) })
-
-        val autoConfirmOn = UsbPermissionSetup.Permission.ACCESSIBILITY.granted(this)
-        body.addView(button(if (autoConfirmOn) getString(R.string.usb_auto_confirm_status_on) else getString(R.string.btn_open_accessibility_setting), false) {
-            if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
-        }, matchButton(0, 56))
-
-        val overlayOn = CenterMapOverlay.permitted(this)
-        body.addView(button(if (overlayOn) getString(R.string.center_map_overlay_allowed) else getString(R.string.btn_open_overlay_setting), false) {
-            openOverlayPermission()
-        }, matchButton(10, 56))
-
-        UsbPermissionSetup.snapshot(this).forEach { (permission, granted) ->
-            val title = getString(when (permission) {
-                UsbPermissionSetup.Permission.ACCESSIBILITY -> R.string.usb_auto_confirm_title
-                UsbPermissionSetup.Permission.USAGE -> R.string.center_map_auto_hide
-                UsbPermissionSetup.Permission.OVERLAY -> R.string.btn_open_overlay_setting
-            })
-            body.addView(label("$title: ${getString(if (granted) R.string.permission_enabled_ready else R.string.permission_not_enabled)}", 14, if (granted) MUTED else WARNING))
-        }
-        val adbCmd = UsbPermissionSetup.manualCommand(packageName)
-        body.addView(label(getString(R.string.manual_grant_cmd_hint), 14, MUTED).apply { setPadding(0, dp(12), 0, dp(6)) })
-        body.addView(label(adbCmd, 13, TEXT).apply {
-            typeface = Typeface.MONOSPACE
-            setTextIsSelectable(true)
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            setBackgroundColor(BUTTON)
-        })
-        body.addView(button(getString(R.string.copy_command), false) {
-            getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(
-                android.content.ClipData.newPlainText("DiPlay ADB Command", adbCmd)
-            )
-            toast(getString(R.string.copied_to_the_car_clipboard_run_the_command_on_your_comput))
-        }, matchButton(8, 50))
-
-        appDialogBuilder()
-            .setTitle(getString(R.string.permissions_and_connection_help))
-            .setView(ScrollView(appDialogContext()).apply { addView(body) })
-            .setPositiveButton(getString(R.string.close)) { _, _ -> render() }
-            .show()
-    }
-
     /** E02 volume routing uses the system input observer; accessibility is not a prerequisite. */
     private fun navigationWheelControls(card: LinearLayout) {
         toggle(card, getString(R.string.settings_navigation_wheel_volume), getString(R.string.settings_navigation_wheel_volume_description),
@@ -2754,69 +2380,32 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
-    /** Steering-wheel keys for the dashboard map zoom and the CarPlay joystick: the switches, the key service and the keys. */
-    // One place for the key service setup, above every feature that needs it.
+    /** Shared service setup for Siri and the CarPlay joystick. */
     private fun wheelKeysSettings(card: LinearLayout) {
-        val zoomAvailable = wheelMapZoomAvailable()
-        val vehicleKeysOn = WheelZoomSettings.joystick(this) ||
-            (zoomAvailable && WheelZoomSettings.enabled(this))
-        if (WheelZoomSettings.siriKey(this) || vehicleKeysOn) wheelKeyServiceControls(card)
+        if (WheelZoomSettings.siriKey(this) || WheelZoomSettings.joystick(this)) wheelKeyServiceControls(card)
         siriKeyControls(card)
-        // Keep previously configured controls reachable even if package detection misses the car.
-        if (zoomAvailable || WheelZoomSettings.joystick(this)) wheelKeyControls(card)
+        if (WheelZoomSettings.joystick(this)) wheelKeyControls(card)
     }
 
-    // Map zoom only works where the dashboard map card used to show these controls.
-    private fun wheelMapZoomAvailable(): Boolean = AirPlayPersistence.loadClusterMapEnabled(this)
-
     private fun wheelKeyControls(card: LinearLayout) {
-        val zoomAvailable = wheelMapZoomAvailable()
-        if (zoomAvailable) {
-            toggle(card, getString(R.string.wheel_map_zoom), getString(R.string.wheel_map_zoom_description),
-                WheelZoomSettings.enabled(this)) {
-                WheelZoomSettings.setEnabled(this, it)
-                render()
-            }
-        }
         toggle(card, getString(R.string.wheel_joystick), getString(R.string.wheel_joystick_description),
             WheelZoomSettings.joystick(this)) {
             WheelZoomSettings.setJoystick(this, it)
             render()
         }
-        val zoom = zoomAvailable && WheelZoomSettings.enabled(this)
-        val joystick = WheelZoomSettings.joystick(this)
-        if (!zoom && !joystick) return
-        if (zoom) {
-            val behaviours = WheelZoomSettings.Behaviour.entries
-            choice(card, getString(R.string.wheel_zoom_behaviour),
-                listOf(getString(R.string.wheel_zoom_behaviour_toggle), getString(R.string.wheel_zoom_behaviour_timed)),
-                behaviours.indexOf(WheelZoomSettings.behaviour(this)), reconnects = false) {
-                WheelZoomSettings.setBehaviour(this, behaviours[it])
-            }
-        }
-        if (joystick) {
-            toggle(card, getString(R.string.wheel_joystick_auto_off), getString(R.string.wheel_joystick_auto_off_description),
-                WheelZoomSettings.joystickAutoOff(this)) { WheelZoomSettings.setJoystickAutoOff(this, it) }
-        }
+        if (!WheelZoomSettings.joystick(this)) return
+        toggle(card, getString(R.string.wheel_joystick_auto_off), getString(R.string.wheel_joystick_auto_off_description),
+            WheelZoomSettings.joystickAutoOff(this)) { WheelZoomSettings.setJoystickAutoOff(this, it) }
         for (role in WheelZoomSettings.Role.entries) {
-            // A key can serve both: the mode key goes back in the joystick, the zoom keys move it.
-            val zoomName = when (role) {
-                WheelZoomSettings.Role.MODE -> R.string.wheel_key_role_mode
-                WheelZoomSettings.Role.ZOOM_IN -> R.string.wheel_key_role_zoom_in
-                WheelZoomSettings.Role.ZOOM_OUT -> R.string.wheel_key_role_zoom_out
-                else -> null
-            }.takeIf { zoom }
-            val joystickName = when (role) {
+            val name = when (role) {
                 WheelZoomSettings.Role.MODE -> R.string.wheel_key_role_back
                 WheelZoomSettings.Role.ZOOM_IN, WheelZoomSettings.Role.PREVIOUS -> R.string.wheel_key_role_previous
                 WheelZoomSettings.Role.ZOOM_OUT, WheelZoomSettings.Role.NEXT -> R.string.wheel_key_role_next
                 WheelZoomSettings.Role.JOYSTICK -> R.string.wheel_key_role_joystick
                 WheelZoomSettings.Role.SELECT -> R.string.wheel_key_role_select
                 WheelZoomSettings.Role.SIRI -> null
-            }.takeIf { joystick }
-            val names = listOfNotNull(zoomName, joystickName)
-            if (names.isEmpty()) continue
-            wheelKeyAssignButton(card, role, names.joinToString(" · ") { getString(it) })
+            } ?: continue
+            wheelKeyAssignButton(card, role, getString(name))
         }
     }
 
@@ -2851,7 +2440,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }, "diplay-wheel-keys-enable").start()
             }, matchButton(10, 56))
             card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
-                if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
+                if (!WheelKeyService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
             }, matchButton(10, 56))
         }
     }
@@ -3390,45 +2979,49 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun openProjection() {
         startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
+    private fun canResumeWirelessSession(): Boolean {
+        val current = CarPlayBackgroundSession.snapshot()?.controller ?: return false
+        return !current.isClosed() && current.connectionTransport() == com.shilapi.xcertplay.orchestration.CarPlayTransport.WIRELESS
+    }
     private fun choosePhone() {
         if (Build.VERSION.SDK_INT >= 31 && checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT); return
         }
         val adapter = getSystemService(BluetoothManager::class.java)?.adapter
+        fun showPicker(choices: List<PhonePickerDialog.Choice>, title: String, emptyMessage: String,
+            pairingTitle: String) {
+            phonePickerDialog?.dismiss()
+            val dialog = PhonePickerDialog(this, palette, choices, DiPlayPreferences.phoneAddress(this),
+                title, emptyMessage, pairingTitle,
+                onChoose = { choice ->
+                    DiPlayPreferences.savePhone(this, choice.address, choice.name ?: "iPhone")
+                    val start = pendingWireless
+                    pendingWireless = false
+                    render()
+                    if (start) connect(true)
+                }, onPair = {
+                    pendingWireless = false
+                    openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                }, onCancel = { pendingWireless = false })
+            phonePickerDialog = dialog
+            dialog.setOnDismissListener { if (phonePickerDialog === dialog) phonePickerDialog = null }
+            dialog.show()
+        }
         if (adapter == null || !adapter.isEnabled) {
-            appDialogBuilder().setTitle(getString(R.string.turn_on_bluetooth))
-                .setMessage(getString(R.string.enable_the_car_s_bluetooth_and_pair_your_iphone_first))
-                .setPositiveButton(getString(R.string.open_bluetooth)) { _, _ -> openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
-                .setNegativeButton(getString(R.string.later), null).show(); return
+            showPicker(emptyList(), getString(R.string.turn_on_bluetooth),
+                getString(R.string.enable_the_car_s_bluetooth_and_pair_your_iphone_first), getString(R.string.open_bluetooth))
+            return
         }
-        val devices = runCatching { adapter.bondedDevices.sortedBy { it.name ?: "" } }.getOrDefault(emptyList())
+        val devices = runCatching {
+            adapter.bondedDevices.map { PhonePickerDialog.Choice(it.address, it.name) }
+                .sortedBy { it.name ?: "" }
+        }.getOrDefault(emptyList())
         if (devices.isEmpty()) {
-            appDialogBuilder().setTitle(getString(R.string.pair_your_iphone))
-                .setMessage(getString(R.string.on_your_iphone_open_settings_bluetooth_and_pair_with_the_c))
-                .setPositiveButton(getString(R.string.open_bluetooth)) { _, _ -> openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
-                .setNegativeButton(getString(R.string.got_it), null).show(); return
+            showPicker(emptyList(), getString(R.string.pair_your_iphone),
+                getString(R.string.on_your_iphone_open_settings_bluetooth_and_pair_with_the_c), getString(R.string.open_bluetooth))
+            return
         }
-        appDialogBuilder().setTitle(getString(R.string.choose_your_iphone))
-            .setItems(devices.map { device ->
-                val name = device.name ?: getString(R.string.paired_device)
-                if (devices.count { it.name == device.name } > 1) "$name · ${device.address.takeLast(5)}" else name
-            }.toTypedArray()) { _, index ->
-                val device = devices[index]
-                DiPlayPreferences.savePhone(this, device.address, device.name ?: "iPhone")
-                val start = pendingWireless; pendingWireless = false
-                render()
-                if (start) connect(true)
-            }.setNeutralButton(getString(R.string.pair_another)) { _, _ -> openSystem(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
-            .setNegativeButton(getString(R.string.cancel)) { _, _ -> pendingWireless = false }.show()
-    }
-
-    private fun wirelessHelp() {
-        appDialogBuilder().setTitle(getString(R.string.wireless_connection_help))
-            .setMessage(getString(R.string.pair_your_iphone_with_the_car_s_bluetooth_keep_wi_fi_on_an))
-            .setPositiveButton(getString(R.string.got_it), null)
-            .setNeutralButton(getString(R.string.reset_carplay_wi_fi)) { _, _ ->
-                confirmWirelessReset()
-            }.show()
+        showPicker(devices, getString(R.string.choose_your_iphone), "", getString(R.string.pair_another))
     }
 
     private fun handleWirelessRecovery() {
@@ -3451,19 +3044,23 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun refreshStatus() {
         val running = CarPlayBackgroundSession.hasSession()
-        status?.text = when {
+        val connectionStatus = when {
             setupError != null -> getString(R.string.setup_needs_attention)
             CarPlayBackgroundSession.active -> getString(R.string.carplay_connected)
             running -> getString(R.string.connecting_to_your_iphone)
             DiPlayPreferences.phoneAddress(this) != null -> "${getString(R.string.status_ready_for_prefix)}${DiPlayPreferences.phoneName(this)}"
-            else -> getString(R.string.ready_when_you_are)
+            else -> null
+        }
+        status?.apply {
+            text = connectionStatus.orEmpty()
+            visibility = if (connectionStatus == null) View.GONE else View.VISIBLE
         }
         if (lastRunning != running) {
-            connectButton?.text = if (running) getString(R.string.open_carplay) else getString(R.string.settings_connect_wireless)
             disconnectButton?.visibility = if (running) View.VISIBLE else View.GONE
             disconnectButton?.isEnabled = true
             lastRunning = running
         }
+        connectButton?.text = getString(if (canResumeWirelessSession()) R.string.open_carplay else R.string.settings_connect_wireless)
         connectButton?.isEnabled = setupError == null
         refreshReconnectBar()
         refreshReadiness()
@@ -3489,6 +3086,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val appContext = applicationContext
         return buildString {
             appendLine("DiPlay ${version()} · private beta diagnostic report")
+            appendLine("Application buildCode=${packageManager.getPackageInfo(packageName, 0).longVersionCodeCompat()}")
+            appendLine("Application package=$packageName")
             appendLine("Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
             appendLine("Head unit: ${Build.MANUFACTURER} ${Build.MODEL}")
             appendLine("Connection: ${if (AirPlayPersistence.loadWirelessEnabled(appContext)) "wireless" else "USB"}")

@@ -49,4 +49,57 @@ class PrefaceMediaKeyEchoesTest {
         assertTrue(press(4, false))
         assertEquals(listOf(4), sent)
     }
+
+    @Test fun threeParallelPathsSendOnceInAnyOrderAndKeepRapidPresses() {
+        val sources = PrefaceMediaKeyEchoes.Source.entries
+        for (first in sources) {
+            echoes.clear(); sent.clear()
+            val order = listOf(first) + sources.filter { it != first }
+            repeat(2) { tap ->
+                time += 50
+                order.forEach { source ->
+                    assertTrue(echoes.dispatch(4, source) { sent.add(4) })
+                }
+                assertEquals(tap + 1, sent.size)
+            }
+        }
+    }
+
+    @Test fun twoFastNativePressesAndTheirDelayedBroadcastsStillSendTwo() {
+        val native = PrefaceMediaKeyEchoes.Source.MEDIA_CENTER
+        val broadcast = PrefaceMediaKeyEchoes.Source.ANDROID_KEY
+        val input = PrefaceMediaKeyEchoes.Source.INPUT
+        echoes.dispatch(4, native) { sent.add(4) }
+        time += 40
+        echoes.dispatch(4, native) { sent.add(4) }
+        repeat(2) {
+            echoes.dispatch(4, broadcast) { sent.add(4) }
+            echoes.dispatch(4, input) { sent.add(4) }
+        }
+        assertEquals(listOf(4, 4), sent)
+    }
+
+    @Test fun nativePlayAndPauseDoNotGetReversedByTheSamePhysicalToggle() {
+        val native = PrefaceMediaKeyEchoes.Source.MEDIA_CENTER
+        val input = PrefaceMediaKeyEchoes.Source.INPUT
+        val broadcast = PrefaceMediaKeyEchoes.Source.ANDROID_KEY
+        echoes.dispatch(1, native) { sent.add(1) }
+        echoes.dispatch(3, input) { sent.add(3) }
+        echoes.dispatch(3, broadcast) { sent.add(3) }
+        echoes.dispatch(2, native) { sent.add(2) }
+        echoes.dispatch(3, input) { sent.add(3) }
+        echoes.dispatch(3, broadcast) { sent.add(3) }
+        assertEquals(listOf(1, 2), sent)
+        echoes.clear(); sent.clear()
+        echoes.dispatch(3, input) { sent.add(3) }
+        echoes.dispatch(1, native) { sent.add(1) }
+        echoes.dispatch(3, broadcast) { sent.add(3) }
+        assertEquals(listOf(3), sent)
+    }
+
+    @Test fun oppositeExplicitCommandsAreNeverMerged() {
+        echoes.dispatch(1, PrefaceMediaKeyEchoes.Source.ANDROID_KEY) { sent.add(1) }
+        echoes.dispatch(2, PrefaceMediaKeyEchoes.Source.MEDIA_CENTER) { sent.add(2) }
+        assertEquals(listOf(1, 2), sent)
+    }
 }

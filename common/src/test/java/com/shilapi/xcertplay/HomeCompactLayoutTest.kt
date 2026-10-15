@@ -92,6 +92,14 @@ class HomeCompactLayoutTest {
                 assertTrue(control.layout.height + control.compoundPaddingTop + control.compoundPaddingBottom <= control.height)
             }
             assertFalse(views(decor).filterIsInstance<TextView>().any { it.text == activity.getString(R.string.a_familiar_drive) })
+            val visibleText = views(decor).filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE }
+                .map { it.text.toString() }.toList()
+            for (id in listOf(R.string.connect_with_usb, R.string.wireless_carplay_transport, R.string.ready_when_you_are)) {
+                assertFalse("Repeated home copy: ${activity.getString(id)}", activity.getString(id) in visibleText)
+            }
+            assertFalse(visibleText.any { it.startsWith("公开预览") || it.startsWith("Public preview") })
+            assertEquals(1, visibleText.count { it == activity.getString(R.string.wireless_carplay) })
+            assertEquals(1, visibleText.count { it == activity.getString(R.string.usb_carplay) })
             if (name.startsWith("full")) {
                 val scroll = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll")
                 assertTrue("Home must fit without scrolling at normal density", scroll.getChildAt(0).height <= scroll.height)

@@ -15,12 +15,11 @@
     <!-- Optional: diagnostic reports in the visible Downloads/DiPlay folder on Android 9.
          Android 10+ needs no permission for this, so it is never requested there. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-    <!-- Optional: the dashboard map as a card over the home screen. -->
+    <!-- Optional overlays for other application controls. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- Optional Usage Access for showing the map over the active home screen. -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
-    <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
+        <package android:name="com.ecarx.sdk.openapi" />
+        <package android:name="ecarx.xsf.mediacenter" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="content" android:mimeType="application/vnd.android.package-archive" />
@@ -117,17 +116,7 @@
                 android:resource="@xml/navigation_widget_info" />
         </receiver>
 
-        <!-- The live dashboard map for launchers that embed it (docs/LAUNCHER_INTEGRATION.md). -->
-        <service
-            android:name="com.shilapi.xcertplay.MapEmbedService"
-            android:exported="true"
-            tools:ignore="ExportedService">
-            <intent-filter>
-                <action android:name="com.shihab.diplay.action.EMBED_MAP" />
-            </intent-filter>
-        </service>
-
-        <!-- Optional: steering-wheel keys for the dashboard map zoom. -->
+        <!-- Optional: custom steering-wheel keys for Siri and the CarPlay joystick. -->
         <service
             android:name="com.shilapi.xcertplay.WheelKeyService"
             android:exported="true"
@@ -150,17 +139,6 @@
             </intent-filter>
         </receiver>
 
-        <service
-            android:name="com.shilapi.xcertplay.UsbAutoConfirmService"
-            android:exported="true"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/usb_auto_confirm_service_config" />
-        </service>
     </application>
 
 </manifest>

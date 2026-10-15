@@ -170,7 +170,6 @@ class WheelSiriWindowTest {
         WheelZoomSettings.setJoystick(settings, true)
         val joystickKey = WheelKey(KeyEvent.KEYCODE_F8, 0, "external-wheel")
         WheelZoomSettings.assign(settings, WheelZoomSettings.Role.JOYSTICK, joystickKey)
-        AirPlayPersistence.saveClusterMapEnabled(settings, false)
 
         val controls = wheelControls()
         val joystick = views(controls).filterIsInstance<Switch>().single {

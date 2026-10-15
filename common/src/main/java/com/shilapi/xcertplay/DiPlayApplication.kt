@@ -15,6 +15,7 @@ class DiPlayApplication : Application() {
         super.onCreate()
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         AppLocale.enforce(this)
+        CarPlayMediaKeys.initialize(this)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

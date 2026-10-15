@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_picker_hint">Choose your iPhone from the paired devices. A change applies at the next connection.</string>
+    <string name="phone_picker_selected">%1$s, selected</string>
+</resources>

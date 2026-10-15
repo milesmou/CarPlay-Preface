@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="status_testing_usb_ncm">Testing USB NCM frames automatically…</string>
+    <string name="status_usb_ncm_test_finished">USB frame test ended. Save a diagnostic report.</string>
+    <string name="connection_help_usb_ncm_test">The USB connection could not start, so an automatic NCM frame test was attempted. Save a diagnostic report to check received frames, USB writes and matching probe replies. Unplug and reconnect the USB cable before trying again; testing may detach the system NCM driver. No VPN permission or root is required.</string>
     <string name="connection_help_usb_direct">The iPhone USB network is not ready or the phone did not connect to AirPlay. Unplug and reconnect the USB data cable, then save a diagnostic report if it still fails. This connection uses the system USB network and does not require VPN permission or root.</string>
 </resources>

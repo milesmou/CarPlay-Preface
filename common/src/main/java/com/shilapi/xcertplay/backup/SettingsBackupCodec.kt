@@ -20,8 +20,6 @@ object SettingsBackupCodec {
      * detected screen size, the car's hotspot) and consents (sharing the map with other apps) stay out too.
      */
     private val AIRPLAY_KEYS = setOf(
-        "cluster_map_enabled",
-        "cluster_map_scale_percent",
         "cluster_content",
         "cluster_small_window_mode",
         "cluster_turn_card_overlay_x_percent",
@@ -47,11 +45,10 @@ object SettingsBackupCodec {
         "ambient_lux_threshold", "display_fps", "media_buffer_ms", "main_buffered_audio",
         "speech_without_8_16_khz", "car_bluetooth_audio", "call_echo_cancellation", "call_voice_filter",
         "smooth_video", "direct_video_output", "low_latency_decoder", "mtk_decoder_tuning", "fps_counter",
-        "center_map_overlay", "center_map_auto_hide",
-        "center_map_follows_dashboard", "settings_gesture_fingers", "display_width_physical_mm",
+        "settings_gesture_fingers", "display_width_physical_mm",
         "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
         "safe_area_draw_outside", "main_display_disable_safe_area",
-        "adapt_pip_resolution", "auto_start_on_boot",
+        "auto_start_on_boot",
         "location_reporting_enabled", "usb_charging_current",
     )
 

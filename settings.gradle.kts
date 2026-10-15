@@ -24,6 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "xcertplay"
 include(":common")
+include(":ecarx-mediacenter-api-stubs")
 include(":mobile")
 include(":automotive")
 include(":shared")

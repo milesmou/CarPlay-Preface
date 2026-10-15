@@ -42,10 +42,10 @@ object ConnectionSettingsSection {
     )
 
     fun hotspotModeOptions(context: Context): List<Pair<WirelessHotspotMode, String>> = buildList {
+        add(WirelessHotspotMode.MANUAL to context.getString(R.string.settings_manual_hotspot_title))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             add(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT to context.getString(R.string.settings_temporary_hotspot))
         }
-        add(WirelessHotspotMode.MANUAL to context.getString(R.string.settings_manual_hotspot_title))
     }
 
     fun createHotspotModeChoice(

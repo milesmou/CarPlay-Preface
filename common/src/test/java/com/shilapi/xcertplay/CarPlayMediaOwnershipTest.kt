@@ -141,6 +141,18 @@ class CarPlayMediaOwnershipTest {
         assertFalse(lines.any { it.contains("1234") || it.contains("5678") })
     }
 
+    @Test fun disablingVolumeSelectionKeepsTrackKeysAndDefaultMediaCenterAttached() {
+        val controller = attach()
+        CarPlayBackgroundSession.active = true
+        NavigationWheelSettings.setEnabled(app, false)
+        try {
+            assertFalse(CarPlayMediaKeys.volumeKeysEligible(app))
+            assertTrue(CarPlayMediaKeys.onWindowMediaKey(key(KeyEvent.KEYCODE_MEDIA_NEXT)) == true)
+            verify(controller).sendMediaButton(CarPlayMediaButton.NEXT)
+            assertNotNull(ReflectionHelpers.getField<PrefaceMediaCenter>(CarPlayMediaKeys, "mediaCenter"))
+        } finally { NavigationWheelSettings.setEnabled(app, true) }
+    }
+
     private fun attach(owner: Any? = null): CarPlayController {
         val controller = mock(CarPlayController::class.java).also(controllers::add)
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())

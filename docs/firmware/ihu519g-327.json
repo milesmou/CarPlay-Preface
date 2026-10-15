@@ -2,6 +2,83 @@
   "schemaVersion": 1,
   "analyzedAt": "2026-10-13",
   "scope": "Static evidence for the supplied IHU519G/FS11A1 build 327 only; vehicle validation pending.",
+  "followupMediaUsbDiagnosticImplementation": {
+    "scope": "Application diagnostic implementation only; new runtime evidence pending",
+    "documentation": "docs/MEDIA_USB_DIAGNOSTICS_2026-10-15.md",
+    "media": ["read-only package and service resolution", "init and callback timing/thread", "register and requestPlay outcomes", "fixed exception categories", "bounded own-process SDK log categories on first ready=false"],
+    "vendorCrossProcessLogs": "unavailable",
+    "bluetooth": ["A2DP Sink connection and playing broadcasts", "AVRCP Controller and Headset Client events", "bounded audio snapshots and role aggregate queries"],
+    "oemCurrentSourceMeasured": false,
+    "usb": ["bringup stage timing", "outgoing neighbor protocol counters", "other local address TCP row count with unverified ownership", "DHCP option 53 type counts", "CDC link and speed notification summary", "claim and alternate outcome"],
+    "reportBuildCodeRecorded": true,
+    "connectionPolicyChange": false,
+    "fullCiRun": false,
+    "targetedTestsPassed": 101,
+    "apkBuiltWithTheseDiagnostics": false
+  },
+  "separateNetEaseTrackServiceReference": {
+    "scope": "Independent user APK static evidence plus user confirmation; not validation of this OTA or equivalence to installed bytes",
+    "filename": "切歌服务(不可禁用多媒体) (1).apk",
+    "bytes": 5817627,
+    "sha256": "8e0e8b76f53f10a9c0d49d5efbd99b24f946223ebecfc9d9ecf42b3460f6aa23",
+    "packageName": "com.ecarx.sdk.openapi",
+    "applicationLabel": "XCOpenAPIService",
+    "versionName": "4.1.6 (26A7051)",
+    "versionCode": 40530001,
+    "manifestSharedUserId": "android.uid.system",
+    "role": "OpenAPI service pool provider, not a demonstrated MusicClient or media-key receiver implementation",
+    "userConfirmedInstalledAndNetEaseWheelWorking": true,
+    "observedFailureBranches": ["caller authorization failure before target Binder lookup", "target service Binder not ready after authorization"],
+    "mediaServicePackage": "ecarx.xsf.mediacenter",
+    "carPlayReadyFalseCause": "not_yet_identified",
+    "decompiler": {"version": "jadx 1.5.6", "reportedErrors": 6, "completeImplementationRecovered": false},
+    "originalOtaOpenApiApkSha256": "3bada64ef495484a9b9a7dd9653aca9a07794c8d6daaa0f74092c02f49b87c53",
+    "exactModificationDeltaAgainstOriginal": "not_established",
+    "documentation": "docs/NETEASE_TRACK_SERVICE_REFERENCE.md",
+    "localEvidenceCatalog": "agent_docs/apk-reference/netease-track-service/catalog.json"
+  },
+  "separateRuntimeReport20261015Number5": {
+    "scope": "IHU353G report and user observation only; not validation of this OTA or all E02 firmware",
+    "sourceFilename": "diplay-report 5.txt",
+    "sourceSha256": "5b7d54b6393c7b126826347e828832a63545956ef7c7590df14835ad2ed59b4b",
+    "sourceBytes": 205109,
+    "applicationVersionName": "0.1.1",
+    "applicationVersionCode": "not_recorded_in_report",
+    "documentation": "docs/CONNECTION_REPORT_2026-10-15_5.md",
+    "userObservation": "CarPlay play and wheel next both result in OEM Bluetooth music playback",
+    "oemMediaCenter": {"path": "package-music-client", "sdkVersion": 351, "ready": false, "phase": "before-registration", "registerAttemptObserved": false, "requestPlayAcceptedObserved": false, "failureReason": "not_recorded"},
+    "carPlayAudio": {"receivedAndDecoded": true, "playbackHeadAdvanced": true, "audioTrackDeviceType": 2, "oemSelectedSourceMeasured": false},
+    "shortPlayingIntervalsMs": [1524, 1424, 1023, 1127],
+    "wheelNext": {"appCommands": 2, "pairedBroadcastEchoesSuppressed": 2, "foregroundStopAfterEach": true, "oemAvrcpCommandMeasured": false},
+    "usb": {"driver": "cdc_ncm", "ipv6Ready": true, "listenerPort": 7000, "airPlayTcpAccepted": 0, "selectedInterfaceIcmp6InNs": 1, "selectedInterfaceIcmp6InNa": 1},
+    "rawNcmTest": {"usbInTransfers": 1, "usbInBytes": 372, "ntb16Blocks": 1, "ipv4Headers": 1, "udpDhcp4Headers": 1, "ipv6": 0, "outCalls": 3, "outFull": 0, "outNegative": 3, "outLastReturn": -1, "outEffectiveTimeoutMs": 20, "bidirectionalConfirmed": false},
+    "temporaryHotspot": {"sessionsEstablished": 2, "manualVersusAutomaticJoin": "not_recorded", "creationFailures": ["generic_error"]},
+    "laterWirelessBackend": "Manual hotspot",
+    "evidenceLines": {"oemReady": [53, 57, 834, 839], "carPlayAudio": [1153, 1161, 1184, 1454], "wheel": [1169, 1179, 1205, 1211], "usbIpv6Control": [689, 707], "rawNcm": [780, 805]}
+  },
+  "separateRuntimeReport20261015": {
+    "scope": "User IHU353G Android 9 API 28 report only; not validation of this IHU519G OTA or all E02 firmware.",
+    "sourceFilename": "diplay-report 4.txt",
+    "sourceSha256": "9f38e3b7b04344f1d9bff02993e2db9f7fc58903611ea4bcacfcf92b6f93145f",
+    "sourceBytes": 237537,
+    "applicationVersionName": "0.1.1",
+    "applicationVersionCode": "not_recorded_in_report",
+    "documentation": "docs/CONNECTION_REPORT_2026-10-15.md",
+    "oemMediaCenter": {"stage": "api-not-ready", "registered": false, "sourceOwned": false, "rejectionReason": "not_recorded"},
+    "automaticPause": {"shortPlayingIntervalsMs": [1505, 1127, 1462, 1121, 1122], "appPauseCommandObserved": false, "bluetoothAvrcpCause": "not_confirmed"},
+    "usb": {"interface": "usb0", "driver": "cdc_ncm", "ipv6": "ready", "listenerPort": 7000, "authentication": "accepted", "airPlayTcpAccepted": 0},
+    "rawNcmTest": {"usbInTransfers": 2, "usbInBytes": 744, "ntb16Blocks": 2, "ipv6": 0, "unsupported": 2, "txAttempts": 3, "txAccepted": 0, "bidirectionalConfirmed": false},
+    "followupUsbDiagnostics": {
+      "scope": "Application diagnostics only; new runtime evidence pending, no firmware capability claim",
+      "rawPath": ["bounded header-only Ethernet and protocol classification", "OUT API return, effective timeout and elapsed time", "endpoint properties and format-query result length", "split sample/result lines"],
+      "systemPath": "Allowlisted per-interface IPv6 protocol counters and deltas, checked against selected interface index",
+      "connectionPolicyChange": false,
+      "documentation": "docs/USB_NCM_FRAME_DIAGNOSTICS.md"
+    },
+    "temporaryHotspot": {"userConfirmedAllSuccessfulConnectionsWereManualJoins": true, "validReservationReusedOnFirstTimeout": true, "channelKnown": false, "creationFailures": ["generic_error", "incompatible_wifi_mode"]},
+    "laterWirelessBackend": "Manual hotspot",
+    "evidenceLines": {"sourceNotRegistered": [10, 54, 61, 1499, 1501], "trackDispatchAndEcho": [1973, 1974, 1975], "phonePause": [1848, 1852, 2054, 2056], "usbReady": [999, 1007, 1008, 1020, 1021], "rawNcmResult": [1159, 1166], "hotspotReused": [145, 157], "laterManualBackend": [1273, 1538]}
+  },
   "cacheRoot": "agent_docs/firmware/ihu519g-327",
   "source": {
     "providedFilename": "23星瑞1.5T固件.zip",
@@ -105,6 +182,23 @@
     "airPlayStartupTimeoutMillis": 30000,
     "vpnConsent": "not_requested",
     "fallbackAfterEstablishedSession": false,
+    "automaticFrameTest": {
+      "updatedAt": "2026-10-15",
+      "verification": "implementation_and_targeted_tests_only_vehicle_validation_pending",
+      "trigger": "system_network_unavailable_listener_failure_or_30s_airplay_startup_timeout",
+      "afterEstablishedSession": false,
+      "keepsIap2Authentication": true,
+      "windowStartsAfterStartSession": true,
+      "durationMillis": 15000,
+      "maxEchoProbes": 3,
+      "claimsOnlyNcm": true,
+      "airPlayFallback": false,
+      "setsUsbConfiguration": false,
+      "requiresVpnOrRoot": false,
+      "replugRequiredAfterTest": true,
+      "recordsRawPayloadsOrAddresses": false,
+      "documentation": "docs/USB_NCM_FRAME_DIAGNOSTICS.md"
+    },
     "startupDiagnostics": {
       "verification": "implementation_and_targeted_tests_only_reported_device_validation_pending",
       "sampleIntervalMillis": 5000,
@@ -649,6 +743,11 @@
     ]
   },
   "evidence": {
+    "mediacenter_sdk_definitions": {
+      "path": "system/framework/boot-ecarx.gkui.openapi.impl.vdex",
+      "bytes": 1165440,
+      "sha256": "f0b8f013ccd0b5fcdb52c59bb77ef28c4c9abd142b9540515de3066de7db797f"
+    },
     "system_properties": {
       "path": "system/build.prop",
       "bytes": 4120,
@@ -832,5 +931,284 @@
     "declared-features.json",
     "init-services.json"
   ],
-  "rebuildCatalogCommand": "python scripts/firmware_catalog.py --cache agent_docs/firmware/ihu519g-327 --aapt2 <existing-aapt2-path>"
+  "rebuildCatalogCommand": "python scripts/firmware_catalog.py --cache agent_docs/firmware/ihu519g-327 --aapt2 <existing-aapt2-path>",
+  "mediaCenterSdkReference": {
+    "applicationConcreteRegistration": {
+      "updatedAt": "2026-10-15",
+      "defaultPath": "registerMusic(application_package_name, application_owned_MusicClient_subclass)",
+      "initializationTrigger": "DiPlayApplication.onCreate; background init and register on SDK ready before any phone session",
+      "firstConnection": "adopt startup registration or pending initialization without unregister/register churn",
+      "idleBehavior": "no requestPlay, audio focus, Android MediaSession or key consumption until a valid playing CarPlay session",
+      "disconnectBehavior": "unregister retired token and reject stale callbacks; later connections initialize again",
+      "runtimeImplementation": "installed_firmware_SDK",
+      "compileOnlyDeclarations": "ecarx-mediacenter-api-stubs; handwritten signatures, excluded from production runtime dependencies",
+      "statePublicationOrder": ["requestPlay accepted", "updateMediaList", "updateCurrentSourceType 6", "updateMusicPlaybackState"],
+      "interfaceFallback": "class_or_signature_missing_or_linkage_unavailable_only; no alternate registration after readiness or permission rejection",
+      "reportedIhu353gReadiness": "api-not-ready observed before registration; effect of this change unverified",
+      "documentation": "docs/LINKCO_APK_MEDIA_KEYS_REFERENCE.md"
+    },
+    "analyzedAt": "2026-10-15",
+    "verification": "compact_dex_class_method_and_proto_definitions_only",
+    "scope": "IHU519G/FS11A1 Android 9 build 327; reported IHU353G SDK identity not verified",
+    "sourceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "artifact": {
+      "path": "system/framework/boot-ecarx.gkui.openapi.impl.vdex",
+      "bytes": 1165440,
+      "sha256": "f0b8f013ccd0b5fcdb52c59bb77ef28c4c9abd142b9540515de3066de7db797f"
+    },
+    "referenceApkSha256": "bdb4f4075a4b0a3ffad93faa1fd1c07f284b2fe4ade1f114d12bd12c2409d4c9",
+    "runtimeAdmissionForCurrentApplication": "not_verified",
+    "currentApplicationRegistration": "default_runtime_interface_proxy_implemented_vehicle_admission_not_verified",
+    "metadataOutput": {
+      "implemented": ["title", "artist", "album", "duration", "playback_state", "optional_progress_push"],
+      "lyricInput": "not_provided_by_current_iap2_subscription_and_parser",
+      "lyricOutput": "empty_until_verified_text_input_exists",
+      "userReportedPlayer": "NetEase Cloud Music; lyrics visible in CarPlay video UI",
+      "vehicleMetadataDisplay": "not_verified",
+      "progressTimeUnit": "iap2_milliseconds_used_sdk_display_requires_vehicle_verification",
+      "documentation": "docs/PREFACE_MEDIA_METADATA.md"
+    },
+    "methodBodyInstructionValidation": "selected_methods_contain_quickened_instructions_not_fully_decoded",
+    "copiesSdkOrCredentialsIntoApplication": false,
+    "definitions": [
+      {
+        "class": "Lcom/ecarx/sdk/mediacenter/IMusicClient;",
+        "classDefinitionOffset": 193972,
+        "methods": [
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/IMusicClient;",
+            "name": "onNext",
+            "return": "Z",
+            "params": [],
+            "access": 1025,
+            "absoluteCodeOffset": null
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/IMusicClient;",
+            "name": "onPause",
+            "return": "Z",
+            "params": [],
+            "access": 1025,
+            "absoluteCodeOffset": null
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/IMusicClient;",
+            "name": "onPlay",
+            "return": "Z",
+            "params": [],
+            "access": 1025,
+            "absoluteCodeOffset": null
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/IMusicClient;",
+            "name": "onPrevious",
+            "return": "Z",
+            "params": [],
+            "access": 1025,
+            "absoluteCodeOffset": null
+          }
+        ]
+      },
+      {
+        "class": "Lcom/ecarx/sdk/mediacenter/IMusicPlaybackInfo;",
+        "classDefinitionOffset": 194132,
+        "methods": [
+          {"name": "getLyric", "return": "Landroid/net/Uri;", "params": [], "access": 1025},
+          {"name": "getLyricContent", "return": "Ljava/lang/String;", "params": [], "access": 1025},
+          {"name": "getCurrentLyricSentence", "return": "Ljava/lang/String;", "params": [], "access": 1025}
+        ]
+      },
+      {
+        "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPI;",
+        "classDefinitionOffset": 194452,
+        "methods": [
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPI;",
+            "name": "get",
+            "return": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPI;",
+            "params": [
+              "Landroid/content/Context;"
+            ],
+            "access": 9,
+            "absoluteCodeOffset": 280476
+          }
+        ]
+      },
+      {
+        "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+        "classDefinitionOffset": 194804,
+        "methods": [
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "get",
+            "return": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "params": [
+              "Landroid/content/Context;"
+            ],
+            "access": 9,
+            "absoluteCodeOffset": 283530
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "init",
+            "return": "V",
+            "params": [],
+            "access": 2,
+            "absoluteCodeOffset": 283546
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "init",
+            "return": "V",
+            "params": [
+              "Landroid/content/Context;",
+              "Lcom/ecarx/sdk/openapi/ECarXApiClient$Callback;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 285128
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "registerMusic",
+            "return": "Lecarx/xsf/mediacenter/IMediaCenterClientToken;",
+            "params": [
+              "Lcom/ecarx/sdk/mediacenter/IMusicClient;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 285370
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "registerMusic",
+            "return": "Ljava/lang/Object;",
+            "params": [
+              "Lcom/ecarx/sdk/mediacenter/IMusicClient;"
+            ],
+            "access": 4161,
+            "absoluteCodeOffset": 285454
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "registerMusic",
+            "return": "Ljava/lang/Object;",
+            "params": [
+              "Ljava/lang/String;",
+              "Lcom/ecarx/sdk/mediacenter/MusicClient;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 285468
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "requestPlay",
+            "return": "Z",
+            "params": [
+              "Ljava/lang/Object;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 286068
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "unregister",
+            "return": "Z",
+            "params": [
+              "Ljava/lang/Object;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 286330
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "updateCurrentSourceType",
+            "return": "V",
+            "params": [
+              "Ljava/lang/Object;",
+              "I"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 287076
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "updateCurrentLyric",
+            "return": "V",
+            "params": ["Ljava/lang/Object;", "Ljava/lang/String;"],
+            "access": 1,
+            "absoluteCodeOffset": 286786
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "updateCurrentProgress",
+            "return": "V",
+            "params": ["Ljava/lang/Object;", "J"],
+            "access": 1,
+            "absoluteCodeOffset": 286916
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "updateMusicPlaybackState",
+            "return": "Z",
+            "params": [
+              "Ljava/lang/Object;",
+              "Lcom/ecarx/sdk/mediacenter/IMusicPlaybackInfo;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 287680
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MediaCenterAPIImpl;",
+            "name": "updateMusicPlaybackState",
+            "return": "Z",
+            "params": [
+              "Ljava/lang/Object;",
+              "Lcom/ecarx/sdk/mediacenter/MusicPlaybackInfo;"
+            ],
+            "access": 1,
+            "absoluteCodeOffset": 287768
+          }
+        ]
+      },
+      {
+        "class": "Lcom/ecarx/sdk/mediacenter/MusicClient;",
+        "classDefinitionOffset": 194932,
+        "methods": [
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MusicClient;",
+            "name": "onNext",
+            "return": "Z",
+            "params": [],
+            "access": 1,
+            "absoluteCodeOffset": 255342
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MusicClient;",
+            "name": "onPause",
+            "return": "Z",
+            "params": [],
+            "access": 1,
+            "absoluteCodeOffset": 255342
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MusicClient;",
+            "name": "onPlay",
+            "return": "Z",
+            "params": [],
+            "access": 1,
+            "absoluteCodeOffset": 255342
+          },
+          {
+            "class": "Lcom/ecarx/sdk/mediacenter/MusicClient;",
+            "name": "onPrevious",
+            "return": "Z",
+            "params": [],
+            "access": 1,
+            "absoluteCodeOffset": 255342
+          }
+        ]
+      }
+    ],
+    "localRecheckCommand": "python agent_docs/firmware/inspect_media_center.py",
+    "documentation": "docs/LINKCO_APK_MEDIA_KEYS_REFERENCE.md"
+  }
 }

@@ -24,7 +24,7 @@ import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.glance.CarPlayGlance
 import com.shilapi.xcertplay.host.R
 
-/** Learned wheel keys control map zoom, the CarPlay joystick and Siri while their features are enabled. */
+/** Learned wheel keys control the CarPlay joystick and Siri while their features are enabled. */
 class WheelKeyService : AccessibilityService() {
     private val keys = WheelZoomKeys()
     private val navigationKeys = NavigationWheelKeyPolicy()
@@ -43,7 +43,7 @@ class WheelKeyService : AccessibilityService() {
     // This read is nonblocking: no ADB, input-device query or network lock in the periodic poll.
     internal var volumeEligible: () -> Boolean = { CarPlayMediaKeys.volumeKeysEligible(this) }
     internal var adjustVolume: (Int) -> Boolean = { CarPlayWheelVolume.adjust(this, it) }
-    internal var mapRoute: () -> Any? = { CarPlayBackgroundSession.snapshot()?.controller?.dashboardMapRoute() }
+    internal var mapRoute: () -> Any? = { null } // Independent map output was removed.
     internal var session: () -> Any? = { CarPlayBackgroundSession.snapshot()?.controller?.activeAirPlaySessionToken() }
     internal var knob: (AirPlayKnobState) -> Boolean = { CarPlayBackgroundSession.snapshot()?.controller?.sendKnob(it) == true }
     internal var routeActive: () -> Boolean = { CarPlayGlance.snapshot().maneuverType != null }
@@ -134,7 +134,6 @@ class WheelKeyService : AccessibilityService() {
             WheelZoomSettings.anyEnabled(this) -> WheelZoomSettings.roleOf(this, key)
             else -> null
         }
-        val controller = CarPlayBackgroundSession.snapshot()?.controller
         val action = keys.onKey(
             role = role.takeIf { enabled },
             down = down,
@@ -166,7 +165,7 @@ class WheelKeyService : AccessibilityService() {
             WheelZoomKeys.Action.MODE_ON -> announce(zoomOn = true)
             WheelZoomKeys.Action.MODE_OFF -> announce(zoomOn = false)
             WheelZoomKeys.Action.ZOOM_IN, WheelZoomKeys.Action.ZOOM_OUT ->
-                controller?.zoomDashboardMap(zoomIn = action == WheelZoomKeys.Action.ZOOM_IN)
+                Unit // No independent map stream to zoom.
         }
         rearmTimedMode()
         return true
@@ -293,6 +292,15 @@ class WheelKeyService : AccessibilityService() {
     }
 
     companion object {
+        private val accessibilityLock = Any()
+
+        fun openSettings(context: Context): Boolean =
+            listOf(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), Intent().setComponent(
+                ComponentName("com.android.settings", "com.android.settings.Settings\$AccessibilitySettingsActivity")))
+                .any { intent -> runCatching {
+                    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    true
+                }.getOrDefault(false) }
         internal const val TAG = "DiPlay-WheelKeys"
         private const val ELIGIBILITY_POLL_MILLIS = 250L
         private const val ROUTE_CHECK_MILLIS = 1_000L
@@ -360,7 +368,7 @@ class WheelKeyService : AccessibilityService() {
 
         /** Failed reads and shell commands must not replace the accessibility list or claim success. */
         internal fun applyServiceSettings(context: Context, shell: (String) -> String?,
-            shouldContinue: () -> Boolean = { true }): Boolean = synchronized(UsbPermissionSetup.accessibilityLock) {
+            shouldContinue: () -> Boolean = { true }): Boolean = synchronized(accessibilityLock) {
             applyServiceSettingsLocked(context, shell, shouldContinue)
         }
 

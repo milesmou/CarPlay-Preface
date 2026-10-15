@@ -52,6 +52,19 @@ class WirelessStartupRecoveryTest {
     }
     private fun budget() = ReflectionHelpers.getField<WirelessStartupRetryBudget>(activity, "startupRetryBudget")
 
+    @Test fun frameTestingStopsQueuedRecoveryAndDoesNotOfferManualRetryUntilItEnds() {
+        report()
+        assertTrue(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        report(status = CarPlayStatus.TestingUsbNcm)
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        assertEquals(View.GONE, retry.visibility)
+        report(status = CarPlayStatus.Failed("old listener socket closed"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        report(status = CarPlayStatus.Failed("NCM test complete", retryable = false, usbNcmTested = true))
+        assertEquals(View.VISIBLE, retry.visibility)
+    }
+
     @Test fun unavailableUsbStopsAutomaticRetriesAndExposesManualRetry() {
         val stage = android.widget.TextView(activity)
         ReflectionHelpers.setField(activity, "stageStatusView", stage)

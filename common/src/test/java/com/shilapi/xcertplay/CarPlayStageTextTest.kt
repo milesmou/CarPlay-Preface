@@ -57,6 +57,9 @@ class CarPlayStageTextTest {
         assertStage(R.string.looking_for_your_paired_iphone, CarPlayStatus.WaitingForPairedIphone)
         assertStage(R.string.connecting_to_your_iphone, CarPlayStatus.ConnectingBluetooth)
         assertStage(R.string.opening_carplay, CarPlayStatus.RunningControl)
+        assertStage(R.string.status_testing_usb_ncm, CarPlayStatus.TestingUsbNcm)
+        assertStage(R.string.status_usb_ncm_test_finished,
+            CarPlayStatus.Failed("test ended", retryable = false, usbNcmTested = true))
         assertStage(R.string.reconnecting_to_your_iphone, CarPlayStatus.ControlEnded)
         assertStage(R.string.waiting_for_mfi_coprocessor, CarPlayStatus.WaitingForMfi)
         assertStage(R.string.getting_carplay_ready, CarPlayStatus.OpeningDataPaths)

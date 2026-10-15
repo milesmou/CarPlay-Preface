@@ -18,18 +18,33 @@ class PrefaceBrandingTest {
     private val context get() = RuntimeEnvironment.getApplication()
 
     @After fun clearPreferences() {
-        context.getSharedPreferences("xcertplay_airplay", 0).edit().remove("oem_label").commit()
+        context.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .remove("manufacturer").remove("model").remove("oem_label").commit()
     }
 
     @Test fun defaultVehicleNameUsesXingrui() {
         clearPreferences()
         assertEquals("CarPlay", context.getString(R.string.app_name))
-        assertEquals("星瑞", AirPlayPersistence.loadOemLabel(context))
+        assertEquals("吉利", AirPlayPersistence.loadManufacturer(context))
+        assertEquals("星瑞", AirPlayPersistence.loadModel(context))
+        assertEquals("Preface", AirPlayPersistence.loadOemLabel(context))
+    }
 
+    @Test fun previouslySavedBundledIdentityUsesUpdatedDefaults() {
+        AirPlayPersistence.saveManufacturer(context, "DiPlay")
+        AirPlayPersistence.saveModel(context, "DiPlay")
+        AirPlayPersistence.saveOemLabel(context, "星瑞")
+        assertEquals("吉利", AirPlayPersistence.loadManufacturer(context))
+        assertEquals("星瑞", AirPlayPersistence.loadModel(context))
+        assertEquals("Preface", AirPlayPersistence.loadOemLabel(context))
     }
 
     @Test fun customVehicleNameIsPreserved() {
+        AirPlayPersistence.saveManufacturer(context, "我的制造商")
+        AirPlayPersistence.saveModel(context, "我的车型")
         AirPlayPersistence.saveOemLabel(context, "我的星瑞")
+        assertEquals("我的制造商", AirPlayPersistence.loadManufacturer(context))
+        assertEquals("我的车型", AirPlayPersistence.loadModel(context))
         assertEquals("我的星瑞", AirPlayPersistence.loadOemLabel(context))
     }
 

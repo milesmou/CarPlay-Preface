@@ -26,6 +26,10 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 - [机器可读的适配事实](firmware/ihu519g-327.json)：身份、音频常量、按键映射、服务、权限和证据校验值，可随仓库保留。
 - [方控与音频接入分析](PREFACE_FIRMWARE_327.md)：已有代码接入范围、去重及真车验证项。
 - [2026-10-14 用户连接报告排查](CONNECTION_REPORT_2026-10-14.md)：运行时报告的设备为 IHU353G，身份与参考 OTA 不一致，证据单独记录；无线曾渲染画面，USB 认证通过但网络与 VPN 授权阻塞，不能外推到构建 327。
+- [2026-10-15 用户连接报告排查](CONNECTION_REPORT_2026-10-15.md)：IHU353G 上原厂媒体 API 未就绪；USB 网卡、IPv6 与监听已就绪但无 AirPlay TCP，原始诊断未确认双向；临时热点成功记录均为用户手动加入。不能再用旧报告的 VPN 阻塞解释本轮 USB。
+- [2026-10-15 第五份报告](CONNECTION_REPORT_2026-10-15_5.md)：用户确认播放／方控均实际走原车蓝牙；日志显示 SDK 351 的具体类路径仍在注册前 `ready=false`，同时 CarPlay 音频持续接收／写入。USB 原始 IN 被识别为 IPv4 DHCP，3 次 OUT 返回 -1，未确认双向。运行证据与用户观察分别记录，不外推到参考 OTA。
+- [Linkco 注册路径后续修订](LINKCO_APK_MEDIA_KEYS_REFERENCE.md#后续修订默认采用盒子的具体类注册路径)：默认采用 `registerMusic(本应用包名, MusicClient)`，父类实现由车机 SDK 提供。当前 IHU353G 的 API ready 失败发生在注册前，同一路径不等于已经实车修复。
+- [网易云切歌服务参考](NETEASE_TRACK_SERVICE_REFERENCE.md)：用户提供包实际为 `com.ecarx.sdk.openapi` 服务端，用户确认同车已安装且网易云切歌正常。静态代码区分调用者未获授权与目标服务未就绪，可用于追查 CarPlay 的 ready=false；不是已经确认的网易云专用按键客户端实现，也不作为参考 OTA 实车验证。
 - 本地完整索引：`agent_docs/firmware/ihu519g-327/catalog/index.json`。固件、镜像、APK/JAR、反编译代码及完整索引保存在 Git 忽略目录，可直接继续分析。
 
 最新 16:13 报告及构建 56 后的媒体控制代码审查见 [第四份报告与后续排查](CONNECTION_REPORT_2026-10-14.md)：明确播放／暂停不再转成切换，旧媒体回调和音频通知隔离，后台页面复用更新方控归属。以上为工程实现与定向测试，不是实车根因或固件接口可用性的新证据。
@@ -42,6 +46,20 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 ## 后续工程可复用的信息
 
+2026-10-15 后续 [音源、蓝牙与 USB 定位日志](MEDIA_USB_DIAGNOSTICS_2026-10-15.md) 补充服务查询／SDK 分类、接收端蓝牙状态、USB 阶段／DHCP／CDC 通知。属于应用诊断与定向测试，没有取得新的原厂准入或实车通信成功证据；现有 64 包不含这些日志。
+
+2026-10-15 按用户要求增加 [USB 自动 NCM 帧测试](USB_NCM_FRAME_DIAGNOSTICS.md)：系统 USB 接入失败时保留认证，自动尝试原始帧及 ICMPv6 探测；测试可能解除 NCM 内核驱动绑定，结束后提示重新插拔，不抢占已建立会话，不提供 AirPlay 网络回退。这是工程诊断与定向验证，未新增构建 327 或报告 IHU353G 的实车接口可用性证据。
+
+同日分析用户提供的 [Linkco 盒子车机端 APK](LINKCO_APK_WIRELESS_REFERENCE.md)：主要通过 USB 私有命令与外接盒子通信，无线接入主流程推断在盒子固件。记录可借鉴的分阶段恢复原则及与临时热点的差异；固定热点、无线握手细节和快连根因仍未确认。此为独立 APK 参考，不属于本页 OTA 的静态接口证据，也未引入其他车型适配。
+
+后续 [切歌与原厂媒体中心参考](LINKCO_APK_MEDIA_KEYS_REFERENCE.md) 确认盒子 APK 使用 MediaCenterAPI 注册音源并接收 MusicClient 切歌回调；用户确认同车切歌不跳页。参考 OTA 的 `boot-ecarx.gkui.openapi.impl.vdex` 也有相应 SDK 类型／方法定义，实际准入与内部路由未确认。当前项目已按用户要求默认尝试该音源注册，独立于音量选流开关；接口／准入失败保留原接入。新实现待实车验证，不能把同车盒子结果描述成本仓库已修复。
+
+同日 [原厂音源元数据补充](PREFACE_MEDIA_METADATA.md) 核对 `updateCurrentProgress`、`updateCurrentLyric` 和歌词 getter 的定义／偏移；工程同步歌曲信息和位置，当前没有独立歌词输入。用户确认网易云 CarPlay 画面可见歌词，不能据此认定 iAP2 已传歌词文本；实际原厂进度单位和显示仍待验证。
+
+2026-10-15 按用户要求移除独立仪表／桌面地图功能：设置入口、Stream 111 配置、桌面悬浮卡片及地图共享服务均退出主应用；保留正常 CarPlay 主屏地图与文字／箭头导航小部件。原保存开关不再读取，备份不再导出或恢复该开关；这不是对参考固件仪表能力的新增判断。桌面功能范围见 [桌面导航集成](LAUNCHER_INTEGRATION.md)。
+
+随后按用户要求 [移除整个“显示（实验性）”卡片](REMOVED_EXPERIMENTAL_DISPLAY.md)：分屏区域、免重连旋转方形画面及侧边面板均退出主应用，旧开关不再读取；固定程序栏位置与普通窗口布局保留。此为应用功能范围精简，不增加固件能力或实车验证结论。
+
 ### 方控与原车媒体
 
 - 输入服务：`ecarx.xsf.inputservice/ecarx.xsf.inputservice.InputService`；不是 OneOS 的 `com.geely.inputservice`。
@@ -49,7 +67,7 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 - 私有码 304/305 经 AdapterAPI 200088/200087，原厂短按输出标准上一曲 88／下一曲 87；播放暂停动作 200085 输出 85，其原始物理码未确认。
 - 原厂对媒体键发 `android.intent.action.MEDIA_BUTTON` 广播，带 DEFAULT category 和 `android.intent.extra.KEY_EVENT`。同一短按产生 DOWN/UP，对广播和 MediaSession 双路送达需要去重。
 - 自定义按键 `soft_key_function=7` 对应媒体暂停动作。语音、电话和音量有原车专用处理，不应把全部私有按键直接转成 CarPlay 按键。
-- 原车音乐包 `com.ecarx.multimedia`（4.0.0 / versionCode 40001095），媒体中心包 `ecarx.xsf.mediacenter`。媒体中心服务 action 为 `ecarx.xsf.MEDIA_CENTER_SERVICE`；其 Binder 协议及应用准入尚未分析，不能仅凭 action 接入桌面媒体卡片。
+- 原车音乐包 `com.ecarx.multimedia`（4.0.0 / versionCode 40001095），媒体中心包 `ecarx.xsf.mediacenter`。媒体中心服务 action 为 `ecarx.xsf.MEDIA_CENTER_SERVICE`；已补充 SDK 注册／回调定义和盒子客户端用法，Binder 实现及当前应用准入仍未确认，不能仅凭 action 接入桌面媒体卡片。
 - HiCar 配套 SDK 静态实现通过定制 `IInputManager.requestKeysInterception` 登记媒体／语音按键观察者；工程请求标准 85/87/88/298 及物理 304/305，并为语音按钮接入有序广播回退。HiCar 音量沿用原车；本项目曾申请私有音量键并写导航音量，该候选在第五份报告与底层分发复核后撤回，不能把收到回调当独占。电话、方向键、快进快退和唤醒词的处理边界见 [HiCar 对照与按钮审查](PREFACE_FIRMWARE_327.md) 及事实索引 `hicarTrackInterception`、`hicarButtonAudit`。权限与原车页面抑制效果分别待验证。
 
 证据：`decompiled/input/sources/ecarx/xsf/inputservice/{key,util,factory}/`、`decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/`、`catalog/apk-manifests.json`。

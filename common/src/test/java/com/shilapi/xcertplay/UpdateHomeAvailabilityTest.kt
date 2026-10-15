@@ -19,13 +19,13 @@ import org.robolectric.annotation.Config
 import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [29], qualifiers = "en-w900dp-h600dp-land")
+@Config(sdk = [29], qualifiers = "en-w1920dp-h720dp-land-mdpi")
 class UpdateHomeAvailabilityTest {
     private val application: Application = RuntimeEnvironment.getApplication()
 
     @After fun clear() = UpdateAvailability.clearAllForTest(application)
 
-    @Test fun cachedUpdateAppearsBelowTheVersionAndOpensTheExistingDownloadFlow() {
+    @Test fun cachedUpdateOpensTheExistingDownloadFlowFromTheSimplifiedHome() {
         val release = release()
         UpdateAvailability.save(application, release)
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
@@ -46,7 +46,7 @@ class UpdateHomeAvailabilityTest {
         controller.pause().stop().destroy()
     }
 
-    @Config(sdk = [29], qualifiers = "en-w400dp-h900dp-port")
+    @Config(sdk = [29], qualifiers = "en-w640dp-h240dp-land-xxhdpi")
     @Test fun cachedUpdateKeepsAnArmLengthTargetInCompactHome() {
         val release = release()
         UpdateAvailability.save(application, release)

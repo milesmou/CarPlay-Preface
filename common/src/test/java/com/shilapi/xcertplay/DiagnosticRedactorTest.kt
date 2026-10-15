@@ -5,6 +5,36 @@ import org.junit.Test
 import java.nio.file.Files
 
 class DiagnosticRedactorTest {
+    @Test fun categoricalMediaAndUsbEvidenceSurvivesWhileRawPrivateDataRemainsRejected() {
+        for (line in listOf(
+            "OEM media diagnostic phase=init failureClass=SecurityException reason=caller_not_authorized causes=2",
+            "Car audio diagnostic event=a2dp_sink_playing state=10 previous=11 selectedPhoneMatch=true observationOnly=true",
+            "USB milestone failed step=waiting_airplay_tcp elapsedMs=30000 failureClass=IOException cancelled=false",
+            "NCM frame test result dhcp4Messages discover=1 offer=0 request=0 ack=0 malformed=0 contentNotRetained=true",
+            "NCM frame test result usbStatus linkIndication=up upstreamBps=100000000 ipReachability=unconfirmed")) {
+            assertEquals(line, DiagnosticRedactor.redact(line))
+        }
+        assertNull(DiagnosticRedactor.redact("password=private"))
+        assertNull(DiagnosticRedactor.redact("NCM payload=private"))
+    }
+    @Test fun ncmProbeEvidenceSurvivesSavedReportsWithoutRawFrames() {
+        val lines = listOf(
+            "NCM frame test automatic trigger=airplay_startup_timeout",
+            "NCM frame test setup ntbFormat=0 crcMode=0 codec=NTB16_no_crc",
+            "NCM frame test setup receiveFilterAccepted=true unknownFormatOrCrc=false",
+            "NCM frame test opened control=2 data=3 diagnosticOnly=true replugRequired=true",
+            "NCM frame test endpoints in=0x88 out=0x6 inPacket=512 outPacket=512 inType=2 outType=2 control=3 diagnosticOnly=true",
+            "NCM frame test control request=0x83 return=-1 expectedBytes=2 elapsedUs=1020",
+            "NCM frame test write attempt=1 ep=0x6 frameBytes=78 ntbBytes=106 requestedTimeoutMs=100 effectiveTimeoutMs=20 elapsedUs=20123 return=-1 outcome=negative_api_result",
+            "NCM frame test result ethernetHeaders ipv4=2 ipv6=0 arp=1 vlan=0 other=0 short=0 otherTypes=none",
+            "NCM frame test result protocolHeaders malformed=0 ipv6Extensions=0 fragments=0 udp=2 dhcp4=2 mdns=0 synTo7000=0 icmp6=0 ns=0 na=0 echo=0 headerOnly=true",
+            "NCM frame test result usbOutCalls=3 full=0 negative=3 zero=0 partial=0 exceptions=0 maxOutUs=20123 lastReturn=-1 lastOutcome=negative_api_result",
+            "system USB snapshot cached=false ipv6ProtocolCounters scope=selected_interface Ip6InReceives=40 Ip6InReceivesDelta=5 Ip6InDiscards=0 Ip6InDiscardsDelta=0",
+            "NCM frame test result outcome=window_complete rxFrames=40 ipv6=40 rejected=0 ns=3 tcp=8 udp=0 unsupported=0 txAttempts=6 txAccepted=6 echoReplies=3 bidirectionalConfirmed=true usbInTransfers=35 usbInBytes=4000 ntb16Blocks=40 emptyNtb16Blocks=0",
+        )
+        lines.forEach { assertEquals(it, DiagnosticRedactor.redact(it)) }
+        assertNull(DiagnosticRedactor.redact("NCM frame test payload=private-data"))
+    }
     @Test fun additionalTroubleshootingMetadataSurvivesSavedReportWithoutPayloads() {
         val lines = listOf(
             "wireless startup elapsedMs=10000 authenticated=true wifiConfigs=2 startRequests=1 tcpAccepted=0 sessionActive=false waitingFor=WiFi_discovery_or_AirPlay_TCP startRequestAgeMs=9000 firstTcpAfterStartMs=none",

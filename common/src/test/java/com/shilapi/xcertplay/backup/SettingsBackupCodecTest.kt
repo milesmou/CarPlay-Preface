@@ -29,6 +29,7 @@ class SettingsBackupCodecTest {
             .putInt("navigation_stream_type", 15)
             .putString("cluster_turn_card_overlay_position", "LEFT")
             .putInt("cluster_marker_horizontal_step", 2)
+            .putBoolean("adapt_pip_resolution", true)
             .commit()
         val file = JSONObject(SettingsBackupCodec.export(context, "0.1.1").toString(Charsets.UTF_8))
             .getJSONObject("settings").getJSONObject("xcertplay_airplay")
@@ -37,17 +38,17 @@ class SettingsBackupCodecTest {
         assertTrue(file.getBoolean("cluster_music_enabled"))
         assertEquals(100, file.getInt("cluster_speedometer_size"))
         for (key in listOf("display_scale_tenths", "navigation_stream_type",
-            "cluster_turn_card_overlay_position", "cluster_marker_horizontal_step")) {
+            "cluster_turn_card_overlay_position", "cluster_marker_horizontal_step", "adapt_pip_resolution")) {
             assertFalse(file.has(key))
         }
         val obsolete = """{"format":"diplay-settings","version":1,"settings":{
             "xcertplay_airplay":{"display_scale_tenths":6,"navigation_stream_type":15,
-            "cluster_turn_card_overlay_position":"LEFT","cluster_marker_horizontal_step":2}}}"""
+            "cluster_turn_card_overlay_position":"LEFT","cluster_marker_horizontal_step":2,"adapt_pip_resolution":true}}}"""
         values.edit().clear().commit()
         val outcome = SettingsBackupCodec.import(context, obsolete.toByteArray())
         assertFalse(outcome.invalid)
         assertEquals(0, outcome.applied)
-        assertEquals(4, outcome.skipped)
+        assertEquals(5, outcome.skipped)
         assertTrue(values.all.isEmpty())
     }
 
@@ -96,7 +97,7 @@ class SettingsBackupCodecTest {
         assertEquals(SettingsBackupCodec.VERSION, document.getInt("version"))
         val airplay = document.getJSONObject("settings").getJSONObject("xcertplay_airplay")
         assertEquals(60, airplay.getInt("display_fps"))
-        assertTrue(airplay.getBoolean("cluster_map_enabled"))
+        assertFalse(airplay.has("cluster_map_enabled"))
         assertFalse(airplay.has("manual_hotspot_ssid"))
         assertFalse(airplay.has("pairing.0F7A"))
         assertFalse(airplay.has("mfi_target"))

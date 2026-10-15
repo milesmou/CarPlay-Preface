@@ -11,6 +11,7 @@ android {
 
     defaultConfig {
         minSdk = 25
+        consumerProguardFiles("ecarx-consumer-rules.pro")
     }
 
     compileOptions {
@@ -30,6 +31,8 @@ android {
 }
 
 dependencies {
+    compileOnly(project(":ecarx-mediacenter-api-stubs"))
+    testImplementation(project(":ecarx-mediacenter-api-stubs"))
     api(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

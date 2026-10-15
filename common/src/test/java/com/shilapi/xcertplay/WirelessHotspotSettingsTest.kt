@@ -100,14 +100,17 @@ class WirelessHotspotSettingsTest {
         texts(activity).single { it.text.startsWith(activity.getString(R.string.settings_hotspot_mode) + " · ") }.performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         assertEquals(activity.getString(R.string.save), dialog.getButton(AlertDialog.BUTTON_POSITIVE).text)
-        shadowOf(dialog).clickOnItem(1)
+        assertEquals(listOf("手动车机热点（推荐）", "临时热点"),
+            (0 until dialog.listView.adapter.count).map { dialog.listView.adapter.getItem(it).toString() })
+        assertEquals(1, dialog.listView.checkedItemPosition)
+        shadowOf(dialog).clickOnItem(0)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(WirelessHotspotMode.MANUAL, AirPlayPersistence.loadWirelessHotspotMode(app))
         assertTrue(PendingReconnect.isPending(controller))
         assertEquals(0, stops)
         assertEquals(0, hotspotStarts)
-        assertTrue(texts(activity).any { it.text == activity.getString(R.string.settings_manual_hotspot_module) })
+        assertManualControlsInWirelessCard(activity)
     }
 
     @Test fun selectingManualStartsSavedHotspotAndReportsMissingPermission() {
@@ -150,18 +153,18 @@ class WirelessHotspotSettingsTest {
         AirPlayPersistence.saveWirelessHotspotMode(app, WirelessHotspotMode.MANUAL)
         val activity = open()
         texts(activity).single { it.text.startsWith(activity.getString(R.string.settings_manual_hotspot_details) + " · ") }.performClick()
-        val dialog = ShadowAlertDialog.getLatestAlertDialog()
+        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog() as HotspotCredentialsDialog
         shadowOf(Looper.getMainLooper()).idle()
         val fields = views(dialog.window!!.decorView).filterIsInstance<EditText>().toList()
         assertEquals(2, fields.size)
         fields[0].setText(" Xingrui ")
         fields[1].setText("short")
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        views(dialog.window!!.decorView).single { it.tag == "hotspot-save" }.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(dialog.isShowing)
         assertEquals("", AirPlayPersistence.loadManualHotspotSsid(app))
         fields[1].setText(" password123 ")
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        views(dialog.window!!.decorView).single { it.tag == "hotspot-save" }.performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertFalse(dialog.isShowing)
         assertEquals(" Xingrui ", AirPlayPersistence.loadManualHotspotSsid(app))
@@ -169,7 +172,7 @@ class WirelessHotspotSettingsTest {
         assertFalse(texts(activity).any { it.text.contains("password123") })
         ReflectionHelpers.setField(activity, "settingsCategory", SettingsCategory.DISPLAY)
         render(activity)
-        assertFalse(texts(activity).any { it.text == activity.getString(R.string.settings_manual_hotspot_module) })
+        assertFalse(texts(activity).any { it.text.startsWith(activity.getString(R.string.settings_manual_hotspot_details) + " · ") })
         assertFalse(texts(activity).any { it.text == activity.getString(R.string.settings_wireless_hotspot) })
     }
 
@@ -192,6 +195,7 @@ class WirelessHotspotSettingsTest {
         assertEquals(1920, width)
         assertEquals(720, height)
         render(activity)
+        assertManualControlsInWirelessCard(activity)
         val root = activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)
         val decor = activity.window.decorView
         repeat(3) {
@@ -202,9 +206,11 @@ class WirelessHotspotSettingsTest {
         }
         val scroll = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll")
         val directory = File("../agent_docs/screenshots/manual-hotspot").apply { mkdirs() }
-        for ((part, title) in listOf("wireless" to R.string.settings_wireless_hotspot,
-            "manual" to R.string.settings_manual_hotspot_module)) {
-            val target = texts(activity).single { it.text == activity.getString(title) }
+        for ((part, target) in listOf("wireless" to texts(activity).single {
+            it.text == activity.getString(R.string.settings_wireless_hotspot)
+        }, "manual" to texts(activity).single {
+            it.text.startsWith(activity.getString(R.string.settings_manual_hotspot_details) + " · ")
+        })) {
             val rect = Rect(0, 0, target.width, target.height)
             scroll.offsetDescendantRectToMyCoords(target, rect)
             scroll.scrollTo(0, (rect.top - 16).coerceAtLeast(0))
@@ -216,5 +222,27 @@ class WirelessHotspotSettingsTest {
             }
             bitmap.recycle()
         }
+    }
+
+    private fun assertManualControlsInWirelessCard(activity: DiPlayActivity) {
+        val heading = texts(activity).single { it.text == activity.getString(R.string.settings_wireless_hotspot) }
+        val card = heading.parent.parent as ViewGroup
+        for (title in listOf(R.string.settings_hotspot_mode, R.string.settings_manual_hotspot_details)) {
+            assertEquals("Each hotspot control must appear once in the wireless card", 1,
+                views(card).filterIsInstance<TextView>().count {
+                    it.text == activity.getString(title) || it.text.startsWith(activity.getString(title) + " · ")
+                })
+        }
+        assertFalse(views(card).filterIsInstance<TextView>().any {
+            it.text == "开启车机热点" || it.text == activity.getString(R.string.open_car_hotspot_settings)
+        })
+        assertFalse(texts(activity).any { it.text == "热点手动配置" })
+    }
+
+    @Test fun temporaryModeHasOneWirelessCardWithoutManualCredentials() {
+        val activity = open()
+        assertEquals(1, texts(activity).count { it.text == activity.getString(R.string.settings_wireless_hotspot) })
+        assertFalse(texts(activity).any { it.text.startsWith(activity.getString(R.string.settings_manual_hotspot_details) + " · ") })
+        assertFalse(texts(activity).any { it.text == "热点手动配置" })
     }
 }

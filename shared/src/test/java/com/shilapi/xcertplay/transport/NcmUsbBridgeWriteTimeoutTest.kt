@@ -5,6 +5,8 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import java.util.ArrayDeque
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,6 +43,83 @@ class NcmUsbBridgeWriteTimeoutTest {
         assertEquals(listOf(5), NcmWriteReplay.timeouts)
     }
 
+    @Test fun diagnosticWritesDistinguishNakFromAnEntireAcceptedBlock() {
+        NcmWriteReplay.results.addAll(listOf(-1, 0, NcmWriteReplay.ALL, -1))
+        withBridge {
+            assertFalse(it.sendAccepted(frame, 100))
+            assertFalse(it.sendAccepted(frame, 100))
+            assertTrue(it.sendAccepted(frame, 100))
+            assertFalse(it.sendAccepted(frame, 100))
+        }
+    }
+
+    @Test fun partialWriteIsAnErrorAndDoesNotAnnounceReadiness() {
+        NcmWriteReplay.results.add(1)
+        val diagnostics = withBridge {
+            try { it.sendAccepted(frame, 100); throw AssertionError("partial write accepted") }
+            catch (_: IphoneUsbException.DeviceUnavailable) { }
+        }
+        assertTrue(diagnostics.isEmpty())
+    }
+
+    @Test fun diagnosticSetupReportsKnownFormatAndEnablesReceptionOnTheNcmInterfaceOnly() {
+        NcmWriteReplay.controlWords[0x83] = 0
+        NcmWriteReplay.controlWords[0x89] = 0
+        val diagnostics = withBridge { it.prepareFrameDiagnostics(2) }
+        assertTrue(diagnostics.any { it.contains("ntbFormat=0 crcMode=0") })
+        assertEquals(listOf(Triple(0xa1, 0x83, 2), Triple(0xa1, 0x89, 2), Triple(0x21, 0x43, 2)),
+            NcmWriteReplay.controlCalls)
+        assertEquals(0x0e, NcmWriteReplay.filter)
+    }
+
+    @Test fun unsupportedNtb32StopsDiagnosticsWithoutChangingItsFormat() {
+        NcmWriteReplay.controlWords[0x83] = 1
+        NcmWriteReplay.controlWords[0x89] = 0
+        withBridge {
+            try { it.prepareFrameDiagnostics(2); throw AssertionError("unsupported format accepted") }
+            catch (_: IphoneUsbException.DeviceUnavailable) { }
+        }
+        assertEquals(listOf(0x83, 0x89), NcmWriteReplay.controlCalls.map { it.second })
+    }
+
+    @Test fun diagnosticOutResultsKeepApiFailureZeroPartialAndSuccessDistinctAndBoundDetailLines() {
+        NcmWriteReplay.results.addAll(listOf(-1, 0, 1, NcmWriteReplay.ALL))
+        val diagnostics = withBridge { ncm ->
+            ncm.prepareFrameDiagnostics(2)
+            assertFalse(ncm.sendAccepted(frame, 100))
+            assertFalse(ncm.sendAccepted(frame, 100))
+            try { ncm.sendAccepted(frame, 100); throw AssertionError("partial accepted") }
+            catch (_: IphoneUsbException.DeviceUnavailable) { }
+            assertTrue(ncm.sendAccepted(frame, 100))
+            repeat(20) { ncm.sendAccepted(frame, 100) }
+            val summary = ncm.readDiagnosticSummary()
+            assertTrue(summary, summary.contains("usbOutCalls=24 full=21 negative=1 zero=1 partial=1"))
+        }
+        val writes = diagnostics.filter { it.startsWith("NCM frame test write ") }
+        assertEquals(12, writes.size)
+        assertTrue(writes[0].contains("return=-1 outcome=negative_api_result"))
+        assertTrue(writes[0].contains("requestedTimeoutMs=100 effectiveTimeoutMs=20"))
+        assertTrue(writes[1].contains("outcome=zero"))
+        assertTrue(writes[2].contains("outcome=partial"))
+        assertTrue(writes[3].contains("outcome=full"))
+        assertTrue(writes[4].contains("effectiveTimeoutMs=100"))
+        assertTrue(writes.all { it.contains("elapsedUs=") && it.length < 500 })
+        assertTrue(diagnostics.any { it.contains("request=0x83 return=-1 expectedBytes=2") })
+        assertTrue(diagnostics.any { it.contains("endpoints in=0x88 out=0x6 inPacket=512 outPacket=512") })
+    }
+
+    @Test fun diagnosticExceptionIsRecordedWithoutPrivateErrorMessagesAndStillPropagates() {
+        NcmWriteReplay.failure = SecurityException("private USB identity")
+        val diagnostics = withBridge { ncm ->
+            ncm.prepareFrameDiagnostics(2)
+            try { ncm.sendAccepted(frame, 100); throw AssertionError("failure swallowed") }
+            catch (_: SecurityException) { }
+            assertTrue(ncm.readDiagnosticSummary().contains("exceptions=1"))
+        }
+        assertTrue(diagnostics.any { it.contains("outcome=exception failureClass=SecurityException") })
+        assertFalse(diagnostics.any { it.contains("private USB identity") })
+    }
+
     private fun withBridge(block: (NcmUsbBridge) -> Unit): List<String> {
         val connection = ReflectionHelpers.callConstructor(UsbDeviceConnection::class.java,
             ClassParameter.from(UsbDevice::class.java, null))
@@ -65,12 +144,25 @@ object NcmWriteReplay {
     /** One result per bulkTransfer: a byte count, or [ALL] for the whole frame. */
     val results = ArrayDeque<Int>()
     val timeouts = mutableListOf<Int>()
-    fun reset() { results.clear(); timeouts.clear() }
+    val controlWords = mutableMapOf<Int, Int>()
+    val controlCalls = mutableListOf<Triple<Int, Int, Int>>()
+    var filter: Int? = null
+    var failure: RuntimeException? = null
+    fun reset() { results.clear(); timeouts.clear(); controlWords.clear(); controlCalls.clear(); filter = null; failure = null }
 }
 
 @Implements(UsbDeviceConnection::class)
 class NcmWriteConnectionShadow {
+    @Implementation fun controlTransfer(type: Int, request: Int, value: Int, index: Int,
+        buffer: ByteArray?, length: Int, timeout: Int): Int {
+        NcmWriteReplay.controlCalls.add(Triple(type, request, index))
+        if (request == 0x43) { NcmWriteReplay.filter = value; return 0 }
+        val word = NcmWriteReplay.controlWords[request] ?: return -1
+        buffer!![0] = word.toByte(); buffer[1] = (word ushr 8).toByte()
+        return 2
+    }
     @Implementation fun bulkTransfer(endpoint: UsbEndpoint, buffer: ByteArray, length: Int, timeout: Int): Int {
+        NcmWriteReplay.failure?.let { throw it }
         NcmWriteReplay.timeouts += timeout
         return NcmWriteReplay.results.pollFirst()?.takeIf { it != NcmWriteReplay.ALL } ?: length
     }

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="status_testing_usb_ncm">正在自动测试 USB NCM 帧收发…</string>
+    <string name="status_usb_ncm_test_finished">USB 帧测试已结束，请保存诊断报告</string>
+    <string name="connection_help_usb_ncm_test">USB 连接未成功，已尝试自动测试 NCM 帧收发。请保存诊断报告，核对接收帧、USB 写入和匹配的探测响应。测试可能解除系统 NCM 驱动绑定，请重新插拔 USB 后再连接；无需 VPN 授权或 root。</string>
     <string name="connection_help_usb_direct">iPhone 的 USB 网络未就绪，或手机未接入 AirPlay。请重新插拔 USB 数据线，仍失败时保存诊断报告。此连接使用系统 USB 网卡，无需 VPN 授权或 root。</string>
 </resources>

@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_temporary_hotspot_reconnect">结束本次 CarPlay 连接并重新连接。临时热点方式会释放本应用的热点占用后重新创建。其他应用的连接和原车保存的热点设置保持不变。</string>
-    <string name="settings_temporary_hotspot">临时热点（推荐）</string>
+    <string name="settings_temporary_hotspot">临时热点</string>
     <string name="settings_temporary_hotspot_description">CarPlay 创建系统生成名称和密码的临时 Wi-Fi 热点，无需保存热点信息。仅用于本地通信，不提供互联网；频段由系统选择，断开时释放本应用的热点占用。更改在下次连接时生效。</string>
     <string name="settings_temporary_hotspot_hint">保持 iPhone 蓝牙和 Wi-Fi 开启，允许定位或附近设备权限；Android 9 还需开启系统定位。点击连接后创建临时热点，并通过蓝牙把热点信息发送给 iPhone。如果原车热点已开启，请先关闭再使用此方式。</string>
 </resources>

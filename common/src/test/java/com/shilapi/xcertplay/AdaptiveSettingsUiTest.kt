@@ -52,6 +52,59 @@ class AdaptiveSettingsUiTest {
     @Test
     @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactConnectionWithoutUsbAutoConfirmLargeFontScreenshot() = captureWithoutUsbAutoConfirm("compact")
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullConnectionWithoutUsbAutoConfirmLargeFontScreenshot() = captureWithoutUsbAutoConfirm("full")
+
+    private fun captureWithoutUsbAutoConfirm(size: String) {
+        val config = android.content.res.Configuration(context.resources.configuration).apply { fontScale = 1.5f }
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        // A previously enabled component must not restore the removed feature or its status row.
+        android.provider.Settings.Secure.putString(context.contentResolver, "enabled_accessibility_services",
+            "${context.packageName}/com.shilapi.xcertplay.UsbAutoConfirmService")
+        android.provider.Settings.Secure.putInt(context.contentResolver, "accessibility_enabled", 1)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.CONNECTION))
+        val content = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(content).forEach { it.forceLayout() }
+            content.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            content.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+        assertEquals(1920, content.width); assertEquals(720, content.height)
+        for (title in listOf("自动确认 USB 权限", "USB 弹窗自动确认", "无障碍服务已激活", "设置 USB 与地图权限")) {
+            assertFalse(texts(screen).any { it.text.toString().contains(title) })
+        }
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.automatic_connection) })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_usb_connection) })
+        val services = context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SERVICES).services.orEmpty()
+        assertFalse(services.any { it.name.endsWith(".UsbAutoConfirmService") })
+        assertTrue(services.any { it.name.endsWith(".WheelKeyService") })
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        val target = texts(screen).first { it.text == screen.getString(R.string.automatic_connection) }
+        val rect = android.graphics.Rect(0, 0, target.width, target.height)
+        scroll.offsetDescendantRectToMyCoords(target, rect)
+        scroll.scrollTo(0, rect.top)
+        shadowOf(Looper.getMainLooper()).idle()
+        val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        content.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/remove-usb-auto-confirm").apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun compactAdvancedWithoutHotspotJoinLargeFontScreenshot() = captureAdvancedWithoutHotspotJoin("compact")
 
     @Test
@@ -100,14 +153,75 @@ class AdaptiveSettingsUiTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun fullVolumeWithoutPermissionButtonsLargeFontScreenshot() = captureAdvancedWithoutExternalController("full", volume = true)
 
-    private fun captureAdvancedWithoutExternalController(size: String, volume: Boolean = false) {
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactAdvancedWithoutClusterMapLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("compact", withoutMap = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullAdvancedWithoutClusterMapLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("full", withoutMap = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactAdvancedWithoutDisplayCardLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("compact", withoutDisplay = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullAdvancedWithoutDisplayCardLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("full", withoutDisplay = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactConnectionWithoutPhoneAndHelpCardsLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("compact", withoutPhone = true)
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullConnectionWithoutPhoneAndHelpCardsLargeFontScreenshot() =
+        captureAdvancedWithoutExternalController("full", withoutPhone = true)
+
+    private fun captureAdvancedWithoutExternalController(size: String, volume: Boolean = false,
+        withoutMap: Boolean = false, withoutDisplay: Boolean = false, withoutPhone: Boolean = false) {
         val config = android.content.res.Configuration(context.resources.configuration).apply { fontScale = 1.5f }
         context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        if (withoutMap) context.getSharedPreferences("xcertplay_airplay", 0).edit()
+            .putBoolean("cluster_map_enabled", true).putBoolean("center_map_overlay", true).commit()
+        if (withoutDisplay) for (name in listOf("diplay_split_screen", "diplay_carplay_rotation", "diplay_side_panel")) {
+            context.getSharedPreferences(name, 0).edit().putBoolean("enabled", true).commit()
+        }
         val screen = openSettings()
+        if (withoutPhone) ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
-            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java,
+                if (withoutPhone) SettingsCategory.CONNECTION else SettingsCategory.EXPERIMENTAL))
         layoutRoot(screen)
         assertFalse(texts(screen).any { it.text.toString().contains("外接控制器") })
+        if (withoutMap) {
+            assertFalse(texts(screen).any { it.text.toString().contains("仪表盘上的CarPlay地图") })
+            assertFalse(texts(screen).any { it.text.toString().contains("共享实时地图") })
+        }
+        if (withoutDisplay) {
+            for (title in listOf("显示（实验性）", "分屏中的 CarPlay", "随屏幕旋转 CarPlay", "侧边面板")) {
+                assertFalse(texts(screen).any { it.text.toString().contains(title) })
+            }
+        }
+        if (withoutPhone) {
+            assertFalse(texts(screen).any { it.text.toString().contains("选择你的 iPhone") })
+            assertEquals(View.GONE, ReflectionHelpers.getField<LinearLayout>(screen, "readinessCard").visibility)
+            for (title in listOf(screen.getString(R.string.permissions_and_connection_help),
+                screen.getString(R.string.app_permissions), screen.getString(R.string.bluetooth_settings), "无线连接帮助")) {
+                assertFalse("Removed help card: $title", texts(screen).any { it.text == title })
+            }
+        }
         if (volume) {
             assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_navigation_wheel_volume) })
             for (id in listOf(R.string.wheel_keys_open_settings, R.string.wheel_keys_enable_adb)) {
@@ -116,7 +230,7 @@ class AdaptiveSettingsUiTest {
         }
         val contentFrame = screen.findViewById<ViewGroup>(android.R.id.content)
         val root = contentFrame.getChildAt(0)
-        if (volume) {
+        if (volume || withoutMap || withoutDisplay || withoutPhone) {
             repeat(3) {
                 descendants(contentFrame).forEach { it.forceLayout() }
                 contentFrame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
@@ -127,6 +241,8 @@ class AdaptiveSettingsUiTest {
             assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
             assertEquals(1920, root.width)
             assertEquals(720, root.height)
+        }
+        if (volume) {
             val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
             val target = texts(screen).first { it.text == screen.getString(R.string.settings_navigation_wheel_volume) }
             val rect = android.graphics.Rect(0, 0, target.width, target.height)
@@ -134,11 +250,61 @@ class AdaptiveSettingsUiTest {
             scroll.scrollTo(0, rect.top)
             shadowOf(Looper.getMainLooper()).idle()
         }
+        if (withoutPhone) {
+            val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+            scroll.scrollTo(0, scroll.getChildAt(0).height)
+        }
         val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
         // Draw through the parent so a compact root ScrollView's own scroll is applied.
-        (if (volume) contentFrame else root).draw(android.graphics.Canvas(bitmap))
+        (if (volume || withoutMap || withoutDisplay || withoutPhone) contentFrame else root).draw(android.graphics.Canvas(bitmap))
         val directory = java.io.File("../agent_docs/screenshots/" +
-            if (volume) "remove-volume-permission-buttons" else "remove-external-controller").apply { mkdirs() }
+            when {
+                withoutPhone -> "connection-without-phone-and-help-cards"
+                withoutDisplay -> "remove-experimental-display"
+                withoutMap -> "remove-cluster-map"
+                volume -> "remove-volume-permission-buttons"
+                else -> "remove-external-controller"
+            }).apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullDisplayWithoutPipResolutionLargeFontScreenshot() = captureDisplayWithoutPipResolution("full")
+
+    @Test
+    @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactDisplayWithoutPipResolutionLargeFontScreenshot() = captureDisplayWithoutPipResolution("compact")
+
+    private fun captureDisplayWithoutPipResolution(size: String) {
+        context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
+            fontScale = 1.5f
+        }, context.resources.displayMetrics)
+        context.getSharedPreferences("xcertplay_airplay", 0).edit().putBoolean("adapt_pip_resolution", true).commit()
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.DISPLAY))
+        val frame = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(frame).forEach { it.forceLayout() }
+            frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            frame.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+        assertFalse(texts(screen).any { it.text.toString().contains("画中画与分屏自适应") })
+        assertTrue(texts(screen).any { it.text.startsWith(screen.getString(R.string.frame_rate) + " · ") })
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        frame.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/remove-pip-resolution").apply { mkdirs() }
         java.io.File(directory, "$size-font150.png").outputStream().use {
             assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
@@ -181,6 +347,9 @@ class AdaptiveSettingsUiTest {
         context.getSharedPreferences("diplay", 0).edit().clear().commit()
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         context.getSharedPreferences("carplay_audio_volume", 0).edit().clear().commit()
+        for (name in listOf("diplay_split_screen", "diplay_carplay_rotation", "diplay_side_panel")) {
+            context.getSharedPreferences(name, 0).edit().clear().commit()
+        }
     }
 
     @Test fun compactSettingsOpenDirectlyOnConnection() {
@@ -375,8 +544,8 @@ class AdaptiveSettingsUiTest {
         ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_title) })
-        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_action) })
+        assertFalse(texts(screen).any { it.text.toString().contains("选择你的 iPhone") })
+        assertEquals(View.GONE, ReflectionHelpers.getField<LinearLayout>(screen, "readinessCard").visibility)
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
     }
 
@@ -389,9 +558,10 @@ class AdaptiveSettingsUiTest {
         ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertTrue(texts(screen).any { it.text.toString() == "${screen.getString(R.string.choose_iphone_prefix)}My iPhone" })
+        assertTrue(texts(screen).any { it.text.toString() == "${screen.getString(R.string.status_ready_for_prefix)}My iPhone" })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.choose_iphone) })
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_connect_wireless) && it.isEnabled })
-        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_choose_iphone_action) })
+        assertFalse(texts(screen).any { it.text.toString().contains("选择你的 iPhone") })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.setup_needs_attention) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.open_connection_setup) })
@@ -676,7 +846,7 @@ class AdaptiveSettingsUiTest {
             .performClick()
 
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_advanced_caution_title) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.carplay_map_on_instrument_cluster_experimental) })
+        assertFalse(texts(screen).any { it.text.toString().contains("仪表盘上的CarPlay地图") })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.advanced_vehicle_data) })
         assertFalse(texts(screen).any { it.text.toString().contains("External controller") || it.text.toString().contains("外接控制器") })
         assertFalse(texts(screen).any { it.text == "热点加入修复" })
@@ -698,6 +868,7 @@ class AdaptiveSettingsUiTest {
     }
 
     @Test fun settingsLiveWhereDriversLookForThem() {
+        AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         val screen = openSettings()
         fun visibleIn(category: Int): List<CharSequence> {
             descendants(screen.window.decorView).first { candidate ->
@@ -713,7 +884,16 @@ class AdaptiveSettingsUiTest {
         val advanced = visibleIn(R.string.settings_advanced)
         val connection = visibleIn(R.string.connection)
 
+        assertFalse(advanced.any { it.toString().contains("仪表盘上的CarPlay地图") })
+        assertFalse(vehicle.any { it == text(R.string.wheel_map_zoom) })
+
         assertTrue(connection.any { it.startsWith(text(R.string.settings_usb_charging)) })
+        assertTrue(text(R.string.settings_wireless_hotspot) in connection)
+        assertTrue(connection.any { it.startsWith(text(R.string.settings_manual_hotspot_details) + " · ") })
+        assertFalse(connection.any { it == "热点手动配置" })
+        for (other in listOf(display, audio, vehicle, advanced)) {
+            assertFalse(other.any { it.startsWith(text(R.string.settings_manual_hotspot_details) + " · ") })
+        }
         assertFalse(advanced.any { it.startsWith(text(R.string.settings_usb_charging)) })
         assertTrue(audio.any { it.startsWith(text(R.string.music_buffer)) })
         listOf(R.string.main_buffered_audio, R.string.settings_car_bluetooth_audio, R.string.efficient_video, R.string.smooth_video, R.string.settings_direct_video_output, R.string.settings_low_latency_decoder, R.string.call_echo_cancellation, R.string.call_voice_filter, R.string.settings_disable_media_key_audio_focus, R.string.contrib_audio_home_toggle_audio_focus).forEach {
@@ -731,13 +911,12 @@ class AdaptiveSettingsUiTest {
         assertFalse(text(R.string.settings_ambient_title) in audio)
         assertFalse(text(R.string.settings_ambient_title) in vehicle)
         assertFalse(text(R.string.settings_ambient_title) in display)
-        assertTrue(text(R.string.side_panel) in advanced)
+        assertFalse(advanced.any { it.toString().contains("显示（实验性）") })
         assertTrue(display.any { it.startsWith(text(R.string.settings_app_appearance)) })
         assertFalse(audio.any { it.startsWith(text(R.string.settings_app_appearance)) })
         assertFalse(vehicle.any { it.startsWith(text(R.string.settings_app_appearance)) })
         assertFalse(advanced.any { it.startsWith(text(R.string.settings_app_appearance)) })
-        listOf(R.string.main_buffered_audio, R.string.efficient_video, R.string.smooth_video, R.string.settings_direct_video_output, R.string.settings_low_latency_decoder, R.string.call_echo_cancellation, R.string.call_voice_filter, R.string.settings_disable_media_key_audio_focus, R.string.right_hand_drive, R.string.car_button_in_carplay,
-            R.string.side_panel, R.string.split_screen_areas, R.string.carplay_rotation).forEach {
+        listOf(R.string.main_buffered_audio, R.string.efficient_video, R.string.smooth_video, R.string.settings_direct_video_output, R.string.settings_low_latency_decoder, R.string.call_echo_cancellation, R.string.call_voice_filter, R.string.settings_disable_media_key_audio_focus, R.string.right_hand_drive, R.string.car_button_in_carplay).forEach {
             assertFalse(text(it), text(it) in display)
         }
     }

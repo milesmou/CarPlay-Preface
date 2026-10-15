@@ -11,22 +11,22 @@ class SettingsStateTest {
 
     @Test fun readinessReportsTheMostUrgentStateFirst() {
         fun of(error: Boolean = false, active: Boolean = false, running: Boolean = false,
-            wireless: Boolean = true, phone: Boolean = true) =
-            SettingsReadiness.of(error, active, running, wireless, phone)
+            wireless: Boolean = true, hotspotSetup: Boolean = false) =
+            SettingsReadiness.of(error, active, running, wireless, hotspotSetup)
 
         assertEquals(SettingsReadiness.SETUP_ERROR, of(error = true, active = true))
-        assertEquals(SettingsReadiness.CONNECTED, of(active = true, running = true, phone = false))
-        assertEquals(SettingsReadiness.CONNECTING, of(running = true, phone = false))
-        assertEquals(SettingsReadiness.CHOOSE_IPHONE, of(phone = false))
+        assertEquals(SettingsReadiness.CONNECTED, of(active = true, running = true))
+        assertEquals(SettingsReadiness.CONNECTING, of(running = true))
+        assertEquals(SettingsReadiness.HOTSPOT_SETUP, of(hotspotSetup = true))
         assertEquals(SettingsReadiness.READY_WIRELESS, of())
-        assertEquals(SettingsReadiness.READY_USB, of(wireless = false, phone = false))
-        assertTrue(SettingsReadiness.CHOOSE_IPHONE.needsAction)
+        assertEquals(SettingsReadiness.READY_USB, of(wireless = false))
+        assertTrue(SettingsReadiness.HOTSPOT_SETUP.needsAction)
         assertFalse(SettingsReadiness.READY_USB.needsAction)
     }
 
     @Test fun temporaryHotspotNeedsNoSetupAndDoesNotHideAnActiveSession() {
         fun of(active: Boolean = false, running: Boolean = false, wireless: Boolean = true) =
-            SettingsReadiness.of(false, active, running, wireless, phoneChosen = true)
+            SettingsReadiness.of(false, active, running, wireless)
 
         assertEquals(SettingsReadiness.READY_WIRELESS, of())
         assertFalse(SettingsReadiness.READY_WIRELESS.needsAction)

@@ -23,6 +23,7 @@ internal class SystemUsbSnapshot(
     private val listenerPort: () -> Int? = { null },
 ) {
     private var previousCounters: Map<String, Long> = emptyMap()
+    private var previousProtocolCounters: Map<String, Long> = emptyMap()
     private val unavailable = mutableMapOf<String, String>()
 
     fun sample(): String = listOf(
@@ -37,6 +38,17 @@ internal class SystemUsbSnapshot(
             val state = read("$base/operstate", 32).trim().takeIf { it in OPERSTATES } ?: "unknown"
             val carrier = read("$base/carrier", 32).trim().takeIf { it == "0" || it == "1" } ?: "unknown"
             "operstate=$state carrier=$carrier"
+        },
+        source("ipv6ProtocolCounters") {
+            val values = protocolCounters(read("/proc/net/dev_snmp6/${link.name}", PROC_LIMIT), link.address.scopeId)
+            val lines = values.entries.chunked(4).joinToString("\n") { group ->
+                "ipv6ProtocolCounters scope=selected_interface " + group.joinToString(" ") { (name, value) ->
+                    val before = previousProtocolCounters[name]
+                    "$name=$value ${name}Delta=${when { before == null -> "baseline"; value < before -> "reset"; else -> value - before }}"
+                }
+            }
+            previousProtocolCounters = values
+            lines
         },
     ).joinToString("\n")
 
@@ -66,8 +78,25 @@ internal class SystemUsbSnapshot(
     companion object {
         private const val PROC_LIMIT = 64 * 1024
         private val COUNTERS = listOf("rx_packets", "rx_bytes", "rx_errors", "rx_dropped", "tx_packets", "tx_bytes", "tx_errors", "tx_dropped")
+        private val PROTOCOL_COUNTERS = setOf("Ip6InReceives", "Ip6InHdrErrors", "Ip6InDiscards", "Ip6InDelivers",
+            "Ip6OutRequests", "Ip6OutDiscards", "Ip6OutNoRoutes", "Ip6InAddrErrors", "Icmp6InMsgs", "Icmp6OutMsgs",
+            "Icmp6InDestUnreachs", "Icmp6OutDestUnreachs", "Icmp6InNeighborSolicits", "Icmp6InNeighborAdvertisements",
+            "Icmp6OutNeighborSolicits", "Icmp6OutNeighborAdvertisements", "Ip6InUnknownProtos", "Ip6InNoRoutes")
         private val OPERSTATES = setOf("unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up")
         private val HEX_ADDRESS = Regex("[0-9a-fA-F]{32}")
+        internal fun protocolCounters(text: String, expectedIndex: Int? = null): Map<String, Long> {
+            val result = linkedMapOf<String, Long>()
+            var index: Int? = null
+            for (line in text.lineSequence()) {
+                val columns = line.trim().split(Regex("\\s+"))
+                if (columns.size == 2 && columns[0] == "ifIndex") index = columns[1].toIntOrNull()
+                if (columns.size != 2 || columns[0] !in PROTOCOL_COUNTERS) continue
+                columns[1].toLongOrNull()?.takeIf { it >= 0 }?.let { result[columns[0]] = it }
+            }
+            if (expectedIndex != null && index != expectedIndex) throw IOException("IPv6 counter interface index unavailable or replaced")
+            if (result.isEmpty()) throw IOException("No supported per-interface IPv6 counters")
+            return result
+        }
         private val STATES = listOf("INCOMPLETE", "FAILED", "REACHABLE", "STALE", "DELAY", "PROBE", "PERMANENT", "NOARP")
 
         private fun interfaceSummary(link: SystemUsbNetwork.Link): String {
@@ -146,16 +175,18 @@ internal class SystemUsbSnapshot(
             if (port == null) return "tcp6Listener=unknown"
             val expected = address.toList().chunked(4).flatMap { it.reversed() }
                 .joinToString("") { "%02x".format(it.toInt() and 255) }
-            var listening = 0; var synReceived = 0; var established = 0
+            var listening = 0; var synReceived = 0; var established = 0; var otherAddressRows = 0
             for (row in text.lineSequence().filter { it.isNotBlank() && !it.trim().startsWith("sl") }) {
                 val fields = row.trim().split(Regex("\\s+"))
                 if (fields.size < 4) throw IOException("Invalid TCP row")
                 val local = fields[1].split(':')
                 if (local.size != 2 || !HEX_ADDRESS.matches(local[0])) throw IOException("Invalid TCP address")
-                if (local[1].toIntOrNull(16) != port || !local[0].equals(expected, true)) continue
+                if (local[1].toIntOrNull(16) != port) continue
+                if (!local[0].equals(expected, true)) { otherAddressRows++; continue }
                 when (fields[3]) { "0A" -> listening++; "03" -> synReceived++; "01" -> established++ }
             }
-            return "tcp6 port=$port listening=$listening synReceived=$synReceived established=$established socketScope=advertised_address"
+            return "tcp6 port=$port listening=$listening synReceived=$synReceived established=$established " +
+                "socketScope=advertised_address otherLocalAddressRowsAtPort=$otherAddressRows otherRowsOwner=unverified"
         }
     }
 }
@@ -247,7 +278,7 @@ internal class SystemUsbStartupDiagnostics(
         } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
     }
     private fun emitSnapshot(snapshot: String, flags: String) {
-        snapshot.lineSequence().filter { it.isNotBlank() }.take(8).forEach { emit("system USB snapshot $flags $it") }
+        snapshot.lineSequence().filter { it.isNotBlank() }.take(16).forEach { emit("system USB snapshot $flags $it") }
     }
     private fun emit(message: String) { try { log(message) } catch (_: RuntimeException) { /* Diagnostics cannot fail connection. */ } }
 }

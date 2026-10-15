@@ -43,6 +43,8 @@ class NcmUsbBridgeFramingTest {
             assertArrayEquals(alignedFrame, ncm.recv(50))
             assertArrayEquals(second, ncm.recv(50))
             assertArrayEquals(smallFrame, ncm.recv(50))
+            assertEquals("usbInTransfers=1 usbInBytes=${512 + 1024 + 28 + smallFrame.size} " +
+                "ntb16Blocks=3 emptyNtb16Blocks=0", ncm.readDiagnosticSummary())
         }
         assertEquals(1, NcmFramingReplay.completions)
     }

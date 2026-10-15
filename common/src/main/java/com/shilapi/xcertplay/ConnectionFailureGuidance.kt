@@ -15,6 +15,7 @@ internal object ConnectionFailureGuidance {
         wireless: Boolean,
         mode: WirelessHotspotMode = WirelessHotspotMode.LOCAL_ONLY_HOTSPOT,
     ): Int {
+        if (!wireless && failure.usbNcmTested) return R.string.connection_help_usb_ncm_test
         if (!wireless && failure.usbDirectUnavailable) return R.string.connection_help_usb_direct
         if (failure.wifiResetRequired) return R.string.connection_help_reset_wifi
         when (failure.startupFailure) {

@@ -46,7 +46,6 @@ class CarPlayHostDisplaySizeTest {
 
     @Before fun setUp() {
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
-        AirPlayPersistence.saveAdaptPipResolution(activity, false)
         // Source-only tests have no provisioned local authentication identity.
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
         // Exercise host startup without launching vendor-service workers or real transports.
@@ -97,16 +96,15 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(1, keepLogs())
     }
 
-    @Test fun aNarrowWindowWithAdaptPipResolutionTriggersReconnect() {
-        AirPlayPersistence.saveAdaptPipResolution(activity, true)
+    @Test fun anObsoleteSavedPipOptionCannotReconnectANarrowWindow() {
+        activity.getSharedPreferences("xcertplay_airplay", 0).edit().putBoolean("adapt_pip_resolution", true).commit()
         val display = startSession()
         applySize(700, 990)
-        assertEquals(1, getField("restartGeneration"))
-        assertNull(getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+        assertSame(display, getField("sessionDisplay"))
     }
 
     @Test fun resumingASquareCanvasInTheSameWindowDoesNotReconnect() {
-        AirPlayPersistence.saveAdaptPipResolution(activity, true)
         val display = startSession(windowHeight = 1080, canvasHeight = 1920)
         val video = object : TextureView(activity) {
             override fun post(action: Runnable): Boolean = Handler(Looper.getMainLooper()).post(action)
@@ -122,14 +120,13 @@ class CarPlayHostDisplaySizeTest {
         assertNull(getField("pendingDisplaySize"))
     }
 
-    @Test fun aRealPipAspectChangeStillReconnectsWithASquareCanvas() {
-        AirPlayPersistence.saveAdaptPipResolution(activity, true)
-        startSession(windowHeight = 1080, canvasHeight = 1920)
+    @Test fun aPipAspectChangeKeepsTheNegotiatedCanvas() {
+        val display = startSession(windowHeight = 1080, canvasHeight = 1920)
 
         applySize(700, 1080)
 
-        assertEquals(1, getField("restartGeneration"))
-        assertNull(getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+        assertSame(display, getField("sessionDisplay"))
     }
 
 

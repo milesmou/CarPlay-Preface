@@ -40,7 +40,9 @@ class SystemUsbDiagnosticsTest {
     @Test fun periodicSnapshotsSplitIntoBoundedReportLinesAndKeepCounterDeltas() {
         val lines = CopyOnWriteArrayList<String>()
         val sampled = CountDownLatch(1)
-        val diagnostics = SystemUsbStartupDiagnostics({ "iface=usb0\nrx_packets=5 rx_packetsDelta=2\nneighbors=unavailable failureClass=IOException" }, {
+        val diagnostics = SystemUsbStartupDiagnostics({ "iface=usb0\nrx_packets=5 rx_packetsDelta=2\n" +
+            (1..10).joinToString("\n") { "ipv6ProtocolCounters block=$it" } +
+            "\nneighbors=unavailable failureClass=IOException" }, {
             lines += it
             if (it.contains("neighbors=unavailable")) sampled.countDown()
         })
@@ -48,6 +50,7 @@ class SystemUsbDiagnosticsTest {
             diagnostics.start()
             assertTrue(sampled.await(2, TimeUnit.SECONDS))
             assertTrue(lines.any { it.contains("rx_packetsDelta=2") })
+            assertTrue(lines.any { it.contains("ipv6ProtocolCounters block=10") })
             assertTrue(lines.none { '\n' in it || '\r' in it || it.length > 700 })
         } finally { diagnostics.close() }
     }
@@ -96,6 +99,7 @@ class SystemUsbDiagnosticsTest {
         val result = SystemUsbSnapshot.tcpSummary(text, address, 7000)
         assertTrue(result, result.contains("listening=1 synReceived=1 established=1"))
         assertFalse(result.contains(local))
+        assertTrue(result.contains("otherLocalAddressRowsAtPort=1 otherRowsOwner=unverified"))
     }
 
     @Test fun inaccessibleSourcesStayUnavailableWhileCountersContinueAndResetSafely() {
@@ -128,6 +132,46 @@ class SystemUsbDiagnosticsTest {
         assertTrue(result.contains("addresses=unavailable")); assertTrue(result.contains("routes=unavailable"))
         assertTrue(result.contains("neighbors=unavailable")); assertTrue(result.contains("rx_packets=unavailable"))
         assertFalse(result.contains("ipv6Neighbors=0"))
+    }
+
+    @Test fun ipv6ProtocolCountersAreInterfaceScopedAllowlistedAndPreserveDeltas() {
+        var count = 10L
+        val sample = SystemUsbSnapshot(link, read = { path, _ ->
+            when {
+                path == "/proc/net/dev_snmp6/usb0" -> "ifIndex 3\nIp6InReceives $count\nIp6InDelivers 4\n" +
+                    "Ip6InDiscards 1\nIcmp6InNeighborAdvertisements 2\nprivate_data 888\n"
+                path.endsWith("/operstate") -> "up"
+                path.endsWith("/carrier") -> "1"
+                path.contains("/statistics/") -> "0"
+                else -> ""
+            }
+        }, neighborRead = { "" }, interfaceRead = { "iface=usb0" })
+        val first = sample.sample()
+        assertTrue(first.contains("Ip6InReceives=10 Ip6InReceivesDelta=baseline"))
+        assertTrue(first.contains("scope=selected_interface"))
+        assertFalse(first.contains("private_data"))
+        count = 12
+        assertTrue(sample.sample().contains("Ip6InReceivesDelta=2"))
+        count = 1
+        assertTrue(sample.sample().contains("Ip6InReceivesDelta=reset"))
+    }
+
+    @Test fun malformedOrReplacedProtocolSourcesAreUnavailableRatherThanZero() {
+        for (text in listOf("ifIndex 3\nIp6InReceives invalid", "ifIndex 4\nIp6InReceives 123")) {
+            try { SystemUsbSnapshot.protocolCounters(text, 3); fail("Invalid evidence accepted") }
+            catch (_: IOException) { }
+        }
+        val values = SystemUsbSnapshot.protocolCounters("ifIndex 3\nIp6InReceives 9\nIp6InDiscards -1\n" +
+            "Icmp6InMsgs 3 extra\nUnknownPrivateField 999", 3)
+        assertEquals(mapOf("Ip6InReceives" to 9L), values)
+    }
+
+    @Test fun outgoingNeighborControlCountersSurviveOnlyForTheSelectedInterface() {
+        val values = SystemUsbSnapshot.protocolCounters("ifIndex 3\nIcmp6OutNeighborSolicits 2\n" +
+            "Icmp6OutNeighborAdvertisements 1\nIp6InUnknownProtos 0\nIp6InNoRoutes 0\nprivate 99", 3)
+        assertEquals(4, values.size)
+        assertEquals(2L, values["Icmp6OutNeighborSolicits"])
+        assertFalse(values.containsKey("private"))
     }
 
     @Test fun startupDistinguishesTcpFromSessionAndIgnoresInternalProbes() {

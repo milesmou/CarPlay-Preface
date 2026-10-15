@@ -93,6 +93,8 @@ import com.shilapi.xcertplay.transport.LockdownCarKitClient
 import com.shilapi.xcertplay.transport.LockdownPairingClient
 import com.shilapi.xcertplay.transport.LockdownPairRecord
 import com.shilapi.xcertplay.transport.NcmFunctionDiscovery
+import com.shilapi.xcertplay.transport.NcmUsbBridge
+import com.shilapi.xcertplay.transport.AutomaticNcmFrameTest
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetAddress
@@ -140,10 +142,11 @@ sealed class CarPlayStatus {
     data object ConnectingControl : CarPlayStatus()
     data object AttachingNetwork : CarPlayStatus()
     data object RunningControl : CarPlayStatus()
+    data object TestingUsbNcm : CarPlayStatus()
     data object ControlEnded : CarPlayStatus()
     data class Failed(val message: String, val wifiResetRequired: Boolean = false,
         val startupFailure: WirelessStartupFailure? = null, val retryable: Boolean = true,
-        val usbDirectUnavailable: Boolean = false) : CarPlayStatus()
+        val usbDirectUnavailable: Boolean = false, val usbNcmTested: Boolean = false) : CarPlayStatus()
 }
 
 internal fun isWirelessHandoffInProgress(
@@ -285,6 +288,7 @@ class CarPlayController(
     }.apply { removeOnCancelPolicy = true }
     @Volatile private var wirelessDiagnostics: WirelessStartupDiagnostics? = null
     @Volatile private var usbDiagnostics: SystemUsbStartupDiagnostics? = null
+    @Volatile private var usbFrameTest: AutomaticNcmFrameTest? = null
     @Volatile private var bluetoothSocket: BluetoothSocket? = null
     @Volatile private var bluetoothStream: BluetoothRfcommDuplexStream? = null
     @Volatile private var wirelessTunnelChannel: Iap2Session? = null
@@ -432,6 +436,9 @@ class CarPlayController(
     }
 
     fun isClosed(): Boolean = closed
+
+    /** The actual immutable connection mode, independent of preferences saved for a future attempt. */
+    fun connectionTransport(): CarPlayTransport = config.transport
 
     /** Nonblocking identity for wheel controls: only an unclosed phone with an accepted primary stream. */
     fun activeAirPlaySessionToken(): Any? {
@@ -678,6 +685,7 @@ class CarPlayController(
                     if (config.transport == CarPlayTransport.WIRELESS) {
                         closeBestEffort("wireless stack") { closeWirelessStack(service) }
                     } else {
+                        closeBestEffort("NCM frame test") { usbFrameTest?.close() }
                         closeBestEffort("CSM") { csm?.close() }
                         csm = null
                     }
@@ -2079,11 +2087,19 @@ class CarPlayController(
     private fun runStack(usbSession: Iap2UsbSession, device: UsbDevice) {
         phase = Phase.CONTROL
         var networkAttached = false
+        val stackStarted = System.nanoTime()
+        var usbStep = "usbmux"
+        fun milestone(step: String) {
+            usbStep = step
+            connectionDiagnostic("USB milestone step=$step elapsedMs=${elapsedMillis(stackStarted)}")
+        }
         try {
             if (closed) return
+            connectionDiagnostic("NCM frame test automatic policy=system_observation_then_raw_on_startup_failure")
             val mux = Iap2UsbMuxHost.open(usbSession, onDiagnostic = ::connectionDiagnostic)
             this.mux = mux
             debugLog("wired USBMUX host opened")
+            milestone("lockdown_pairing")
             onStatus(CarPlayStatus.Pairing)
             val pairingClient = LockdownPairingClient(mux)
             val savedPairRecord = loadPairRecord()
@@ -2097,6 +2113,7 @@ class CarPlayController(
             )
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
+            milestone("carkit_control")
             // Temporary lab capture, limited to accessory/authentication messages and two minutes.
             try {
                 val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
@@ -2193,11 +2210,18 @@ class CarPlayController(
             )
             this.csm = csm
             debugLog("wired iAP2 CSM channel opened")
+            milestone("system_network")
 
-            val network = attachWiredNetwork(device)
-            networkAttached = true
+            var network = try {
+                attachWiredNetwork(device).also { networkAttached = true }
+            } catch (unavailable: SystemUsbUnavailable) {
+                milestone("raw_ncm_diagnostic")
+                connectionDiagnostic("NCM frame test automatic trigger=system_network_unavailable")
+                openUsbFrameTest(device)
+            }
             if (closed) {
-                network.diagnostics.close()
+                network.diagnostics?.close()
+                network.frameTest?.close()
                 socketService?.detach()
                 return
             }
@@ -2211,7 +2235,9 @@ class CarPlayController(
                 sourceVersion = airPlayConfig.sourceVersion,
                 deviceIdentifier = network.hostMac.macString(),
             )
-            onStatus(CarPlayStatus.RunningControl)
+            onStatus(if (network.frameTest != null) CarPlayStatus.TestingUsbNcm else CarPlayStatus.RunningControl)
+            milestone(if (network.frameTest != null) "raw_ncm_control" else "iap2_start_session")
+            var testWaitingSince = if (network.frameTest != null) System.nanoTime() else null
             debugLog(
                 "wired iAP2 runtime control starting " +
                     "location=${config.identification.locationInformationEnabled}",
@@ -2226,19 +2252,33 @@ class CarPlayController(
                 onProgress = { message ->
                     debugLog("wired $message")
                     if (message == "iap2 tx=0x4301 carplay-start-session") {
+                        milestone(if (network.frameTest != null) "raw_ncm_window" else "waiting_airplay_tcp")
                         network.systemFallback?.startSessionSent()
-                        network.diagnostics.startSessionSent()
+                        network.diagnostics?.startSessionSent()
+                        network.frameTest?.startSessionSent()
+                        testWaitingSince = null
                     }
                 },
                 refreshEndpoint = {
                     if (!closed && network.systemFallback?.claimFallback() == true) {
-                        debugLog("wired system USB did not establish AirPlay; terminating without VPN fallback")
-                        network.diagnostics.finish("startup_timeout")
-                        throw SystemUsbUnavailable("iPhone did not establish AirPlay over the system USB network within 30 seconds. Check the USB network diagnostics; VPN fallback is disabled.")
-                    } else null
+                        connectionDiagnostic("NCM frame test automatic trigger=airplay_startup_timeout")
+                        milestone("raw_ncm_diagnostic")
+                        onStatus(CarPlayStatus.TestingUsbNcm)
+                        network.diagnostics?.finish("startup_timeout")
+                        socketService?.detach()
+                        network = openUsbFrameTest(device, network)
+                        // The original endpoint and StartSession remain valid for this bounded test.
+                        network.frameTest?.startSessionSent()
+                    }
+                    network.frameTest?.result?.let { throw UsbNcmTestEnded(it) }
+                    if (testWaitingSince?.let { System.nanoTime() - it >= 60_000_000_000L } == true) {
+                        throw UsbNcmTestEnded("outcome=no_start_session; NCM data readiness cannot be tested")
+                    }
+                    null
                 },
             )
-            network.diagnostics.finish("control_ended")
+            network.diagnostics?.finish("control_ended")
+            if (network.frameTest != null) throw UsbNcmTestEnded("outcome=control_ended_before_test_complete")
             onStatus(
                 when (result.terminal) {
                     Iap2WiredControlTerminal.TIMED_OUT -> CarPlayStatus.ControlEnded
@@ -2247,10 +2287,18 @@ class CarPlayController(
                 },
             )
         } catch (error: Throwable) {
+            connectionDiagnostic("USB milestone failed step=$usbStep elapsedMs=${elapsedMillis(stackStarted)} " +
+                "failureClass=${error.javaClass.simpleName} cancelled=$closed systemNetworkAttached=$networkAttached")
             usbDiagnostics?.finish("bringup_failed")
+            val frameTest = usbFrameTest
+            if (frameTest != null) {
+                closeBestEffort("NCM frame test") { frameTest.close() }
+                connectionDiagnostic("NCM frame test control ended failureClass=${error.javaClass.simpleName}")
+            }
             debugLog("wired bring-up failed", error)
             if (networkAttached) socketService?.detach()
-            fail(error)
+            fail(if (frameTest != null && error !is UsbNcmTestEnded)
+                UsbNcmTestEnded("NCM frame test stopped: ${error.javaClass.simpleName}", error) else error)
         }
     }
 
@@ -2259,8 +2307,52 @@ class CarPlayController(
         val hostMac: ByteArray,
         val systemFallback: SystemUsbFallback? = null,
         val systemLink: SystemUsbNetwork.Link? = null,
-        val diagnostics: SystemUsbStartupDiagnostics,
+        val diagnostics: SystemUsbStartupDiagnostics? = null,
+        val frameTest: AutomaticNcmFrameTest? = null,
     )
+
+    private fun openUsbFrameTest(device: UsbDevice, previous: WiredNetwork? = null): WiredNetwork {
+        onStatus(CarPlayStatus.TestingUsbNcm)
+        try {
+            val manager = requireUsbManager()
+            if (!manager.hasPermission(device)) throw IOException("iPhone USB permission is unavailable")
+            val configuration = IphoneCarPlayConfiguration.find(device)
+                ?: throw IOException("iPhone CarPlay configuration is unavailable")
+            val function = NcmFunctionDiscovery.find(configuration)
+                ?: throw IOException("iPhone NCM function is unavailable")
+            val connection = manager.openDevice(device) ?: throw IOException("Cannot open iPhone NCM device")
+            val bridge = try {
+                val active = ByteArray(1)
+                if (connection.controlTransfer(0x80, 8, 0, 0, active, 1, 1000) != 1 ||
+                    active[0].toInt() and 255 != configuration.id) {
+                    throw IOException("Active iPhone configuration does not match NCM descriptors")
+                }
+                synchronized(wirelessResourceLock) {
+                    if (closed) throw IOException("USB connection closed")
+                    // No SET_CONFIGURATION: leave USBMUX/iAP2 running. Only the failed NCM path
+                    // is detached from its kernel driver. Replug is required after this test.
+                    NcmUsbBridge.open(connection, function, ::connectionDiagnostic)
+                }
+            } catch (error: Throwable) { connection.close(); throw error }
+            try {
+                bridge.prepareFrameDiagnostics(function.control.id)
+                val mac = previous?.hostMac ?: bridge.hostMac ?: config.hostMac
+                val address = previous?.address ?: config.linkLocal
+                val test = AutomaticNcmFrameTest(bridge, mac, InetAddress.getByName(address).address,
+                    ::connectionDiagnostic)
+                synchronized(wirelessResourceLock) {
+                    if (closed) { test.close(); throw IOException("USB connection closed") }
+                    usbFrameTest = test
+                }
+                connectionDiagnostic("NCM frame test opened control=${function.control.id} data=${function.data.id} " +
+                    "diagnosticOnly=true replugRequired=true")
+                return WiredNetwork(address, mac, frameTest = test)
+            } catch (error: Throwable) { bridge.close(); throw error }
+        } catch (error: Exception) {
+            connectionDiagnostic("NCM frame test unavailable failureClass=${error.javaClass.simpleName}")
+            throw UsbNcmTestEnded("NCM frame test could not start: ${error.message}", error)
+        }
+    }
 
     private fun attachWiredNetwork(device: UsbDevice): WiredNetwork {
         onStatus(CarPlayStatus.AttachingNetwork)
@@ -2301,6 +2393,7 @@ class CarPlayController(
     }
 
     private class SystemUsbUnavailable(message: String) : IOException(message)
+    private class UsbNcmTestEnded(message: String, cause: Throwable? = null) : IOException(message, cause)
 
 
     private fun pairNewRecord(client: LockdownPairingClient): LockdownPairRecord =
@@ -2851,8 +2944,9 @@ class CarPlayController(
             onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName,
                 false,
                 causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason,
-                retryable = error !is SystemUsbUnavailable,
-                usbDirectUnavailable = error is SystemUsbUnavailable),
+                retryable = error !is SystemUsbUnavailable && error !is UsbNcmTestEnded,
+                usbDirectUnavailable = error is SystemUsbUnavailable,
+                usbNcmTested = error is UsbNcmTestEnded),
                 if (wireless) wirelessGeneration.get() else null)
         }
     }
@@ -2971,6 +3065,8 @@ class CarPlayController(
             "STEP network/attach: attaching the AirPlay network transport"
         CarPlayStatus.RunningControl ->
             "STEP iap2/wired: wired iAP2 control loop running"
+        CarPlayStatus.TestingUsbNcm ->
+            "STEP usb/ncm-test: automatic NCM frame diagnostics; not an AirPlay connection"
         CarPlayStatus.ControlEnded ->
             "STEP control/end: the control window ended"
         is CarPlayStatus.Failed ->
