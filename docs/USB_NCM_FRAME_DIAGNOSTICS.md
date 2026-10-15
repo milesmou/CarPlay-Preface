@@ -6,6 +6,8 @@
 
 ## 自动触发与资源归属
 
+构建 67 报告后[复核与修正](CONNECTION_REPORT_2026-10-15_BUILD67.md#usb-连续失败后的复核)：接管 NCM、选择 alternate 后重新发送 StartSession，实际发送成功才启动诊断窗口；不能沿用切换前的发送标志。此时诊断探针采用其请求的 100 ms 超时，不再截成通用启动前的 20 ms；仍为 15 秒窗口及最多三次探针。这是诊断有效性修正，正常系统网卡连接失败的根因仍未确认。
+
 1. 正常连接仍使用当前 iPhone 的系统 NCM 网卡及普通 socket。逐行记录系统网卡 RX/TX、IPv6、邻居、真实监听身份与端口等证据，见 [系统网络诊断](USB_SYSTEM_NETWORK_DIAGNOSTICS.md)。不在正常连接或已建立会话时 claim NCM。
 2. 当前 iPhone 没有可用系统网卡、监听失败，或发出 StartSession 后 30 秒仍未建立 AirPlay，会自动尝试原始 NCM 测试。后者由 `SystemUsbFallback` 同步判定，已经建立过的会话不会触发。无线连接不触发此测试。
 3. 保留 USB 授权及当前 iPhone 身份；通过 GET_CONFIGURATION 核对活动配置与 NCM 描述符一致。单独打开 USB 连接，只强制 claim NCM control/data 接口，不 claim USBMUX，不执行 SET_CONFIGURATION。原有 iAP2、配件认证与 StartSession 保持运行。

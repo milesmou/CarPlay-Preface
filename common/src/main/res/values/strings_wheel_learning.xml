@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_wheel_learning_hint">Learn, restore or disable previous, next and Siri keys. Choose Learn key, then press a key within 10 seconds. Only keys received by the app can be learned. Phone, volume, system and typing keys cannot be assigned. Disabling stops app forwarding; the car retains its own actions. Bluetooth media keys remain with the car. No CarPlay reconnect is needed.</string>
+    <string name="settings_wheel_previous">Previous track</string>
+    <string name="settings_wheel_next">Next track</string>
+    <string name="settings_wheel_siri">Siri key</string>
+    <string name="settings_wheel_binding_default">Default key %1$d</string>
+    <string name="settings_wheel_binding_learned">Learned key %1$d</string>
+    <string name="settings_wheel_binding_disabled">Disabled</string>
+    <string name="settings_wheel_learn">Learn a key</string>
+    <string name="settings_wheel_restore">Restore default</string>
+    <string name="settings_wheel_disable">Disable app forwarding</string>
+    <string name="settings_wheel_learning_press">Press the wheel key for %1$s within 10 seconds.</string>
+    <string name="settings_wheel_learning_saved">Wheel key saved.</string>
+    <string name="settings_wheel_learning_conflict">That key belongs to another action. Disable or change that action first.</string>
+    <string name="settings_wheel_learning_reserved">Phone, volume, system and typing keys cannot be assigned.</string>
+    <string name="settings_wheel_learning_timeout">No usable key arrived. Check that the key reaches the app, then try again.</string>
+    <string name="settings_wheel_learning_cancelled">Key learning cancelled.</string>
+    <string name="settings_wheel_takeover_title">Wheel handling status</string>
+    <string name="settings_wheel_takeover_status">Input request: %1$s\nObserver callbacks received: %2$d\nOEM media source: %3$s\nExclusive wheel handling: unconfirmed. A successful request or received key does not prove that the car stopped handling it.</string>
+    <string name="settings_wheel_status_bluetooth">Car Bluetooth handles media keys</string>
+    <string name="settings_wheel_status_disconnected">No active CarPlay session</string>
+    <string name="settings_wheel_status_unavailable">Input request failed; other available paths retained</string>
+    <string name="settings_wheel_status_requested">Request accepted; check received callbacks separately</string>
+    <string name="settings_wheel_status_idle">Not requested; waiting for session and ownership</string>
+    <string name="settings_wheel_source_owned">Playback ownership granted; wheel exclusivity unconfirmed</string>
+    <string name="settings_wheel_source_registered">Registered; playback ownership not granted</string>
+    <string name="settings_wheel_source_unready">Not ready or not registered</string>
+</resources>

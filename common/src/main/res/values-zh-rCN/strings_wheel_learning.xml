@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_wheel_learning_hint">可学习、恢复默认或停用上一曲、下一曲和 Siri 按键。点“学习按键”后，请在 10 秒内按键；仅能学习应用收到的按键。电话、音量、系统及文字输入键不可分配。停用仅停止应用转发，原车动作仍保留；蓝牙方案的媒体键归原车。修改无需重连 CarPlay。</string>
+    <string name="settings_wheel_previous">上一曲按键</string>
+    <string name="settings_wheel_next">下一曲按键</string>
+    <string name="settings_wheel_siri">Siri 按键</string>
+    <string name="settings_wheel_binding_default">默认按键 %1$d</string>
+    <string name="settings_wheel_binding_learned">已学习按键 %1$d</string>
+    <string name="settings_wheel_binding_disabled">已停用</string>
+    <string name="settings_wheel_learn">学习按键</string>
+    <string name="settings_wheel_restore">恢复默认</string>
+    <string name="settings_wheel_disable">停用应用转发</string>
+    <string name="settings_wheel_learning_press">请在 10 秒内按下用于“%1$s”的方向盘按键。</string>
+    <string name="settings_wheel_learning_saved">方控按键已保存。</string>
+    <string name="settings_wheel_learning_conflict">此键已用于其他操作，请先停用或修改对应操作。</string>
+    <string name="settings_wheel_learning_reserved">电话、音量、系统及文字输入键不可分配。</string>
+    <string name="settings_wheel_learning_timeout">未收到可用按键，请确认该按键能送达应用后再试。</string>
+    <string name="settings_wheel_learning_cancelled">已取消按键学习。</string>
+    <string name="settings_wheel_takeover_title">方控处理状态</string>
+    <string name="settings_wheel_takeover_status">输入申请：%1$s\n已收到观察回调：%2$d 次\n原厂媒体音源：%3$s\n独占处理：未确认。申请成功或收到按键，不代表原车已停止处理。</string>
+    <string name="settings_wheel_status_bluetooth">媒体键交由原车蓝牙处理</string>
+    <string name="settings_wheel_status_disconnected">尚无已连接的 CarPlay 会话</string>
+    <string name="settings_wheel_status_unavailable">申请失败，保留其他可用接入</string>
+    <string name="settings_wheel_status_requested">申请已返回成功，请分别查看收到的回调</string>
+    <string name="settings_wheel_status_idle">未申请，等待会话与媒体归属</string>
+    <string name="settings_wheel_source_owned">已获准播放，方控独占仍未确认</string>
+    <string name="settings_wheel_source_registered">已注册，尚未取得播放归属</string>
+    <string name="settings_wheel_source_unready">未就绪或尚未注册</string>
+</resources>

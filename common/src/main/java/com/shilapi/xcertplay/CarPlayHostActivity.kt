@@ -18,7 +18,6 @@ import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
@@ -68,8 +67,6 @@ import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
 import com.shilapi.xcertplay.airplay.AirPlayPhysicalSizeBasis
 import com.shilapi.xcertplay.airplay.AirPlayPhysicalSizeMm
-import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
-import com.shilapi.xcertplay.airplay.CarPlayUiScale
 import com.shilapi.xcertplay.airplay.AirPlayDisplayConfig
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.airplay.AirPlayIcon
@@ -133,9 +130,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var connectionHelpView: TextView? = null
     private var wifiRecoveryButton: View? = null
     private var reconnectAttempts = 0
-    private val siriKey = WheelSiriKey()
-    private val siriKeyPresses = WheelKeyPresses()
-    private val legacySiriPresses = mutableSetOf<Triple<Int, Int, Int>>()
     private val startupRetryBudget = WirelessStartupRetryBudget()
     private var startupRetryStopped = false
     private var startupRetryButton: View? = null
@@ -334,7 +328,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var statusView: TextView? = null
     private var statusScrollView: ScrollView? = null
     private var stageStatusView: TextView? = null
-    private var resolutionValueView: TextView? = null
     private var resolutionPreviewView: TextView? = null
     private var hotspotStatusView: TextView? = null
     private var manualHotspotFields: View? = null
@@ -362,11 +355,11 @@ class CarPlayHostActivity : ComponentActivity() {
     private var pendingDisplaySize: DisplaySize? = null
     private var sessionDisplay: CarPlaySessionDisplay? = null
     private var touchOutsideContent = false
-    private var displayScalePercent = 100
-    private var displayScaleTenths = CarPlayDisplayScale.DEFAULT_TENTHS
-    private var uiScalePercent = CarPlayUiScale.DEFAULT
     private var displayDiagnosticAttempt: String? = null
     private var hevcEnabled = true
+    private val hevcDecoders by lazy { HevcSupport.decoders() }
+    private val sessionHevc: Boolean
+        get() = HevcSupport.usable(hevcEnabled, hevcSoftwareDecoderEnabled, hevcDecoders)
     private var hevcSoftwareDecoderEnabled = false
     private var advancedAudioChannelMappingSupported = false
     private var advancedAudioChannelMapping = false
@@ -623,10 +616,6 @@ class CarPlayHostActivity : ComponentActivity() {
             nightSchedule,
         )
         gestureFingerCount = AirPlayPersistence.loadSettingsGestureFingers(this)
-        displayScalePercent = AirPlayPersistence.loadDisplayScalePercent(this)
-        displayScaleTenths = CarPlayDisplayScale.sanitize((displayScalePercent + 5) / 10)
-        // Size is now chosen only through CarPlaySize; ignore the canvas scale older builds stored.
-        uiScalePercent = CarPlayUiScale.DEFAULT
         hevcEnabled = AirPlayPersistence.loadHevcEnabled(this)
         hevcSoftwareDecoderEnabled =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
@@ -784,9 +773,7 @@ class CarPlayHostActivity : ComponentActivity() {
         AppAppearanceRuntime.publishHost(this, darkMode)
         refreshAppAppearance()
         if (!menuOpen) {
-            displayScalePercent = AirPlayPersistence.loadDisplayScalePercent(this)
-            displayScaleTenths = CarPlayDisplayScale.sanitize((displayScalePercent + 5) / 10)
-            updateResolutionMenu()
+                    updateResolutionMenu()
         }
         if (intent.getBooleanExtra("picture_controls", false)) {
             intent.removeExtra("picture_controls")
@@ -831,25 +818,19 @@ class CarPlayHostActivity : ComponentActivity() {
     private val windowMediaPresses = mutableSetOf<Triple<Int, Int, Int>>()
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (WheelMediaLearning.offer(event)) return true
         val physicalKey = Triple(event.deviceId, event.keyCode, event.scanCode)
         val downOrUp = event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP
         if (downOrUp && physicalKey in windowMediaPresses) {
+            CarPlayMediaKeys.onWindowMediaKey(event)
             if (event.action == KeyEvent.ACTION_UP) windowMediaPresses.remove(physicalKey)
             return true
         }
-        if (downOrUp && physicalKey in legacySiriPresses) {
-            if (event.action == KeyEvent.ACTION_UP) {
-                legacySiriPresses.remove(physicalKey)
-                requestLegacySiri(event.keyCode)
-            }
-            return true
-        }
-        // A release/repeat belongs to its original press even if a call, session or setting changed.
-        if (downOrUp && siriKeyPresses.hasConsumedPress(physicalKey)) {
-            siriKeyPresses.filter(physicalKey, event.action == KeyEvent.ACTION_DOWN, event.repeatCount == 0) {
-                WheelZoomKeys.Action.PASS
-            }
-            return true
+        if (activeAirPlaySession != null && controller?.usesCarBluetoothAudio == true &&
+            CarPlayMediaButton.belongsToCarBluetooth(event.keyCode)) return super.dispatchKeyEvent(event)
+        if (!menuOpen && activeAirPlaySession != null && CarPlayMediaButton.forKeyCode(event.keyCode) == null &&
+            WheelMediaBindings.known(this, event.keyCode)) {
+            return if (CarPlayMediaKeys.onWindowMediaKey(event) == true) true else super.dispatchKeyEvent(event)
         }
         if (!menuOpen &&
             AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) &&
@@ -864,24 +845,6 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
 
-        // The wheel key service, when it runs, takes an assigned Siri key before this window sees it.
-        val assignedKey = WheelZoomSettings.isSiriKey(this, WheelKey.of(event))
-        val assignedAction = if (downOrUp) siriKeyPresses.filter(
-            physicalKey, event.action == KeyEvent.ACTION_DOWN, event.repeatCount == 0,
-        ) {
-            if (activeAirPlaySession == null || !assignedKey || inCall(this)) {
-                return@filter WheelZoomKeys.Action.PASS
-            }
-            if (siriKey.opens(event.eventTime)) {
-                val message = "Siri: assigned key ${event.keyCode} sent=${controller?.requestSiri() == true}"
-                Log.i(WheelKeyService.TAG, message)
-                appendLog(message)
-            }
-            WheelZoomKeys.Action.CONSUME
-        } else WheelZoomKeys.Action.PASS
-        if (assignedAction != WheelZoomKeys.Action.PASS) return true
-        if (downOrUp && assignedKey) return super.dispatchKeyEvent(event)
-
         if (navigationVolumeKeys.onKey(event.action, event.keyCode, event.deviceId, event.downTime, event.repeatCount,
             eligible = !menuOpen && activeAirPlaySession != null && CarPlayMediaKeys.volumeKeysEligible(this),
         ) { delta -> CarPlayWheelVolume.adjust(this, delta) }) return true
@@ -891,7 +854,7 @@ class CarPlayHostActivity : ComponentActivity() {
             event.keyCode,
             sessionActive = activeAirPlaySession != null,
             inCall = inCall(this),
-            bluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(this),
+            bluetoothAudio = controller?.usesCarBluetoothAudio == true,
         )
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && mediaPress != null) {
             val sent = CarPlayMediaKeys.onWindowMediaKey(event) ?: (controller?.sendMediaButton(mediaPress) == true)
@@ -902,18 +865,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
 
-        // Keep DiPlay's existing steering-wheel/voice-key Siri handling intact.
-        if (!CarPlayMediaButton.opensSiri(event.keyCode)) return super.dispatchKeyEvent(event)
-        if (event.action == KeyEvent.ACTION_DOWN) legacySiriPresses.add(physicalKey)
-        if (event.action == KeyEvent.ACTION_UP) {
-            requestLegacySiri(event.keyCode)
-        }
-        return true
-    }
-
-    private fun requestLegacySiri(keyCode: Int) {
-        val sent = controller?.requestSiri() == true
-        appendLog("Siri: voice key $keyCode sent=$sent")
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -1080,14 +1032,14 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         panel.addView(gestureHint)
         paintWaitingScreen = {
-            val colors = WaitingScreenColors.of(darkMode)
+            val colors = WaitingScreenColors.of(appNight)
             viewport.setBackgroundColor(colors.background)
             title.setTextColor(colors.text)
             stage.setTextColor(colors.text)
             instructions.setTextColor(colors.secondary)
             help.setTextColor(colors.secondary)
             gestureHint.setTextColor(colors.secondary)
-            val buttonPalette = DiPlayPalette.of(darkMode)
+            val buttonPalette = DiPlayPalette.of(appNight)
             back.style(DiPlayButtonKind.PRIMARY, buttonPalette, overlay = false)
             retry.style(DiPlayButtonKind.SECONDARY, buttonPalette, overlay = false)
             recovery.style(DiPlayButtonKind.SECONDARY, buttonPalette, overlay = false)
@@ -1189,6 +1141,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val nextNight = resolveAppNightNow(darkMode)
         if (nextNight == appNight) return
         appNight = nextNight
+        paintWaitingScreen()
 
         settingsMenu?.let { previous ->
             val parent = previous.parent as? ViewGroup ?: return@let
@@ -1413,24 +1366,6 @@ class CarPlayHostActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = dp(40) },
-        )
-
-        val resolutionControl = DisplaySettingsSection.createResolutionSlider(
-            context = this,
-            initialPercent = displayScalePercent,
-            theme = settingsOverlayTheme,
-        ) { percent ->
-            displayScalePercent = percent
-            displayScaleTenths = CarPlayDisplayScale.sanitize((percent + 5) / 10)
-            updateResolutionMenu()
-        }
-        val resolutionValue = resolutionControl.valueTextView
-        content.addView(
-            resolutionControl.container,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
         )
 
         content.addView(
@@ -1752,7 +1687,6 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
 
-        resolutionValueView = resolutionValue
         resolutionPreviewView = preview
         this.hotspotStatusView = hotspotStatusView
         updateHotspotStatusBlock()
@@ -1776,8 +1710,6 @@ class CarPlayHostActivity : ComponentActivity() {
         AirPlayPersistence.saveLocationReportingEnabled(this, locationReportingEnabled)
         AirPlayPersistence.saveAutoStartOnBoot(this, autoStartOnBoot)
         AirPlayPersistence.saveAdvancedAudioChannelMapping(this, advancedAudioChannelMapping)
-        AirPlayPersistence.saveDisplayScaleTenths(this, displayScaleTenths)
-        AirPlayPersistence.saveDisplayScalePercent(this, displayScalePercent)
         AirPlayPersistence.saveFps(this, fps)
         AirPlayPersistence.saveWidthPhysicalMm(this, widthPhysicalMm)
         AirPlayPersistence.savePhysicalSizeBasis(this, physicalSizeBasis)
@@ -1800,8 +1732,8 @@ class CarPlayHostActivity : ComponentActivity() {
         gestureFingerCount, wirelessEnabled, mfiTarget, mfiI2cPath, remoteMfiServer, remoteMfiToken,
         wirelessHotspotMode, manualHotspotSsid,
         manualHotspotPassphrase, manualHotspotBand, manualHotspotChannel, manualHotspotSecurity,
-        locationReportingEnabled, autoStartOnBoot, advancedAudioChannelMapping, displayScaleTenths,
-        displayScalePercent, fps, widthPhysicalMm, physicalSizeBasis, hevcEnabled,
+        locationReportingEnabled, autoStartOnBoot, advancedAudioChannelMapping,
+        fps, widthPhysicalMm, physicalSizeBasis, hevcEnabled,
         hevcSoftwareDecoderEnabled, manufacturer, model, oemLabel, debugLogsEnabled, rightHandDrive,
         carPlayDock, hideTopBar, hideBottomBar, safeAreaDrawOutside, mainDisplayDisableSafeArea,
     ).joinToString("|").hashCode()
@@ -2415,7 +2347,15 @@ class CarPlayHostActivity : ComponentActivity() {
             },
         ) { label, checked, onChanged ->
             section.addView(
-                settingsSwitchRow(getString(label), checked, getString(label), onChanged),
+                SettingsWidgets.createSwitchRow(
+                    context = this,
+                    label = getString(label),
+                    checked = checked,
+                    description = getString(if (label == R.string.hide_the_navigation_bar)
+                        R.string.settings_fixed_resolution_hint else label),
+                    theme = settingsOverlayTheme,
+                    onChanged = onChanged,
+                ).rowView,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -2785,24 +2725,9 @@ class CarPlayHostActivity : ComponentActivity() {
     ).container
 
     private fun updateResolutionMenu() {
-        resolutionValueView?.text = "${displayScalePercent}%"
-        val native = activeDisplaySize ?: currentActivitySize()
-        val resolution = if (native == null) {
-            getString(R.string.handshake_resolution_waiting_for_display)
-        } else {
-            val negotiated = CarPlayDisplayScale.applyPercent(
-                AirPlayDisplayConfig(
-                    widthPixels = native.width,
-                    heightPixels = native.height,
-                    widthPhysicalMm = widthPhysicalMm,
-                    fps = fps,
-                ),
-                displayScalePercent,
-            )
-            "${getString(R.string.resolution_handshake_prefix)}${native.width} x ${native.height} -> " +
-                "${negotiated.widthPixels} x ${negotiated.heightPixels}"
-        }
-        val transport = if (!hevcEnabled) {
+        val native = nativeCarPlaySize()
+        val resolution = "${getString(R.string.resolution_handshake_prefix)}${native.width} x ${native.height}"
+        val transport = if (!sessionHevc) {
             "H.264"
         } else {
             "HEVC (H.265, ${if (hevcSoftwareDecoderEnabled) "software" else "hardware"})"
@@ -2850,55 +2775,13 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
-    private data class CanvasSupport(val supported: Boolean, val reason: String, val details: String)
-
-    private fun largerCanvasSupport(display: AirPlayDisplayConfig): CanvasSupport =
-        if (maxOf(display.widthPixels, display.heightPixels) > 3840 || minOf(display.widthPixels, display.heightPixels) > 2160) {
-            CanvasSupport(false, "canvas_4k_limit", "Decoder capability check skipped: canvas exceeds enlargement limit")
-        } else decoderCanvasSupport(display)
-
-    private fun decoderCanvasSupport(display: AirPlayDisplayConfig): CanvasSupport = try {
-        val mime = if (hevcEnabled) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
-        // Match MediaCodec.createDecoderByType's first suitable decoder; do not silently force
-        // an enlarged stream through a software decoder on a slower head unit.
-        val decoder = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
-            !it.isEncoder && it.supportedTypes.any { type -> type.equals(mime, ignoreCase = true) }
-        }
-        if (decoder == null) {
-            CanvasSupport(false, "no_decoder", "Decoder capability mime=$mime result=no_decoder")
-        } else {
-            val hardware = if (Build.VERSION.SDK_INT >= 29) decoder.isHardwareAccelerated
-                else !decoder.name.startsWith("OMX.google.") && !decoder.name.startsWith("c2.android.")
-            val video = decoder.getCapabilitiesForType(mime).videoCapabilities
-            val sizeSupported = video?.isSizeSupported(display.widthPixels, display.heightPixels) == true
-            val rateSupported = sizeSupported && video?.areSizeAndRateSupported(
-                display.widthPixels, display.heightPixels, display.fps.toDouble()) == true
-            val reason = when {
-                !hardware -> "software_decoder"
-                hevcEnabled && hevcSoftwareDecoderEnabled -> "software_hevc_selected"
-                video == null -> "no_video_capabilities"
-                !sizeSupported -> "canvas_dimensions_unsupported"
-                !rateSupported -> "frame_rate_unsupported"
-                else -> "supported"
-            }
-            CanvasSupport(reason == "supported", reason,
-                "Decoder capability codec=${decoder.name} mime=$mime hardware=$hardware " +
-                    "sizeSupported=$sizeSupported rateSupported=$rateSupported " +
-                    "widths=${video?.supportedWidths} heights=${video?.supportedHeights} " +
-                    "alignment=${video?.widthAlignment}x${video?.heightAlignment} " +
-                    "fpsRange=${video?.supportedFrameRates} result=$reason")
-        }
-    } catch (error: Exception) {
-        CanvasSupport(false, "capability_query_${error.javaClass.simpleName}",
-            "Decoder capability query failed error=${error.javaClass.simpleName}")
-    }
-
     private fun createAirPlayConfig(size: DisplaySize): AirPlayConfig {
         // The home settings page can change the name while this host stays alive.
         if (!menuOpen) oemLabel = AirPlayPersistence.loadOemLabel(this)
-        val safeWidth = (size.width / 2 * 2).coerceAtLeast(2)
-        val safeHeight = (size.height / 2 * 2).coerceAtLeast(2)
-        val alignedSize = DisplaySize(safeWidth, safeHeight)
+        // Only the saved navigation-bar choice selects the E02 native canvas.
+        // Transient window measurements must not change the resolution offered to the phone.
+        val alignedSize = nativeCarPlaySize()
+        if (hevcEnabled && !sessionHevc) appendLog("HEVC requested but no usable hardware decoder; using H.264")
         val physical = resolvePhysicalSize(alignedSize)
         val knobPrimary = AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this)
         val baseDisplay = AirPlayDisplayConfig(
@@ -2916,63 +2799,13 @@ class CarPlayHostActivity : ComponentActivity() {
                 "tv=${AndroidTvInputMode.isTelevision(this)} " +
                 "touchscreen=${resources.configuration.touchscreen}",
         )
-        val requestedResolutionPercent = displayScalePercent
-        val requestedResolutionDisplay = CarPlayDisplayScale.applyPercent(baseDisplay, requestedResolutionPercent)
-        var resolutionDisplay = requestedResolutionDisplay
-        val requestedPercent = uiScalePercent
-        var scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, uiScalePercent)
-        val candidate = scaledDisplay
-        var support = when {
-            uiScalePercent < CarPlayUiScale.DEFAULT && scaledDisplay === resolutionDisplay ->
-                CanvasSupport(false, "canvas_4k_limit", "Decoder capability check skipped: canvas exceeds enlargement limit")
-            uiScalePercent < CarPlayUiScale.DEFAULT || scaledDisplay.widthPixels > baseDisplay.widthPixels ||
-                scaledDisplay.heightPixels > baseDisplay.heightPixels -> largerCanvasSupport(scaledDisplay)
-            else -> CanvasSupport(true, "not_enlarging", "Decoder capability enlargement check not required")
-        }
-        var smallerUiFallback = false
-        var resolutionFallback = false
-        if (!support.supported && uiScalePercent < CarPlayUiScale.DEFAULT) {
-            val failedCanvas = support
-            smallerUiFallback = true
-            uiScalePercent = CarPlayUiScale.DEFAULT
-            AirPlayPersistence.saveUiScalePercent(this, uiScalePercent)
-            scaledDisplay = resolutionDisplay
-            appendLog("Larger CarPlay canvas unavailable reason=${failedCanvas.reason}; using Default icon and text size")
-            // Removing the smaller-controls enlargement may leave a separately enlarged resolution.
-            if (displayScalePercent > 100) {
-                val resolutionSupport = largerCanvasSupport(scaledDisplay)
-                support = resolutionSupport.copy(
-                    reason = if (resolutionSupport.supported) failedCanvas.reason else resolutionSupport.reason,
-                    details = "${failedCanvas.details}\n${resolutionSupport.details}",
-                )
-            }
-        }
-        if (!support.supported && displayScalePercent > 100) {
-            resolutionFallback = true
-            displayScalePercent = 100
-            displayScaleTenths = CarPlayDisplayScale.DEFAULT_TENTHS
-            AirPlayPersistence.saveDisplayScalePercent(this, displayScalePercent)
-            AirPlayPersistence.saveDisplayScaleTenths(this, displayScaleTenths)
-            resolutionDisplay = baseDisplay
-            scaledDisplay = CarPlayUiScale.apply(resolutionDisplay, uiScalePercent)
-            appendLog("Enlarged CarPlay resolution unavailable reason=${support.reason}; using 100%")
-        }
-        if (smallerUiFallback || resolutionFallback) {
-            runOnUiThread {
-                android.widget.Toast.makeText(this,
-                    getString(if (resolutionFallback) R.string.resolution_canvas_unsupported
-                        else R.string.this_head_unit_cannot_use_the_smaller_size_at_this_resolut),
-                    android.widget.Toast.LENGTH_LONG).show()
-            }
-        }
-        appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
-        val display = scaledDisplay.copy(
+        val display = baseDisplay.copy(
             safeArea = if (mainDisplayDisableSafeArea) null else AirPlaySafeArea.toInsets(
                 mapping = AirPlayPersistence.loadSafeAreaRect(this, size.width, size.height),
                 activityWidthPixels = size.width,
                 activityHeightPixels = size.height,
-                displayWidthPixels = scaledDisplay.widthPixels,
-                displayHeightPixels = scaledDisplay.heightPixels,
+                displayWidthPixels = baseDisplay.widthPixels,
+                displayHeightPixels = baseDisplay.heightPixels,
             ),
             safeAreaDrawOutside = safeAreaDrawOutside,
             mainDisplayCornerMasks = if (mainDisplayDisableSafeArea) true else null,
@@ -2984,18 +2817,16 @@ class CarPlayHostActivity : ComponentActivity() {
         pendingViewAreas = viewAreas
         val declared = if (viewAreas == null) display else display.copy(
             viewAreas = viewAreas.areas, initialViewArea = viewAreas.current)
-        val requestSummary = "Display request selected=${CarPlayUiScale.label(requestedPercent)} percent=$requestedPercent " +
-            "surface=${size.width}x${size.height} resolution=${requestedResolutionPercent}% " +
-            "base=${requestedResolutionDisplay.widthPixels}x${requestedResolutionDisplay.heightPixels} " +
-            "candidate=${candidate.widthPixels}x${candidate.heightPixels} fps=$fps " +
-            "codec=${if (hevcEnabled) "HEVC" else "H.264"} softwareHevc=$hevcSoftwareDecoderEnabled"
-        val effectiveSummary = "Display effective percent=$uiScalePercent resolution=${displayScalePercent}% " +
-            "canvas=${display.widthPixels}x${display.heightPixels} decision=${support.reason} " +
-            "physical=${physical.widthMm}x${physical.heightMm}mm safeArea=${display.safeArea} " +
-            "drawOutside=${display.safeAreaDrawOutside}"
-        displayDiagnosticAttempt = DisplayDiagnosticSnapshot.begin(this, requestSummary, support.details, effectiveSummary)
+        val requestSummary = "Display request fixed=true hideNavigationBar=$hideBottomBar " +
+            "surface=${size.width}x${size.height} canvas=${display.widthPixels}x${display.heightPixels} fps=$fps " +
+            "codec=${if (sessionHevc) "HEVC" else "H.264"} softwareHevc=$hevcSoftwareDecoderEnabled"
+        val effectiveSummary = "Display effective canvas=${display.widthPixels}x${display.heightPixels} " +
+            "decision=fixed_navigation_bar physical=${physical.widthMm}x${physical.heightMm}mm " +
+            "safeArea=${display.safeArea} drawOutside=${display.safeAreaDrawOutside}"
+        val policySummary = "E02 fixed canvas selected by navigation-bar preference; resolution and UI canvas scaling disabled"
+        displayDiagnosticAttempt = DisplayDiagnosticSnapshot.begin(this, requestSummary, policySummary, effectiveSummary)
         appendLog(requestSummary)
-        appendLog(support.details)
+        appendLog(policySummary)
         appendLog(effectiveSummary)
         val carBluetoothAudio = AirPlayPersistence.loadCarBluetoothAudio(this)
         if (carBluetoothAudio) logCarBluetoothAudio()
@@ -3007,7 +2838,7 @@ class CarPlayHostActivity : ComponentActivity() {
             main = declared,
             cluster = null, // E02 no longer offers an independent dashboard/launcher map stream.
             rightHandDrive = rightHandDrive,
-            hevc = hevcEnabled,
+            hevc = sessionHevc,
             microphone = microphoneAvailable,
             microphoneOpus = com.shilapi.xcertplay.media.OpusEncoderSupport.isAvailable(),
             manufacturer = normalizedManufacturer(),
@@ -3021,29 +2852,10 @@ class CarPlayHostActivity : ComponentActivity() {
         )
     }
 
-    /** Car Bluetooth audio: shows whether the iPhone keeps A2DP/HFP with the car now and once CarPlay runs. */
+    /** Observe the head-unit receiver roles; never log phone names or change Bluetooth profiles. */
     private fun logCarBluetoothAudio() {
-        appendLog("Car Bluetooth audio: on; CarPlay audio not offered")
-        val adapter = runCatching { getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter ?: android.bluetooth.BluetoothAdapter.getDefaultAdapter() }.getOrNull()
-            ?: return appendLog("Car Bluetooth audio: no Bluetooth adapter")
-        fun probe(moment: String) {
-            for ((name, profile) in listOf("A2DP" to android.bluetooth.BluetoothProfile.A2DP,
-                    "HFP" to android.bluetooth.BluetoothProfile.HEADSET)) {
-                runCatching {
-                    adapter.getProfileProxy(applicationContext, object : android.bluetooth.BluetoothProfile.ServiceListener {
-                        override fun onServiceConnected(id: Int, proxy: android.bluetooth.BluetoothProfile) {
-                            val devices = runCatching { proxy.connectedDevices.map { it.name ?: "?" } }
-                                .getOrElse { listOf("unreadable:${it.javaClass.simpleName}") }
-                            appendLog("Car Bluetooth audio: $moment $name connected=$devices")
-                            adapter.closeProfileProxy(id, proxy)
-                        }
-                        override fun onServiceDisconnected(id: Int) = Unit
-                    }, profile)
-                }.onFailure { appendLog("Car Bluetooth audio: $moment $name unavailable ${it.javaClass.simpleName}") }
-            }
-        }
-        probe("start")
-        mainHandler.postDelayed({ if (!isDestroyed) probe("after30s") }, 30_000L)
+        appendLog("Car Bluetooth audio: enabled; CarPlay audio not offered; music and wheel media keys vehicle-owned")
+        CarAudioDiagnostics(applicationContext, ::appendLog).sample("bluetooth_route_start")
     }
 
     private fun loadAirPlayIcon(): AirPlayIcon {
@@ -3094,12 +2906,17 @@ class CarPlayHostActivity : ComponentActivity() {
         return activeDisplaySize
     }
 
+    private fun nativeCarPlaySize(): DisplaySize = DisplaySize(
+        if (hideBottomBar) PREFACE_CANVAS_WIDTH else PREFACE_CANVAS_WIDTH_WITH_NAVIGATION_BAR,
+        PREFACE_CANVAS_HEIGHT,
+    )
+
     private fun resolvePhysicalSize(size: DisplaySize): AirPlayPhysicalSizeMm =
         AirPlayDisplaySettings.resolvePhysicalSizeMm(
             currentWidthPixels = size.width,
             currentHeightPixels = size.height,
-            maximumWidthPixels = maxOf(maximumDetectedWidthPixels, size.width),
-            maximumHeightPixels = maxOf(maximumDetectedHeightPixels, size.height),
+            maximumWidthPixels = PREFACE_CANVAS_WIDTH,
+            maximumHeightPixels = PREFACE_CANVAS_HEIGHT,
             referenceMillimeters = widthPhysicalMm,
             basis = physicalSizeBasis,
         )
@@ -3224,7 +3041,7 @@ class CarPlayHostActivity : ComponentActivity() {
             onScreenStreamActiveChanged = { type, active ->
                 onScreenStreamStateChanged(controllerGeneration, type, active)
             },
-            mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this),
+            mediaBufferMillis = AirPlayPersistence.loadMediaBufferMillis(this, wireless = wirelessEnabled),
             onAudioDiagnostic = { message ->
                 if (message.startsWith("Microphone: ")) {
                     AsyncDiagnosticLog.append(diagnosticLog, message)
@@ -3469,14 +3286,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
         val controllerGeneration = restartGeneration
         val config = createRuntimeConfig()
-        val effectiveSize = if (isMultiWindowActive() &&
-            maximumDetectedWidthPixels >= size.width && maximumDetectedHeightPixels >= size.height &&
-            (maximumDetectedWidthPixels > size.width || maximumDetectedHeightPixels > size.height)) {
-            DisplaySize(maximumDetectedWidthPixels, maximumDetectedHeightPixels)
-        } else {
-            size
-        }
-        val airPlayConfig = createAirPlayConfig(effectiveSize)
+        val airPlayConfig = createAirPlayConfig(size)
         val locationProvider: Iap2LocationProvider? =
             when {
                 !config.locationReportingEnabled -> null
@@ -3485,7 +3295,6 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog(
             "Starting CarPlay controller at ${size.width}x${size.height} -> " +
                 "${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
-                "(${displayScalePercent}%) " +
                 "physical=${airPlayConfig.main.widthPhysicalMm}x" +
                 "${airPlayConfig.main.heightPhysicalMm}mm " +
                 "video=${if (airPlayConfig.hevc) "HEVC" else "H.264"} " +
@@ -3500,7 +3309,6 @@ class CarPlayHostActivity : ComponentActivity() {
             TAG,
             "starting controller display=${size.width}x${size.height} " +
                 "negotiated=${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
-                "scale=${displayScalePercent}% " +
                 "hevc=${airPlayConfig.hevc} " +
                 "softwareHevc=${airPlayConfig.hevc && hevcSoftwareDecoderEnabled} " +
                 "microphone=${airPlayConfig.microphone} " +
@@ -3542,7 +3350,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
-            displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
+            displayRotation(), hideTopBar, hideBottomBar, size.width, size.height,
             viewAreas = pendingViewAreas,
             statusBarShown = statusBarShown(),
         )
@@ -3672,26 +3480,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     "${previous.width}x${previous.height} -> ${size.width}x${size.height}",
             )
             maybeStartCarPlay()
-        } else if (display != null && controller != null && wirelessEnabled && activeAirPlaySession == null &&
-            !layoutChanged) {
-            // Startup bars can disappear while the LocalOnlyHotspot reservation is being prepared.
-            // Keep that connection and its original canvas; fit it to the new window as usual.
-            val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
-                "keeping wireless startup canvas=${display.width}x${display.height}"
-            appendLog(message)
-            Log.i(TAG, message)
-            videoView?.let { updateVideoLayout(it.width, it.height) }
-        } else if (display != null && !layoutChanged &&
-            statusBarHiddenByAnotherWindow(display, size.width, size.height, statusBarShown())) {
-            val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height} " +
-                "while another window hides the status bar; keeping CarPlay session canvas=${display.width}x${display.height}"
-            appendLog(message)
-            Log.i(TAG, message)
-            videoView?.let { updateVideoLayout(it.width, it.height) }
-        } else if (display != null && !layoutChanged &&
-            size.width <= display.windowWidth && size.height <= display.windowHeight) {
-            // Keep camera shrink/restore cycles within the original window connected. If the
-            // session started in a camera window, growth beyond it needs a full-size canvas.
+        } else if (display != null && !layoutChanged) {
+            // Both growth and shrink only refit the fixed E02 canvas. In particular,
+            // restoring 1920x720 must not release a working temporary hotspot.
             val message = "Display changed ${previous.width}x${previous.height} -> ${size.width}x${size.height}; " +
                 "keeping CarPlay session canvas=${display.width}x${display.height}"
             appendLog(message)
@@ -3710,7 +3501,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun displayLayoutChanged(): Boolean {
         val display = sessionDisplay ?: return false
         if (display.rotation != displayRotation()) return true
-        if (display.hideTopBar != hideTopBar || display.hideBottomBar != hideBottomBar) return true
         return false
     }
 
@@ -4020,8 +3810,7 @@ class CarPlayHostActivity : ComponentActivity() {
         updateDebugOverlays()
         logLines.clear()
         appendLog(
-            "$prefix; resolution " +
-                "${displayScalePercent}% with " +
+            "$prefix; fixed resolution ${nativeCarPlaySize().width}x${nativeCarPlaySize().height} with " +
                 (if (hevcEnabled) "HEVC (H.265)" else "H.264") +
                 ", MFI ${mfiTargetLabel(mfiTarget)}" +
                 ", Wi-Fi session ${hotspotModeLabel(wirelessHotspotMode)}",
@@ -4466,6 +4255,9 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val PREFACE_CANVAS_WIDTH = 1920
+        const val PREFACE_CANVAS_WIDTH_WITH_NAVIGATION_BAR = 1760
+        const val PREFACE_CANVAS_HEIGHT = 720
         private const val SETTINGS_EXPERIMENTAL_MENU_CONTROL_HEIGHT_DP = 52
         private const val SETTINGS_EXPERIMENTAL_MENU_GAP_DP = 16
         const val CLUSTER_SMALL_WINDOW_ON = 1
@@ -4511,7 +4303,7 @@ internal data class CarPlaySessionDisplay(
     val rotation: Int,
     val hideTopBar: Boolean,
     val hideBottomBar: Boolean,
-    // Compare unscaled startup window dimensions, not the scaled video canvas.
+    // Measured startup window; it may differ from the fixed negotiated video canvas.
     val windowWidth: Int,
     val windowHeight: Int,
     /** The view areas this session declared, or null for the whole screen as one area. */

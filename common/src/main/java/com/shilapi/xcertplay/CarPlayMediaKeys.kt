@@ -28,8 +28,6 @@ import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.util.concurrent.Executors
 import java.util.concurrent.Executor
-import java.util.concurrent.FutureTask
-import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 /**
@@ -42,6 +40,7 @@ import kotlin.math.roundToInt
  */
 internal object CarPlayMediaKeys {
     private const val TAG = "DiPlay-MediaKeys"
+    private const val SIRI_REPEAT_GAP_MILLIS = 400L
     private const val ACTIONS = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
         PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS
 
@@ -64,6 +63,8 @@ internal object CarPlayMediaKeys {
     private var focusHeld = false
     private var appContext: Context? = null
     private var mediaAudioActive = false
+    private var adaptiveVolumeForSession = true
+    private val learnedHeld = mutableSetOf<Pair<String, Int>>()
     private var mediaAudioOwner: Any? = null
     private var nowPlaying = CarPlayNowPlaying()
     private var elapsedUpdatedAt = 0L
@@ -76,9 +77,11 @@ internal object CarPlayMediaKeys {
     private var audioDiagnostics: CarAudioDiagnostics? = null
     private val mediaCenterHistory = ArrayDeque<String>()
     private const val MEDIA_CENTER_HISTORY_LIMIT = 64
-    // Shared across owners: unregister the retired token before registering its replacement.
-    private val mediaCenterWorker = Executors.newSingleThreadExecutor { task ->
-        Thread(task, "diplay-oem-media").apply { isDaemon = true }
+    // Linkco initializes the SDK directly from its controller and registers inside onAPIReady.
+    // Keep that synchronous ordering on the application thread, including a synchronous ready callback.
+    private val mediaCenterWorker = Executor { task ->
+        if (Looper.myLooper() === Looper.getMainLooper() && !Thread.holdsLock(this)) task.run()
+        else mainHandler.post(task)
     }
     private val wheelMediaEchoes = PrefaceMediaKeyEchoes()
     private var prefaceVoiceReceiver: PrefaceVoiceButtonReceiver? = null
@@ -130,7 +133,9 @@ internal object CarPlayMediaKeys {
         mediaOwner: Any = next, foreground: () -> Boolean = { false }) {
         val adoptingStartupRegistration = controller == null && mediaCenter != null
         if (controller !== next) {
-            releaseLocked(keepStartupRegistration = controller == null)
+            releaseLocked(keepStartupRegistration = true)
+            learnedHeld.clear()
+            adaptiveVolumeForSession = NavigationWheelSettings.enabled(context)
             artworkOwner = artworkQueue.newSession()
             mediaAudioOwner = mediaOwner
             lateinit var ownedCallback: CarPlayMediaCallback
@@ -148,7 +153,8 @@ internal object CarPlayMediaKeys {
         if (audioDiagnostics == null) {
             audioDiagnostics = CarAudioDiagnostics(context.applicationContext, ::reportDiagnostic).also { it.start() }
         }
-        registerPrefaceReceiver(context, next)
+        if (!next.usesCarBluetoothAudio) registerPrefaceReceiver(context, next)
+        else reportDiagnostic("Media route=car-bluetooth; wheel keys and music remain vehicle-owned")
         if (adoptingStartupRegistration) {
             mediaCenterHistory.forEach(::reportDiagnostic)
             reportDiagnostic("OEM media center startup registration adopted")
@@ -172,7 +178,7 @@ internal object CarPlayMediaKeys {
         expected.nowPlayingListener = null
         expected.artworkListener = null
         controller = null
-        releaseLocked()
+        releaseLocked(keepStartupRegistration = true)
     }
 
     /** Called when CarPlay music starts or stops; may run on any thread. */
@@ -200,7 +206,7 @@ internal object CarPlayMediaKeys {
                 if (controller !== expected) return@synchronized
                 reportDiagnostic("Media iPhone playing=$playing focusHeld=$focusHeld mediaStreamActive=$mediaAudioActive")
                 audioDiagnostics?.sample(if (playing) "iphone_play" else "iphone_pause")
-                if (playing) regainFocusLocked()
+                if (playing && !expected.usesCarBluetoothAudio) regainFocusLocked()
                 synchronizeMediaCenter(requestSource = playing)
             }
         }
@@ -281,7 +287,9 @@ internal object CarPlayMediaKeys {
         val started = active && !mediaAudioActive
         mediaAudioActive = active
         reportDiagnostic("Media stream active=$active focusHeld=$focusHeld")
-        if (active && session == null) start(context) else if (active) regainFocusLocked()
+        if (controller?.usesCarBluetoothAudio != true) {
+            if (active && session == null) start(context) else if (active) regainFocusLocked()
+        }
         publishPlaybackStateLocked()
         refreshTrackOwnership()
         synchronizeMediaCenter(requestSource = started)
@@ -289,6 +297,7 @@ internal object CarPlayMediaKeys {
 
     private fun start(context: Context) {
         val expectedController = controller ?: return
+        if (expectedController.usesCarBluetoothAudio) return
         val focusDisabled = AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
         val granted = if (focusDisabled) {
             // Some OEMs route physical volume buttons to the focus owner. Keep an active
@@ -365,13 +374,16 @@ internal object CarPlayMediaKeys {
     private fun releaseLocked(keepStartupRegistration: Boolean = false) {
         audioDiagnostics?.close()
         audioDiagnostics = null
-        if (!keepStartupRegistration) {
+        if (keepStartupRegistration) {
+            mediaCenter?.disconnect()
+        } else {
             mediaCenter?.close()
             mediaCenter = null
             mediaCenterHistory.clear()
         }
         mediaAudioOwner = null
         callback = null
+        learnedHeld.clear()
         wheelMediaEchoes.clear()
         mainHandler.removeCallbacks(trackOwnershipCheck)
         trackInterception?.close()
@@ -401,12 +413,13 @@ internal object CarPlayMediaKeys {
         diagnostic = {}
     }
 
-    private fun reportDiagnostic(message: String) { runCatching { diagnostic(message) } }
+    private fun reportDiagnostic(message: String) { WheelKeyLog.note(message); runCatching { diagnostic(message) } }
 
     internal fun reportWheelVolume(message: String) = reportDiagnostic(message)
 
     @Synchronized
     fun report(): String = "Media keys controllerAttached=${controller != null} mediaSessionActive=${session?.isActive == true} " +
+        "carBluetoothRoute=${controller?.usesCarBluetoothAudio == true} " +
         "focusRequested=${focusRequest != null} focusHeld=$focusHeld mediaStreamActive=$mediaAudioActive " +
         "broadcastRegistered=${prefaceReceiver != null}; ${trackInterception?.report() ?: "Track interception not initialized"}; " +
         (mediaCenter?.report() ?: "OEM media center not initialized")
@@ -433,6 +446,7 @@ internal object CarPlayMediaKeys {
     }
 
     private fun send(index: Int, source: String) {
+        // Transport callbacks already name an action; only raw KeyEvents use learned key codes.
         dispatchMedia(index, source)
     }
 
@@ -443,6 +457,9 @@ internal object CarPlayMediaKeys {
     } else "unavailable"
 
     private fun dispatchMedia(index: Int, source: String): Boolean {
+        // Recheck before echo matching too: an old successful press must not acknowledge a new
+        // command during a call, after focus loss, or after the controller disconnects.
+        if (!mediaCommandsEligible()) return false
         val origin = when {
             source == "preface-intercept" -> PrefaceMediaKeyEchoes.Source.INPUT
             source == "preface-wheel" -> PrefaceMediaKeyEchoes.Source.ANDROID_KEY
@@ -465,6 +482,28 @@ internal object CarPlayMediaKeys {
     }
 
     private fun sendMediaCommand(index: Int, source: String): Boolean {
+        if (!mediaCommandsEligible()) return false
+        val context = appContext ?: return false
+        val defaultCode = when (index) {
+            CarPlayMediaButton.NEXT -> 87
+            CarPlayMediaButton.PREVIOUS -> 88
+            CarPlayMediaButton.PLAY_PAUSE -> 85
+            CarPlayMediaButton.PLAY -> 126
+            CarPlayMediaButton.PAUSE -> 127
+            else -> null
+        }
+        if (defaultCode != null && WheelKeyService.mediaKeyReserved(defaultCode)) return true
+        if (index in CarPlayMediaButton.PLAY..CarPlayMediaButton.PAUSE && WheelKeyService.mediaKeyReserved(85)) return true
+        val action = when (index) {
+            CarPlayMediaButton.NEXT -> WheelMediaBindings.Action.NEXT
+            CarPlayMediaButton.PREVIOUS -> WheelMediaBindings.Action.PREVIOUS
+            else -> null
+        }
+        if (action != null) {
+            val code = WheelMediaBindings.key(context, action) ?: return false
+            if (WheelKeyService.mediaKeyReserved(code))
+                return true // The active joystick owns this gesture, including parallel OEM callbacks.
+        }
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
         if (CarPlayVideo.onMediaKey(index)) {
@@ -480,16 +519,66 @@ internal object CarPlayMediaKeys {
     }
 
     /** Null retains ordinary Android key handling when no CarPlay receiver owns the window. */
-    internal fun onWindowMediaKey(event: KeyEvent): Boolean? =
-        synchronized(this) { prefaceReceiver }?.handle(event)
+    internal fun onWindowMediaKey(event: KeyEvent): Boolean? {
+        if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
+        val receiver = synchronized(this) { prefaceReceiver }
+        if (receiver != null) return receiver.handle(event)
+        if (synchronized(this) { controller == null }) return null
+        if (usesCarBluetoothAudio() && CarPlayMediaButton.belongsToCarBluetooth(event.keyCode)) return null
+        return handleLearnedMediaKey(event.action == KeyEvent.ACTION_DOWN,
+            event.keyCode, "preface-wheel", event.repeatCount == 0)
+    }
+
+    internal fun mediaBindingsChanged() {
+        mainHandler.post {
+            synchronized(this) {
+                learnedHeld.clear()
+                wheelMediaEchoes.clear()
+                trackInterception?.close()
+                refreshTrackOwnership()
+            }
+        }
+    }
+
+    /** Shares bindings across the input observer, Android window/session and optional key service. */
+    internal fun handleLearnedMediaKey(down: Boolean, code: Int, source: String, first: Boolean = true): Boolean? {
+        if (WheelMediaLearning.offer(down, code, first)) return true
+        val context = appContext ?: return null
+        if (!WheelMediaBindings.known(context, code)) return null
+        val press = source to WheelMediaBindings.canonical(code)
+        val released = if (!down) learnedHeld.remove(press) else false
+        val action = WheelMediaBindings.resolve(context, code) ?: return false
+        if (!(if (action == WheelMediaBindings.Action.SIRI) siriKeyEligible() else mediaCommandsEligible()))
+            return if (released) true else false
+        if (WheelKeyService.mediaKeyReserved(code)) return true
+        if (action == WheelMediaBindings.Action.SIRI) {
+            if (down && first) learnedHeld.add(press)
+            if (!down && released) requestPrefaceSiri()
+            return true
+        }
+        if (!down || !first) return true
+        if (source == "preface-intercept" && !learnedHeld.add(press)) return true
+        val sent = dispatchMedia(if (action == WheelMediaBindings.Action.NEXT) CarPlayMediaButton.NEXT
+            else CarPlayMediaButton.PREVIOUS, source)
+        if (!sent) learnedHeld.remove(press)
+        return sent
+    }
+
+    data class TakeoverStatus(val connected: Boolean, val bluetooth: Boolean,
+        val input: PrefaceTrackKeyInterception.Status?, val media: PrefaceMediaCenter.Status?)
+    @Synchronized internal fun takeoverStatus() = TakeoverStatus(controller != null && CarPlayBackgroundSession.active,
+        usesCarBluetoothAudio(), trackInterception?.status(), mediaCenter?.status())
 
     private var callback: CarPlayMediaCallback? = null
 
     private fun registerPrefaceReceiver(context: Context, expected: CarPlayController) {
         if (prefaceReceiver != null) return
         trackInterception = PrefaceTrackKeyInterception(
-            PrefaceInputInterceptionBackend(deliver = { task -> mainHandler.post { task() } }, diagnostic = ::reportDiagnostic),
+            PrefaceInputInterceptionBackend(deliver = { task -> mainHandler.post { task() } }, diagnostic = ::reportDiagnostic,
+                additionalKeys = { WheelMediaBindings.requestedCodes(context) }),
             diagnostic = ::reportDiagnostic,
+            releaseKeys = { learnedHeld.removeAll { it.first == "preface-intercept" } },
+            handleKey = { down, key -> handleLearnedMediaKey(down, key, "preface-intercept") != null },
             siri = { requestPrefaceSiri() },
         ) { index ->
             // Recheck on delivery: a call or focus loss can precede the periodic ownership check.
@@ -497,7 +586,11 @@ internal object CarPlayMediaKeys {
         }
         refreshTrackOwnership()
         if (prefaceVoiceReceiver == null) {
-            val voiceReceiver = PrefaceVoiceButtonReceiver(::requestPrefaceSiri)
+            val voiceReceiver = PrefaceVoiceButtonReceiver {
+                if (WheelMediaLearning.offer(true, 298)) false
+                else if (WheelMediaBindings.resolve(context, 298) == WheelMediaBindings.Action.SIRI) requestPrefaceSiri()
+                else false
+            }
             runCatching {
                 ContextCompat.registerReceiver(context.applicationContext, voiceReceiver,
                     IntentFilter(PrefaceVoiceButtonReceiver.ACTION).apply {
@@ -509,12 +602,12 @@ internal object CarPlayMediaKeys {
         }
         val receiver = PrefaceMediaButtonReceiver(
             eligible = {
-                val ownsKeys = synchronized(this) {
-                    controller === expected && CarPlayBackgroundSession.active && (focusHeld || foreground())
-                }
-                ownsKeys && !AirPlayPersistence.loadCarBluetoothAudio(context) && !inCall(context)
+                // Siri keeps its own toggle/release policy; media execution is checked centrally.
+                synchronized(this) { controller === expected } && trackKeysEligible()
             },
             send = { dispatchMedia(it, "preface-wheel") },
+            route = { event -> handleLearnedMediaKey(event.action == KeyEvent.ACTION_DOWN, event.keyCode,
+                "preface-wheel", event.repeatCount == 0) },
         )
         runCatching {
             // The sender is the separate system input-service process.
@@ -533,59 +626,72 @@ internal object CarPlayMediaKeys {
     }
 
     private fun synchronizeMediaCenter(requestSource: Boolean = false) {
-        val playing = controller?.mediaPlayingSnapshot() ?: mediaAudioActive
-        mediaCenter?.update(nowPlaying.copy(playing = playing), mediaCenterKeysEligible(), requestSource)
+        // Linkco clears its shared playback record on audio-stream stop. An older iPhone
+        // metadata playing=true must not leave the OEM record playing after that stop.
+        val playing = mediaAudioActive && (controller?.mediaPlayingSnapshot() ?: true)
+        mediaCenter?.update(nowPlaying.copy(playing = playing), mediaOwnerEligible(), requestSource,
+            commandsAllowed = mediaCommandsEligible())
     }
 
-    private fun mediaCenterKeysEligible(): Boolean = trackKeysEligible() &&
+    private fun mediaCommandsEligible(): Boolean = trackKeysEligible() &&
         !com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive &&
         (lastPrefaceSiriRequest?.let { SystemClock.uptimeMillis() - it < 1500L } != true)
 
-    /** Binder callbacks must return acceptance without touching activity state off the main thread. */
+    /** Like the reference EventBus path, Binder acknowledges queued keys without waiting for main. */
     private fun onMediaCenterCommand(owner: PrefaceMediaCenter, index: Int): Boolean {
-        val expected = synchronized(this) { controller } ?: return false
+        val target = synchronized(this) {
+            val expected = controller ?: return false
+            if (mediaCenter !== owner || !mediaCommandsEligible()) return false
+            expected to callback
+        }
         val action = {
             synchronized(this) {
-                controller === expected && mediaCenter === owner && mediaCenterKeysEligible() &&
-                    dispatchMedia(index, "preface-media-center")
+                controller === target.first && callback === target.second && mediaCenter === owner &&
+                    mediaCommandsEligible() && dispatchMedia(index, "preface-media-center")
             }
         }
         if (Looper.myLooper() == Looper.getMainLooper()) return action()
-        val task = FutureTask(action)
-        if (!mainHandler.post(task)) return false
-        return try { task.get(250L, TimeUnit.MILLISECONDS) } catch (_: Exception) {
-            task.cancel(false)
-            mainHandler.removeCallbacks(task)
-            false
-        }
+        return mainHandler.post { action() }
     }
 
-    private fun trackKeysEligible(): Boolean {
-        val context = appContext ?: return false
+    /** Actual source eligibility is retained across temporary call/Siri suppression. */
+    private fun mediaOwnerEligible(): Boolean {
         val ownsMedia = synchronized(this) {
             controller != null && CarPlayBackgroundSession.active &&
                 (focusHeld || (focusRequest == null && foreground()))
         }
-        return ownsMedia && !AirPlayPersistence.loadCarBluetoothAudio(context) && !inCall(context)
+        return ownsMedia && !usesCarBluetoothAudio()
     }
+
+    private fun trackKeysEligible(): Boolean =
+        appContext?.let { mediaOwnerEligible() && !inCall(it) } == true
+
+    internal fun usesCarBluetoothAudio(): Boolean = synchronized(this) { controller?.usesCarBluetoothAudio == true }
 
     internal fun iphoneMediaPlaying(): Boolean? = synchronized(this) { controller }?.mediaPlayingSnapshot()
 
     internal fun volumeKeysEligible(context: Context): Boolean =
-        NavigationWheelSettings.enabled(context) && trackKeysEligible() &&
+        synchronized(this) { adaptiveVolumeForSession } && trackKeysEligible() &&
             !WheelKeyService.volumeKeysReserved() &&
             !com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive &&
             (lastPrefaceSiriRequest?.let { SystemClock.uptimeMillis() - it < 1500L } != true)
 
     private fun requestPrefaceSiri(): Boolean {
-        if (!trackKeysEligible()) return false
+        val context = appContext ?: return false
+        if (!siriKeyEligible() || WheelMediaBindings.key(context, WheelMediaBindings.Action.SIRI) == null) return false
         val now = SystemClock.uptimeMillis()
         val previous = lastPrefaceSiriRequest
-        if (previous != null && now - previous in 0 until WheelSiriKey.REPEAT_GAP_MILLIS) return true
+        if (previous != null && now - previous in 0 until SIRI_REPEAT_GAP_MILLIS) return true
         val sent = synchronized(this) { controller }?.requestSiri() == true
         if (sent) lastPrefaceSiriRequest = now
         Log.i(TAG, "Preface voice key -> Siri sent=$sent")
         return sent
+    }
+
+    private fun siriKeyEligible(): Boolean {
+        val context = appContext ?: return false
+        return if (usesCarBluetoothAudio()) synchronized(this) { controller != null } &&
+            CarPlayBackgroundSession.active && !inCall(context) else trackKeysEligible()
     }
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */

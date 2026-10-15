@@ -29,11 +29,13 @@ class CarPlayMediaOwnershipTest {
     private val controllers = mutableListOf<CarPlayController>()
 
     @Before fun setup() {
+        app.getSharedPreferences(WheelMediaBindings.PREFS, 0).edit().clear().commit()
         CarPlayBackgroundSession.clear()
         AirPlayPersistence.saveDisableMediaKeyAudioFocus(app, true)
     }
 
     @After fun cleanup() {
+        app.getSharedPreferences(WheelMediaBindings.PREFS, 0).edit().clear().commit()
         controllers.forEach(CarPlayMediaKeys::detach)
         CarPlayBackgroundSession.clear()
         AirPlayPersistence.saveDisableMediaKeyAudioFocus(app, false)
@@ -129,6 +131,7 @@ class CarPlayMediaOwnershipTest {
 
     @Test fun transportPauseReportIdentifiesCallingPackageWithoutProcessIdentifiers() {
         val controller = attach()
+        CarPlayBackgroundSession.active = true
         val lines = mutableListOf<String>()
         CarPlayMediaKeys.attach(app, controller, diagnostic = lines::add) { true }
         val platformSession = mock(MediaSession::class.java)
@@ -142,15 +145,64 @@ class CarPlayMediaOwnershipTest {
     }
 
     @Test fun disablingVolumeSelectionKeepsTrackKeysAndDefaultMediaCenterAttached() {
-        val controller = attach()
-        CarPlayBackgroundSession.active = true
         NavigationWheelSettings.setEnabled(app, false)
         try {
+            val controller = attach()
+            CarPlayBackgroundSession.active = true
             assertFalse(CarPlayMediaKeys.volumeKeysEligible(app))
             assertTrue(CarPlayMediaKeys.onWindowMediaKey(key(KeyEvent.KEYCODE_MEDIA_NEXT)) == true)
             verify(controller).sendMediaButton(CarPlayMediaButton.NEXT)
             assertNotNull(ReflectionHelpers.getField<PrefaceMediaCenter>(CarPlayMediaKeys, "mediaCenter"))
         } finally { NavigationWheelSettings.setEnabled(app, true) }
+    }
+
+    @Test fun mergedMusicModeRetainsSavedChoicesAndChangesVolumeOnlyOnTheNextController() {
+        MusicWheelMode.save(app, MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME)
+        try {
+            val current = attach()
+            CarPlayBackgroundSession.active = true
+            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
+            MusicWheelMode.save(app, MusicWheelMode.CARPLAY_SYSTEM_VOLUME)
+            assertEquals(MusicWheelMode.CARPLAY_SYSTEM_VOLUME, MusicWheelMode.load(app))
+            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
+            CarPlayMediaKeys.attach(app, current) { true }
+            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
+            attach()
+            assertFalse(CarPlayMediaKeys.volumeKeysEligible(app))
+            MusicWheelMode.save(app, MusicWheelMode.CAR_BLUETOOTH)
+            assertEquals(MusicWheelMode.CAR_BLUETOOTH, MusicWheelMode.load(app))
+            assertFalse(NavigationWheelSettings.enabled(app))
+            // Existing independently saved values are interpreted without rewriting preferences.
+            AirPlayPersistence.saveCarBluetoothAudio(app, false)
+            assertEquals(MusicWheelMode.CARPLAY_SYSTEM_VOLUME, MusicWheelMode.load(app))
+        } finally { MusicWheelMode.save(app, MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME) }
+    }
+
+    @Test fun learnedKeyDispatchesOnceAcrossSourcesAndDisabledDefaultCannotStillSend() {
+        val controller = attach()
+        CarPlayBackgroundSession.active = true
+        assertTrue(WheelMediaBindings.assign(app, WheelMediaBindings.Action.NEXT, KeyEvent.KEYCODE_F1))
+        shadowOf(Looper.getMainLooper()).idle()
+        val down = KeyEvent(150, 150, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_F1, 0)
+        assertTrue(CarPlayMediaKeys.onWindowMediaKey(down) == true)
+        assertTrue(CarPlayMediaKeys.onWindowMediaKey(down) == true)
+        CarPlayMediaKeys.handleLearnedMediaKey(true, KeyEvent.KEYCODE_F1, "preface-intercept")
+        verify(controller, times(1)).sendMediaButton(CarPlayMediaButton.NEXT)
+        assertFalse(CarPlayMediaKeys.onWindowMediaKey(key(87)) == true)
+        assertTrue(WheelMediaBindings.assign(app, WheelMediaBindings.Action.NEXT, null))
+        shadowOf(Looper.getMainLooper()).idle()
+        callback().onSkipToNext()
+        verify(controller, times(1)).sendMediaButton(CarPlayMediaButton.NEXT)
+    }
+
+    @Test fun disabledSiriCannotBeForwardedThroughTheMediaWindow() {
+        val controller = attach()
+        CarPlayBackgroundSession.active = true
+        WheelMediaBindings.assign(app, WheelMediaBindings.Action.SIRI, null)
+        shadowOf(Looper.getMainLooper()).idle()
+        CarPlayMediaKeys.onWindowMediaKey(KeyEvent(200, 200, KeyEvent.ACTION_DOWN, 231, 0))
+        CarPlayMediaKeys.onWindowMediaKey(KeyEvent(200, 210, KeyEvent.ACTION_UP, 231, 0))
+        verify(controller, never()).requestSiri()
     }
 
     private fun attach(owner: Any? = null): CarPlayController {

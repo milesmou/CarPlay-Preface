@@ -25,9 +25,17 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 - [机器可读的适配事实](firmware/ihu519g-327.json)：身份、音频常量、按键映射、服务、权限和证据校验值，可随仓库保留。
 - [方控与音频接入分析](PREFACE_FIRMWARE_327.md)：已有代码接入范围、去重及真车验证项。
+- [方控学习与处理状态](WHEEL_MEDIA_LEARNING.md)：应用新增上一曲／下一曲／Siri 学习、停用、恢复默认，分别展示申请、收到回调与音源归属；独占处理仍未确认，属于工程实现，不是新增固件可用性证据。
+- [2026-10-15 方控整体复核](WHEEL_DESIGN_REVIEW_2026-10-15.md)：6 项本地探针确认跨入口准入、临时语音归属恢复、语义回调改键、摇杆优先级、释放事件及观察者代际状态缺陷；后续[六项修正](WHEEL_DESIGN_FIXES_2026-10-15.md)通过 151 项定向测试，未构建 APK 或进行真车验证。
+- [E02 专用 APK 方控参考边界](E02_APPSTORE_STEERING_REFERENCE.md)：实际为智全云联市场 2.3.1，业务代码受 SecShell 加固；可见无障碍和媒体通知服务声明，未能复核其方控链路或阻止原车跳页的机制。
 - [2026-10-14 用户连接报告排查](CONNECTION_REPORT_2026-10-14.md)：运行时报告的设备为 IHU353G，身份与参考 OTA 不一致，证据单独记录；无线曾渲染画面，USB 认证通过但网络与 VPN 授权阻塞，不能外推到构建 327。
 - [2026-10-15 用户连接报告排查](CONNECTION_REPORT_2026-10-15.md)：IHU353G 上原厂媒体 API 未就绪；USB 网卡、IPv6 与监听已就绪但无 AirPlay TCP，原始诊断未确认双向；临时热点成功记录均为用户手动加入。不能再用旧报告的 VPN 阻塞解释本轮 USB。
 - [2026-10-15 第五份报告](CONNECTION_REPORT_2026-10-15_5.md)：用户确认播放／方控均实际走原车蓝牙；日志显示 SDK 351 的具体类路径仍在注册前 `ready=false`，同时 CarPlay 音频持续接收／写入。USB 原始 IN 被识别为 IPv4 DHCP，3 次 OUT 返回 -1，未确认双向。运行证据与用户观察分别记录，不外推到参考 OTA。
+- [2026-10-15 构建 65 新报告](CONNECTION_REPORT_2026-10-15_BUILD65.md)：原厂 API 仍未就绪；USB 原始帧明确为两次 DHCP Discover、OUT 三次失败，CDC 先 down 后 up；无线断线后清理等待至少 16 秒未完成。属于 IHU353G 运行证据，具体拒绝原因与清理卡点未确定。
+  用户补充首次临时热点连接成功后自动中断、随后改用手动热点；首次日志对应窗口增长触发应用重建并释放临时热点，随后热点重建失败，区别于末尾手动热点会话的清理阻塞。
+  后续按用户要求[固定 CarPlay 分辨率](PREFACE_FIXED_RESOLUTION.md)：隐藏导航栏为 1920×720、显示导航栏为 1760×720；停用百分比与画布缩放，临时窗口增长不再触发重建。属于工程修改，待新包实车验证。
+  [无线清理与重连修正](WIRELESS_TEARDOWN_RECOVERY.md)核对 JmDNS 3.6.3 的无上限等待，并在确认旧实例 socket 已释放后允许库后台收尾；未知释放状态仍保留屏障。46 项定向测试通过，实际报告卡点待新包验证。
+- [Linkco 完整媒体链路移植](PREFACE_LINKCO_MEDIA_REPLICA.md)：补齐 API 实例创建顺序、主线程初始化、进程注册复用、稳定播放记录与厂商回调入队；声明与构建 327 签名核对，IHU353G 实车准入仍待验证。
 - [Linkco 注册路径后续修订](LINKCO_APK_MEDIA_KEYS_REFERENCE.md#后续修订默认采用盒子的具体类注册路径)：默认采用 `registerMusic(本应用包名, MusicClient)`，父类实现由车机 SDK 提供。当前 IHU353G 的 API ready 失败发生在注册前，同一路径不等于已经实车修复。
 - [网易云切歌服务参考](NETEASE_TRACK_SERVICE_REFERENCE.md)：用户提供包实际为 `com.ecarx.sdk.openapi` 服务端，用户确认同车已安装且网易云切歌正常。静态代码区分调用者未获授权与目标服务未就绪，可用于追查 CarPlay 的 ready=false；不是已经确认的网易云专用按键客户端实现，也不作为参考 OTA 实车验证。
 - 本地完整索引：`agent_docs/firmware/ihu519g-327/catalog/index.json`。固件、镜像、APK/JAR、反编译代码及完整索引保存在 Git 忽略目录，可直接继续分析。
@@ -46,6 +54,8 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 ## 后续工程可复用的信息
 
+2026-10-15 [构建 67 方控与蓝牙报告](CONNECTION_REPORT_2026-10-15_BUILD67.md)：用户确认临时热点稳定、方控切歌仍跳原车多媒体；日志确认 NEXT 成功且广播去重，原厂 API 仍在注册前未就绪。蓝牙唤醒原报告未记录匹配事件，本轮补接收端 profile 连接事件及跳过原因，API 28/29 定向测试 8 项通过，实车自动启动与方控接管仍未确认。
+
 2026-10-15 后续 [音源、蓝牙与 USB 定位日志](MEDIA_USB_DIAGNOSTICS_2026-10-15.md) 补充服务查询／SDK 分类、接收端蓝牙状态、USB 阶段／DHCP／CDC 通知。属于应用诊断与定向测试，没有取得新的原厂准入或实车通信成功证据；现有 64 包不含这些日志。
 
 2026-10-15 按用户要求增加 [USB 自动 NCM 帧测试](USB_NCM_FRAME_DIAGNOSTICS.md)：系统 USB 接入失败时保留认证，自动尝试原始帧及 ICMPv6 探测；测试可能解除 NCM 内核驱动绑定，结束后提示重新插拔，不抢占已建立会话，不提供 AirPlay 网络回退。这是工程诊断与定向验证，未新增构建 327 或报告 IHU353G 的实车接口可用性证据。
@@ -61,6 +71,10 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 随后按用户要求 [移除整个“显示（实验性）”卡片](REMOVED_EXPERIMENTAL_DISPLAY.md)：分屏区域、免重连旋转方形画面及侧边面板均退出主应用，旧开关不再读取；固定程序栏位置与普通窗口布局保留。此为应用功能范围精简，不增加固件能力或实车验证结论。
 
 ### 方控与原车媒体
+
+2026-10-15 按用户要求完善[音乐与方控方式](BLUETOOTH_MUSIC_WHEEL.md)：实验性页面将蓝牙音频与方控音量开关合并为一个互斥选择，保留原保存值，默认 CarPlay＋音量联动，下次连接生效。蓝牙方案不提供 CarPlay 音频且将媒体方控交回原车，避免重复转发与音乐焦点竞争。用户确认原车蓝牙切歌不跳页，混合运行 CarPlay 的实际效果及导航／Siri／通话路由待验证，未新增参考 OTA 的接口事实。
+
+用户另提供 [GeelyPlay 0.2.19.8 方控对照](GEELYPLAY_STEERING_REFERENCE.md)：主 APK 默认接收标准 Android 按键／MediaSession 并转 CarPlay HID，保留独立 VehiclePropertiesService 桥接客户端，未发现同本仓库的 MediaCenterAPI 注册路径。配套加密兼容组件未分析、未实车验证切歌不跳页；此为独立 APK 证据，不属于参考 OTA 的已确认能力。
 
 - 输入服务：`ecarx.xsf.inputservice/ecarx.xsf.inputservice.InputService`；不是 OneOS 的 `com.geely.inputservice`。
 - 输入 SDK：`com.ecarx.xui.adaptapi.input.Input.create(Context)`，`requestKeysInterception(int[], IKeyCallback)`、`abandonKeysInterception(IKeyCallback)`；底层依赖定制 `IInputManager` / `IKeyEventObserver`。第三方调用权限及对原车按键的影响尚未验证。

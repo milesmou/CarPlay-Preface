@@ -17,6 +17,13 @@ object CarPlayMediaButton {
     /** Standard Android voice-assistant key. Custom vehicle keys can be learned in settings. */
     fun opensSiri(keyCode: Int): Boolean = keyCode == KeyEvent.KEYCODE_VOICE_ASSIST
 
+    /** Media/volume belong to the E02 Bluetooth source, including its physical wheel codes. */
+    fun belongsToCarBluetooth(keyCode: Int): Boolean = forKeyCode(keyCode) != null || keyCode in setOf(
+        KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MUTE,
+        KeyEvent.KEYCODE_MEDIA_STOP, KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN,
+        KeyEvent.KEYCODE_VOLUME_MUTE, 301, 302, 304, 305,
+    )
+
     /** The CarPlay press for [keyCode], or null when the key is not a media key CarPlay handles. */
     fun forKeyCode(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_MEDIA_NEXT -> NEXT

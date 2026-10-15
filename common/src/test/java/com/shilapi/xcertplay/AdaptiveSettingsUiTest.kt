@@ -50,6 +50,150 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [29], qualifiers = "en-w600dp-h700dp")
 class AdaptiveSettingsUiTest {
     @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullWheelLearningLargeFontScreenshot() = captureWheelLearning("full")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactWheelLearningLargeFontScreenshot() = captureWheelLearning("compact")
+
+    private fun captureWheelLearning(size: String) {
+        context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
+            fontScale = 1.5f
+        }, context.resources.displayMetrics)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.VEHICLE))
+        val frame = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(frame).forEach { it.forceLayout() }
+            frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            frame.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        val directory = java.io.File("../agent_docs/screenshots/wheel-learning-status").apply { mkdirs() }
+        for ((part, target) in listOf("keys" to texts(screen).first {
+            it.text.startsWith(screen.getString(R.string.settings_wheel_previous) + " · ")
+        }, "status" to texts(screen).first { it.text == screen.getString(R.string.settings_wheel_takeover_title) })) {
+            val rect = android.graphics.Rect(0, 0, target.width, target.height)
+            scroll.offsetDescendantRectToMyCoords(target, rect)
+            scroll.scrollTo(0, rect.top)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+            val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+            frame.draw(android.graphics.Canvas(bitmap))
+            java.io.File(directory, "$size-$part-font150.png").outputStream().use {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+            bitmap.recycle()
+        }
+    }
+
+    @Test fun mediaWheelLearningCanLearnDisableAndRestoreWithoutChangingTheConnection() {
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.VEHICLE))
+        fun menu(index: Int) {
+            texts(screen).single { it.text.startsWith(screen.getString(R.string.settings_wheel_next) + " · ") }.performClick()
+            shadowOf(ShadowAlertDialog.getLatestAlertDialog()).clickOnItem(index)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        menu(0)
+        assertTrue(WheelMediaLearning.active(screen))
+        assertTrue(screen.dispatchKeyEvent(android.view.KeyEvent(100, 100, android.view.KeyEvent.ACTION_DOWN,
+            android.view.KeyEvent.KEYCODE_F1, 0)))
+        assertEquals(android.view.KeyEvent.KEYCODE_F1, WheelMediaBindings.key(context, WheelMediaBindings.Action.NEXT))
+        menu(2)
+        assertNull(WheelMediaBindings.key(context, WheelMediaBindings.Action.NEXT))
+        menu(1)
+        assertEquals(87, WheelMediaBindings.key(context, WheelMediaBindings.Action.NEXT))
+        val status = texts(screen).single { it.text.startsWith("输入申请：") }.text.toString()
+        assertTrue(status.contains("已收到观察回调：0 次"))
+        assertTrue(status.contains("独占处理：未确认"))
+        assertEquals(null, shadowOf(screen).nextStartedActivity)
+    }
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullBluetoothMusicLargeFontScreenshot() = captureBluetoothMusic("full")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactBluetoothMusicLargeFontScreenshot() = captureBluetoothMusic("compact")
+
+    private fun captureBluetoothMusic(size: String) {
+        context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
+            fontScale = 1.5f
+        }, context.resources.displayMetrics)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+        val frame = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(frame).forEach { it.forceLayout() }
+            frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            frame.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val title = screen.getString(R.string.settings_music_wheel_mode)
+        assertEquals(MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME, MusicWheelMode.load(context))
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        val target = texts(screen).first { it.text.startsWith("$title · ") }
+        val rect = android.graphics.Rect(0, 0, target.width, target.height)
+        scroll.offsetDescendantRectToMyCoords(target, rect)
+        scroll.scrollTo(0, rect.top)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+        val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        frame.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/bluetooth-music-wheel").apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
+    @Test fun bluetoothMusicSwitchSavesForNextConnectionWithoutStoppingTheCurrentSession() {
+        val screen = openSettings()
+        val session = mock(CarPlayController::class.java)
+        var stops = 0
+        CarPlayBackgroundSession.store(session, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
+            CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, false, false, 1920, 720)) { stops++ }
+        try {
+            CarPlayBackgroundSession.active = true
+            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.EXPERIMENTAL)
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            val setting = texts(screen).single { it.text.startsWith(screen.getString(R.string.settings_music_wheel_mode) + " · ") }
+            assertFalse(descendants(screen.window.decorView).filterIsInstance<Switch>().any {
+                it.contentDescription == screen.getString(R.string.settings_car_bluetooth_audio) ||
+                    it.contentDescription == screen.getString(R.string.settings_navigation_wheel_volume)
+            })
+            setting.performClick()
+            val dialog = ShadowAlertDialog.getLatestAlertDialog()
+            assertEquals(3, dialog.listView.adapter.count)
+            assertEquals(MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME.ordinal, dialog.listView.checkedItemPosition)
+            shadowOf(dialog).clickOnItem(MusicWheelMode.CAR_BLUETOOTH.ordinal)
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(AirPlayPersistence.loadCarBluetoothAudio(context))
+            assertTrue(PendingReconnect.isPending(session))
+            assertEquals(0, stops)
+            assertSame(session, CarPlayBackgroundSession.snapshot()?.controller)
+            assertEquals(null, shadowOf(screen).nextStartedActivity)
+        } finally {
+            CarPlayBackgroundSession.clear()
+            PendingReconnect.clear()
+        }
+    }
+
+    @Test
     @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun compactConnectionWithoutUsbAutoConfirmLargeFontScreenshot() = captureWithoutUsbAutoConfirm("compact")
@@ -223,7 +367,7 @@ class AdaptiveSettingsUiTest {
             }
         }
         if (volume) {
-            assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_navigation_wheel_volume) })
+            assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_music_wheel_mode) })
             for (id in listOf(R.string.wheel_keys_open_settings, R.string.wheel_keys_enable_adb)) {
                 assertFalse(texts(screen).any { it.text == screen.getString(id) })
             }
@@ -244,7 +388,7 @@ class AdaptiveSettingsUiTest {
         }
         if (volume) {
             val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
-            val target = texts(screen).first { it.text == screen.getString(R.string.settings_navigation_wheel_volume) }
+            val target = texts(screen).first { it.text == screen.getString(R.string.settings_music_wheel_mode) }
             val rect = android.graphics.Rect(0, 0, target.width, target.height)
             scroll.offsetDescendantRectToMyCoords(target, rect)
             scroll.scrollTo(0, rect.top)
@@ -274,14 +418,14 @@ class AdaptiveSettingsUiTest {
     @Test
     @Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun fullDisplayWithoutPipResolutionLargeFontScreenshot() = captureDisplayWithoutPipResolution("full")
+    fun fullDisplayWithFixedResolutionLargeFontScreenshot() = captureDisplayWithFixedResolution("full")
 
     @Test
     @Config(sdk = [29], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun compactDisplayWithoutPipResolutionLargeFontScreenshot() = captureDisplayWithoutPipResolution("compact")
+    fun compactDisplayWithFixedResolutionLargeFontScreenshot() = captureDisplayWithFixedResolution("compact")
 
-    private fun captureDisplayWithoutPipResolution(size: String) {
+    private fun captureDisplayWithFixedResolution(size: String) {
         context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
             fontScale = 1.5f
         }, context.resources.displayMetrics)
@@ -298,13 +442,56 @@ class AdaptiveSettingsUiTest {
             shadowOf(Looper.getMainLooper()).idle()
         }
         assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
-        assertFalse(texts(screen).any { it.text.toString().contains("画中画与分屏自适应") })
+        assertFalse(texts(screen).any { it.text.startsWith(screen.getString(R.string.resolution) + " · ") })
+        assertTrue(texts(screen).any { it.text.toString() == screen.getString(R.string.settings_fixed_resolution_hint) })
         assertTrue(texts(screen).any { it.text.startsWith(screen.getString(R.string.frame_rate) + " · ") })
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        val navigationTitle = texts(screen).first { it.text.toString() == screen.getString(R.string.hide_the_navigation_bar) }
+        val target = android.graphics.Rect()
+        navigationTitle.getDrawingRect(target)
+        scroll.offsetDescendantRectToMyCoords(navigationTitle, target)
+        scroll.scrollTo(0, (target.top - 24).coerceAtLeast(0))
+        val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        frame.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/fixed-resolution").apply { mkdirs() }
+        java.io.File(directory, "$size-font150.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullUpstreamAudioLargeFontScreenshot() = captureUpstreamAudio("full")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactUpstreamAudioLargeFontScreenshot() = captureUpstreamAudio("compact")
+
+    private fun captureUpstreamAudio(size: String) {
+        context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
+            fontScale = 1.5f
+        }, context.resources.displayMetrics)
+        val screen = openSettings()
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.AUDIO))
+        val frame = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(frame).forEach { it.forceLayout() }
+            frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            frame.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertTrue(texts(screen).any { it.text.startsWith(screen.getString(R.string.settings_music_buffer_wireless) + " · ") })
+        assertTrue(texts(screen).any { it.text.startsWith(screen.getString(R.string.settings_music_buffer_wired) + " · ") })
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
         scroll.scrollTo(0, scroll.getChildAt(0).height)
         val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
         frame.draw(android.graphics.Canvas(bitmap))
-        val directory = java.io.File("../agent_docs/screenshots/remove-pip-resolution").apply { mkdirs() }
+        val directory = java.io.File("../agent_docs/screenshots/upstream-0.2.20").apply { mkdirs() }
         java.io.File(directory, "$size-font150.png").outputStream().use {
             assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
@@ -343,10 +530,16 @@ class AdaptiveSettingsUiTest {
 
     @After fun tearDown() {
         activity?.finish()
+        activity?.let { WheelMediaLearning.cancel(it) }
+        WheelMediaLearning.resetForTest()
+        // The learnt press has a short echo quarantine; expire it before another screen/service test.
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
         AppAppearanceRuntime.resetForTest()
         context.getSharedPreferences("diplay", 0).edit().clear().commit()
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         context.getSharedPreferences("carplay_audio_volume", 0).edit().clear().commit()
+        context.getSharedPreferences("diplay_navigation_wheel", 0).edit().clear().commit()
+        context.getSharedPreferences(WheelMediaBindings.PREFS, 0).edit().clear().commit()
         for (name in listOf("diplay_split_screen", "diplay_carplay_rotation", "diplay_side_panel")) {
             context.getSharedPreferences(name, 0).edit().clear().commit()
         }
@@ -585,6 +778,7 @@ class AdaptiveSettingsUiTest {
         assertTrue(texts(screen).any { it.text.startsWith(screen.getString(R.string.frame_rate) + " · ") })
     }
 
+    @Config(sdk = [28])
     @Test fun headerSearchBoxListsMatchesAsYouTypeAndOpensTheChosenSetting() {
         val screen = openSettings()
         fun box() = descendants(screen.window.decorView).filterIsInstance<EditText>()
@@ -896,17 +1090,17 @@ class AdaptiveSettingsUiTest {
         }
         assertFalse(advanced.any { it.startsWith(text(R.string.settings_usb_charging)) })
         assertTrue(audio.any { it.startsWith(text(R.string.music_buffer)) })
-        listOf(R.string.main_buffered_audio, R.string.settings_car_bluetooth_audio, R.string.efficient_video, R.string.smooth_video, R.string.settings_direct_video_output, R.string.settings_low_latency_decoder, R.string.call_echo_cancellation, R.string.call_voice_filter, R.string.settings_disable_media_key_audio_focus, R.string.contrib_audio_home_toggle_audio_focus).forEach {
+        listOf(R.string.main_buffered_audio, R.string.efficient_video, R.string.smooth_video, R.string.settings_direct_video_output, R.string.settings_low_latency_decoder, R.string.call_echo_cancellation, R.string.call_voice_filter, R.string.settings_disable_media_key_audio_focus, R.string.contrib_audio_home_toggle_audio_focus).forEach {
             assertTrue(text(it), text(it) in advanced)
             assertFalse(text(it), text(it) in audio)
         }
         assertTrue(text(R.string.right_hand_drive) in vehicle)
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)
-        assertTrue(text(R.string.wheel_siri_key) in vehicle)
+        assertTrue(vehicle.any { it.startsWith(text(R.string.settings_wheel_siri) + " · ") })
         assertTrue(text(R.string.settings_wheel_keys) in vehicle)
-        assertTrue(text(R.string.settings_navigation_wheel_volume) in advanced)
-        assertFalse(text(R.string.settings_navigation_wheel_volume) in audio)
-        assertFalse(text(R.string.settings_navigation_wheel_volume) in vehicle)
+        assertTrue(text(R.string.settings_music_wheel_mode) in advanced)
+        assertFalse(text(R.string.settings_music_wheel_mode) in audio)
+        assertFalse(text(R.string.settings_music_wheel_mode) in vehicle)
         assertFalse(text(R.string.settings_ambient_title) in advanced)
         assertFalse(text(R.string.settings_ambient_title) in audio)
         assertFalse(text(R.string.settings_ambient_title) in vehicle)

@@ -13,6 +13,8 @@ Instructions for coding agents that work on CarPlay-Preface.
 
 7. USB 连接使用系统为当前 iPhone NCM 建立的网卡及普通 socket 服务，不依赖 root，不申请 VPN 授权、不建立 VPN/TUN、不回退 VPN。保留 USB 授权、网卡归属、IPv6 就绪和会话检查；网卡不可用或 AirPlay 接入超时时明确失败，不把删除 VPN 回退描述为实车已修复。应用内 TCP/IP 协议栈尚未实现。用户已要求选择 USB 后自动测试 NCM 帧；仅正常路径启动失败且无已建立会话时，保留认证并尝试原始 NCM 诊断，不将其作为 AirPlay 备用通路。结束释放接口、停止自动重试并提示重新插拔，详见 `docs/USB_NCM_FRAME_DIAGNOSTICS.md`。
 
+8. CarPlay 协商像素严格由“隐藏导航栏”选项决定：勾选为 **1920×720**，不勾选为 **1760×720**。停用分辨率百分比及旧画布缩放，已有保存值不得改变这两档。图标文字物理尺寸调节保留；窗口测量只用于本地显示与触摸映射，不因临时窗口增长／缩小重建连接。导航栏选择引起的分辨率变更在下次连接生效，不擅自中断会话。
+
 ## Checks
 
 只有用户明确要求“完整测试”时，才运行以下 CI 全量检查。普通修改或“构建测试 APK”默认不运行全量单元测试、Lint 或所有模块检查；构建测试包时仅执行用户指定模块的构建任务（默认 `:mobile:assembleDebug`），并继续核对签名及按下文规则自动安装。不要把仅构建成功描述为完整检查通过。
@@ -36,7 +38,7 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 版本与上游同步
 
-1. 当前上游参考基线为 **DiPlay v0.2.19（选择性同步）**，具体提交与排除范围见 `docs/UPSTREAM_SYNC_0.2.19.md`。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
+1. 当前上游参考基线为 **DiPlay v0.2.20（选择性同步）**，具体提交与排除范围见 `docs/UPSTREAM_SYNC_0.2.20.md`。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
 2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的 `versionCode`。应用 `versionName` 遵循下一条的发布规则，不得直接覆盖为上游的应用版本号。
 3. 用户指定应用版本时采用指定版本。当前开发版本为 **0.1.1**，在 GitHub 正式发布此版本前，所有开发修改与上游同步均保持 `versionName = "0.1.1"`，不自动递增补丁号。正式发布后，未指定下一版本时默认递增本仓库应用版本的补丁号。`versionCode` 不得回退，新升级构建必须大于上一升级构建，以支持覆盖安装；修改应用版本时同时更新中文 `README.md`。
 4. 如果同步的是尚未发布或零散的上游提交，记录实际同步的提交 SHA 和同步范围，不虚构上游发布版本，也不将部分提交描述为完整同步某个新版本。

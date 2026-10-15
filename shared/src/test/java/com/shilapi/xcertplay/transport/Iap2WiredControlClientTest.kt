@@ -7,6 +7,29 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class Iap2WiredControlClientTest {
+    @Test fun diagnosticWindowStartsAfterTheReplacementStartSessionIsWritten() {
+        val endpoint = Iap2WiredCarPlayEndpoint(listOf("fe80::2"), 7000, "abcd", "1.0")
+        val order = mutableListOf<String>()
+        // Initial request, then a new request after reclaiming/selecting the NCM alternate.
+        repeat(2) {
+            sendWiredStartSession(endpoint, { frame ->
+                assertEquals(0x4301, frame.messageId)
+                order += "write"
+            }, { order += "start-window" })
+        }
+        assertEquals(listOf("write", "start-window", "write", "start-window"), order)
+    }
+
+    @Test fun failedReplacementStartSessionDoesNotStartTheDiagnosticWindow() {
+        val endpoint = Iap2WiredCarPlayEndpoint(listOf("fe80::2"), 7000, "abcd", "1.0")
+        var started = false
+        try {
+            sendWiredStartSession(endpoint, { throw java.io.IOException("control write failed") }, { started = true })
+            throw AssertionError("write failure swallowed")
+        } catch (_: java.io.IOException) { }
+        org.junit.Assert.assertFalse(started)
+    }
+
     @Test
     fun carPlayStartSessionNestsAddressesInsideWiredAttributes() {
         val frame = Iap2WiredControlClient.carPlayStartSession(

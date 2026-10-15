@@ -428,11 +428,7 @@
     <string name="wheel_key_role_previous">previous item</string>
     <string name="wheel_key_role_next">next item</string>
     <string name="wheel_key_role_select">select</string>
-    <string name="wheel_key_role_siri">Siri</string>
     <string name="wheel_key_none">none</string>
-    <string name="wheel_key_in_use">That key is already the %1$s key. Choose another key.</string>
-    <string name="wheel_siri_key">Siri key on the wheel</string>
-    <string name="wheel_siri_key_description">Opens Siri with a wheel key you choose while CarPlay is on the screen. A key that the car keeps for itself works only with the wheel key service, which also works when CarPlay is in the background. Without CarPlay, or during a call, the key keeps the car\'s own action.</string>
     <string name="wheel_key_role_back">back</string>
     <string name="wheel_key_service_label">CarPlay wheel keys</string>
     <string name="wheel_key_service_description">Optional wheel key filtering for navigation volume during spoken guidance, dashboard map zoom, CarPlay joystick and call controls. No screen content is read.</string>
@@ -447,8 +443,8 @@
     <string name="carplay_dock_hint">Where CarPlay shows its apps, clock and status. Between Driver\'s side and Bottom it moves at once; Automatic leaves it to the iPhone and applies after a reconnect.</string>
     <string name="main_buffered_audio">Buffered music (experimental)</string>
     <string name="main_buffered_audio_description">Apps that support it, such as Apple Music, send up to about two minutes of music ahead, so short Wi-Fi gaps are not heard. Other apps keep the normal stream. Reconnects CarPlay.</string>
-    <string name="settings_car_bluetooth_audio">CarPlay audio over the car\'s Bluetooth (experimental)</string>
-    <string name="settings_car_bluetooth_audio_description">CarPlay offers the iPhone no CarPlay audio, so music, navigation and calls should go over the iPhone\'s Bluetooth connection with the car. Keep the iPhone paired with the car and choose Bluetooth as the car\'s audio source. If the sound plays on the iPhone instead, turn this off. Reconnects CarPlay.</string>
+    <string name="settings_car_bluetooth_audio">Music and wheel controls over Bluetooth (experimental)</string>
+    <string name="settings_car_bluetooth_audio_description">Keep the iPhone connected to the car for Bluetooth music and select the car\'s Bluetooth audio source. Music and media wheel controls stay with the car; DiPlay stops forwarding media keys and requesting music focus. CarPlay picture and touch remain available. This mode offers no CarPlay audio, so navigation, calls and Siri audio may also change routes. If sound is missing or plays on the iPhone, choose a CarPlay mode.</string>
     <string name="call_echo_cancellation">Call echo cancellation (experimental)</string>
     <string name="call_echo_cancellation_description">Tries to reduce speaker echo sent to the other person during CarPlay calls. Results depend on the head unit. Applies at the next CarPlay connection.</string>
     <string name="call_voice_filter">Clearer call voices (experimental)</string>
@@ -524,4 +520,9 @@
     <string name="settings_cluster_music_vertical">Music card · vertical position</string>
     <string name="settings_cluster_music_size">Music card · size</string>
     <string name="settings_cluster_music_unknown">Unknown artist</string>
+    <string name="settings_fixed_resolution_hint">Hide navigation bar: 1920×720. Show navigation bar: 1760×720. The CarPlay resolution changes at the next connection.</string>
+    <string name="settings_music_buffer_wireless">Music buffer (wireless CarPlay)</string>
+    <string name="settings_music_buffer_wired">Music buffer (USB cable)</string>
+    <string name="settings_music_buffer_ms">%1$d ms</string>
+    <string name="settings_music_buffer_next_connection">Buffer changes apply at the next connection.</string>
 </resources>

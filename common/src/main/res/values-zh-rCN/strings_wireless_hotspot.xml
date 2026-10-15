@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_hotspot_dialog_hint">请与车机系统热点的名称、密码和安全类型保持一致。保存后在下次连接时生效。</string>
-    <string name="settings_manual_hotspot_title">手动车机热点（推荐）</string>
+    <string name="settings_manual_hotspot_title">手动车机热点</string>
     <string name="settings_hotspot_password">热点密码</string>
     <string name="settings_hotspot_empty_name">请输入热点 SSID。</string>
     <string name="settings_hotspot_long_name">SSID 的 UTF-8 编码不能超过 32 字节。</string>

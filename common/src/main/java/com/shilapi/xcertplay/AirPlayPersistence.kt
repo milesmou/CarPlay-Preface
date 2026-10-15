@@ -68,6 +68,7 @@ object AirPlayPersistence {
     private const val KEY_AMBIENT_LUX_THRESHOLD = "ambient_lux_threshold"
     private const val KEY_FPS = "display_fps"
     private const val KEY_MEDIA_BUFFER_MS = "media_buffer_ms"
+    private const val KEY_WIRED_MEDIA_BUFFER_MS = "wired_media_buffer_ms"
     private const val KEY_MAIN_BUFFERED_AUDIO = "main_buffered_audio"
     private const val KEY_SPEECH_WITHOUT_8_16_KHZ = "speech_without_8_16_khz"
     private const val KEY_CAR_BLUETOOTH_AUDIO = "car_bluetooth_audio"
@@ -538,10 +539,16 @@ object AirPlayPersistence {
             .getInt(KEY_FPS, AirPlayDisplaySettings.DEFAULT_FPS),
     )
 
-    fun loadMediaBufferMillis(context: Context): Int = com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS),
-    )
+    fun loadMediaBufferMillis(context: Context, wireless: Boolean = true): Int {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val shared = prefs.getInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.DEFAULT_MILLIS)
+        return if (wireless) {
+            com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWireless(shared)
+        } else {
+            // Until wired has its own value, keep the delay saved when one setting covered both transports.
+            com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWired(prefs.getInt(KEY_WIRED_MEDIA_BUFFER_MS, shared))
+        }
+    }
 
     /** CarPlay's buffered music (Apple Music sends ahead over TCP); off by default, applies at reconnect. */
     fun loadMainBufferedAudio(context: Context): Boolean =
@@ -604,9 +611,22 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LOW_LATENCY_DECODER, enabled).apply()
     }
 
-    fun saveMediaBufferMillis(context: Context, millis: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.sanitize(millis)).apply()
+    fun saveMediaBufferMillis(context: Context, millis: Int) = saveMediaBufferMillis(context, true, millis)
+
+    fun saveMediaBufferMillis(context: Context, wireless: Boolean, millis: Int) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (wireless) {
+            val wired = loadMediaBufferMillis(context, wireless = false)
+            prefs.edit()
+                // Pin the wired delay first, so it no longer follows the wireless value.
+                .putInt(KEY_WIRED_MEDIA_BUFFER_MS, wired)
+                .putInt(KEY_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWireless(millis))
+                .apply()
+        } else {
+            prefs.edit()
+                .putInt(KEY_WIRED_MEDIA_BUFFER_MS, com.shilapi.xcertplay.media.MediaAudioBuffer.sanitizeWired(millis))
+                .apply()
+        }
     }
 
     /** DiPlay's own experimental echo canceller on CarPlay call audio; opt-in, applies at reconnect. */

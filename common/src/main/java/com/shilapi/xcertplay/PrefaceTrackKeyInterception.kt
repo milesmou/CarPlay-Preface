@@ -13,6 +13,8 @@ internal class PrefaceTrackKeyInterception(
     private val siri: () -> Unit = {},
     private val volume: (Boolean, Int) -> Unit = { _, _ -> },
     private val diagnostic: (String) -> Unit = {},
+    private val handleKey: ((Boolean, Int) -> Boolean)? = null,
+    private val releaseKeys: () -> Unit = {},
     private val send: (Int) -> Unit,
 ) {
     internal interface Backend {
@@ -26,9 +28,15 @@ internal class PrefaceTrackKeyInterception(
     private var volumeFailed = false
     private var requestedVolume = false
     private var generation = 0L
+    private var accepted = false
+    private var receivedEvents = 0L
     private val held = mutableSetOf<Int>()
 
-    fun report(): String = "Track interception requested=$requested volumeRequested=$requestedVolume unavailable=$failed volumeUnavailable=$volumeFailed"
+    data class Status(val requested: Boolean, val accepted: Boolean, val receivedEvents: Long,
+        val unavailable: Boolean, val exclusiveConfirmed: Boolean = false)
+    fun status() = Status(requested, accepted, receivedEvents, failed)
+    fun report(): String = "Track interception requested=$requested requestAccepted=$accepted receivedEvents=$receivedEvents " +
+        "exclusiveHandling=unconfirmed volumeRequested=$requestedVolume unavailable=$failed volumeUnavailable=$volumeFailed"
 
     fun update(eligible: Boolean, volumeKeys: Boolean = false) {
         val withVolume = eligible && volumeKeys && !volumeFailed
@@ -37,6 +45,8 @@ internal class PrefaceTrackKeyInterception(
         if (eligible) {
             requested = true
             requestedVolume = withVolume
+            accepted = false
+            receivedEvents = 0
             val owner = ++generation
             try {
                 backend.request({ down, key ->
@@ -46,6 +56,8 @@ internal class PrefaceTrackKeyInterception(
                             if (requestedVolume) volume(down, key)
                             return@request
                         }
+                        receivedEvents++
+                        if (handleKey?.invoke(down, key) == true) return@request
                         if (key == 298) {
                             // Release triggers Siri once; a held/repeated key cannot toggle it repeatedly.
                             if (down) held.add(298) else if (held.remove(298)) siri()
@@ -66,6 +78,7 @@ internal class PrefaceTrackKeyInterception(
                         } else held.remove(index)
                     }
                 }, withVolume)
+                accepted = true
             } catch (error: Exception) {
                 // A failed/partial request must also be released. Broadcast handling remains available.
                 close()
@@ -86,9 +99,11 @@ internal class PrefaceTrackKeyInterception(
     fun close() {
         if (!requested) return
         requested = false
+        accepted = false
         requestedVolume = false
         generation++
         held.clear()
+        releaseKeys()
         diagnostic("Wheel interception release requested")
         runCatching { backend.release() }
             .onSuccess { diagnostic("Wheel interception released") }
@@ -107,6 +122,7 @@ internal class PrefaceTrackKeyInterception(
 internal class PrefaceInputInterceptionBackend(
     private val deliver: (() -> Unit) -> Unit,
     private val diagnostic: (String) -> Unit = {},
+    private val additionalKeys: () -> IntArray = { intArrayOf() },
 ) : PrefaceTrackKeyInterception.Backend {
     private var release: (() -> Unit)? = null
 
@@ -153,7 +169,7 @@ internal class PrefaceInputInterceptionBackend(
         // The API registers an observer; it does not promise exclusive handling. Physical 304/305
         // may be followed by the OEM's synthetic 87/88 broadcast, which must share deduplication.
         val request = inputType.getMethod("requestKeysInterception", IntArray::class.java, observerType)
-        val keys = requestPrefaceTrackKeys(standardKeys,
+        val keys = requestPrefaceTrackKeys(standardKeys, additionalKeys = additionalKeys(),
             request = { request.invoke(manager, it, observer) },
             abandon = { abandon.invoke(manager, observer) }, diagnostic = diagnostic)
         Log.i("DiPlay-MediaKeys", "Preface interception requested (${keys.joinToString()}); vehicle validation pending")
@@ -170,8 +186,8 @@ internal class PrefaceInputInterceptionBackend(
 
 /** A rejected expanded request is released before retrying the reference SDK's key set. */
 internal fun requestPrefaceTrackKeys(standardKeys: IntArray, request: (IntArray) -> Unit,
-    abandon: () -> Unit, diagnostic: (String) -> Unit): IntArray {
-    val expanded = standardKeys + intArrayOf(304, 305)
+    abandon: () -> Unit, diagnostic: (String) -> Unit, additionalKeys: IntArray = intArrayOf()): IntArray {
+    val expanded = (standardKeys + intArrayOf(304, 305) + additionalKeys).distinct().toIntArray()
     try {
         request(expanded)
         return expanded

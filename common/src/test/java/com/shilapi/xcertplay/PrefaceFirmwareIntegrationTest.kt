@@ -160,9 +160,9 @@ class PrefaceFirmwareIntegrationTest {
     @Test fun failedDispatchCanRetryThroughAnotherDeliveryPath() {
         var accepts = false
         val delivered = mutableListOf<Int>()
-        val receiver = PrefaceMediaButtonReceiver({ true }) {
+        val receiver = PrefaceMediaButtonReceiver({ true }, send = {
             if (accepts) { delivered += it; true } else false
-        }
+        })
         val event = KeyEvent(100, 100, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT, 0)
         assertFalse(receiver.handle(event))
         accepts = true
@@ -253,8 +253,12 @@ class PrefaceFirmwareIntegrationTest {
         }
         broadcast(123)
         AirPlayPersistence.saveCarBluetoothAudio(context, true)
+        // A saved next-connection setting must not change the live route.
         broadcast(124)
-        verify(active, times(1)).sendMediaButton(CarPlayMediaButton.NEXT)
+        verify(active, times(2)).sendMediaButton(CarPlayMediaButton.NEXT)
+        `when`(active.usesCarBluetoothAudio).thenReturn(true)
+        broadcast(125)
+        verify(active, times(2)).sendMediaButton(CarPlayMediaButton.NEXT)
         CarPlayMediaKeys.detach(active)
         assertNull(ReflectionHelpers.getField<Any?>(CarPlayMediaKeys, "prefaceReceiver"))
     }

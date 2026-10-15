@@ -63,6 +63,23 @@ class WirelessHotspotSettingsTest {
     private fun texts(activity: DiPlayActivity) = views(activity.window.decorView).filterIsInstance<TextView>()
     private fun render(activity: DiPlayActivity) = ReflectionHelpers.callInstanceMethod<Unit>(activity, "render")
 
+    @Test fun aReportedOffHotspotDoesNotBlockTheValidatedManualConnectionPath() {
+        val activity = open()
+        AirPlayPersistence.saveWirelessHotspotMode(activity, WirelessHotspotMode.MANUAL)
+        AirPlayPersistence.saveManualHotspotSsid(activity, "Xingrui")
+        AirPlayPersistence.saveManualHotspotPassphrase(activity, "password123")
+        DiPlayPreferences.savePhone(activity, "02:00:00:00:00:12", "test phone")
+        ReflectionHelpers.setField(activity, "setupError", null)
+        app.sendStickyBroadcast(Intent("android.net.wifi.WIFI_AP_STATE_CHANGED")
+            .putExtra("wifi_state", 11).putExtra("wifi_ap_mode", 1))
+        assertEquals(false, com.shilapi.xcertplay.network.CarHotspotStatus.isEnabled(activity))
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "connect",
+            ReflectionHelpers.ClassParameter(Boolean::class.javaPrimitiveType, true))
+        assertEquals(CarPlayHostActivity::class.java.name, shadowOf(activity).nextStartedActivity.component?.className)
+        assertNull(ShadowAlertDialog.getLatestAlertDialog())
+        assertEquals(WirelessHotspotMode.MANUAL, AirPlayPersistence.loadWirelessHotspotMode(activity))
+    }
+
     @Test fun bothModesRoundTripWithoutRewritingOrLosingCredentials() {
         val prefs = app.getSharedPreferences("xcertplay_airplay", 0)
         val before = prefs.all
@@ -100,10 +117,10 @@ class WirelessHotspotSettingsTest {
         texts(activity).single { it.text.startsWith(activity.getString(R.string.settings_hotspot_mode) + " · ") }.performClick()
         val dialog = ShadowAlertDialog.getLatestAlertDialog()
         assertEquals(activity.getString(R.string.save), dialog.getButton(AlertDialog.BUTTON_POSITIVE).text)
-        assertEquals(listOf("手动车机热点（推荐）", "临时热点"),
+        assertEquals(listOf("临时热点", "手动车机热点"),
             (0 until dialog.listView.adapter.count).map { dialog.listView.adapter.getItem(it).toString() })
-        assertEquals(1, dialog.listView.checkedItemPosition)
-        shadowOf(dialog).clickOnItem(0)
+        assertEquals(0, dialog.listView.checkedItemPosition)
+        shadowOf(dialog).clickOnItem(1)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(WirelessHotspotMode.MANUAL, AirPlayPersistence.loadWirelessHotspotMode(app))

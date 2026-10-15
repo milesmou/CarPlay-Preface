@@ -691,7 +691,7 @@ class AirPlaySession(
                     }
                 }
                 STREAM_TYPE_MAIN_AUDIO, STREAM_TYPE_ALT_AUDIO, STREAM_TYPE_MAIN_HIGH_AUDIO -> {
-                    val streamResponse = media.onAudio(this, type, stream)
+                    val streamResponse = if (config.disableAudioOutput) null else media.onAudio(this, type, stream)
                     debugLog(
                         "airplay audio stream type=$type accepted=${streamResponse != null} " +
                             "dataPort=${streamResponse?.get("dataPort") ?: "none"} " +

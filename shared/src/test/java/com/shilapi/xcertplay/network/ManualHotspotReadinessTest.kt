@@ -22,6 +22,15 @@ class ManualHotspotReadinessTest {
         sample, cancel, { now += it }, { now },
     ).await(timeout)
 
+    @Test fun falseOffReportRequiresAnExplicitlyOwnedReadyInterface() {
+        val sample = snapshot(iface(), ap = setOf("wlan0")).copy(apEnabled = false)
+        assertNotNull(select(sample))
+        assertNull(select(sample.copy(apInterfaces = null)))
+        assertNull(select(sample.copy(interfaces = listOf(iface(up = false)))))
+        assertNull(select(sample.copy(interfaces = listOf(iface(addresses = emptyList())))))
+        assertNull(select(sample.copy(consistent = false)))
+    }
+
     @Test fun ethernetFirstWaitsForStableWireless() {
         val selected = await {
             if (now < 500) snapshot(iface("eth0")) else snapshot(iface("eth0"), iface())

@@ -18,6 +18,24 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun wheelBindingsRoundTripWithoutIncludingUnrelatedInputData() {
+        val values = prefs("diplay_media_wheel")
+        values.edit().clear().putInt("PREVIOUS", 131).putInt("NEXT", -1)
+            .putInt("SIRI", 231).putString("device_name", "private-device").commit()
+        try {
+            val bytes = SettingsBackupCodec.export(context, "0.1.1")
+            val saved = JSONObject(bytes.toString(Charsets.UTF_8))
+                .getJSONObject("settings").getJSONObject("diplay_media_wheel")
+            assertEquals(3, saved.length())
+            assertFalse(saved.has("device_name"))
+            values.edit().clear().commit()
+            assertFalse(SettingsBackupCodec.import(context, bytes).invalid)
+            assertEquals(131, values.getInt("PREVIOUS", 0))
+            assertEquals(-1, values.getInt("NEXT", 0))
+            assertEquals(231, values.getInt("SIRI", 0))
+        } finally { values.edit().clear().commit() }
+    }
+
     @Test fun backupUsesCurrentKeysAndSkipsObsoleteConfiguration() {
         val values = prefs("xcertplay_airplay")
         values.edit().clear()

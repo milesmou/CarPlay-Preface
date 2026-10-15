@@ -29,6 +29,7 @@ class Iap2WiredControlClient(
         onIncoming: (Iap2Frame) -> Unit = {},
         onProgress: (String) -> Unit = {},
         refreshEndpoint: (() -> Iap2WiredCarPlayEndpoint?)? = null,
+        onStartSessionSent: () -> Unit = {},
     ): Iap2WiredControlResult {
         require(availableCurrentMilliAmps in 0..0xffff) {
             "availableCurrentMilliAmps must be in 0..65535"
@@ -61,7 +62,7 @@ class Iap2WiredControlClient(
                 refreshEndpoint?.invoke()?.let { replacement ->
                     currentEndpoint = replacement
                     if (carPlayStartSessions > 0) {
-                        send(carPlayStartSession(currentEndpoint), deadlineNanos)
+                        sendWiredStartSession(currentEndpoint, { send(it, deadlineNanos) }, onStartSessionSent)
                         carPlayStartSessions++
                         onProgress("iap2 tx=0x4301 carplay-start-session transport-fallback")
                     }
@@ -101,7 +102,7 @@ class Iap2WiredControlClient(
                         onProgress(carPlayAvailabilitySummary(incoming.payload))
                         // LIVI sends its wired answer on every availability notification; do not gate it on
                         // the phone's advertised availability boolean.
-                        send(carPlayStartSession(currentEndpoint), deadlineNanos)
+                        sendWiredStartSession(currentEndpoint, { send(it, deadlineNanos) }, onStartSessionSent)
                         stage = Iap2WiredControlStage.CARPLAY_START_SENT
                         carPlayStartSessions++
                         onProgress("iap2 tx=0x4301 carplay-start-session")
@@ -171,6 +172,13 @@ class Iap2WiredControlClient(
         private fun remainingMillis(deadlineNanos: Iap2ControlDeadline): Long = deadlineNanos.remainingMillis()
 
     }
+}
+
+/** Start the data-test window only after the current interface's StartSession was written. */
+internal fun sendWiredStartSession(endpoint: Iap2WiredCarPlayEndpoint,
+    send: (Iap2Frame) -> Unit, onSent: () -> Unit) {
+    send(Iap2WiredControlClient.carPlayStartSession(endpoint))
+    onSent()
 }
 
 /** A configured wired AirPlay endpoint; configuration does not claim that either service is live. */

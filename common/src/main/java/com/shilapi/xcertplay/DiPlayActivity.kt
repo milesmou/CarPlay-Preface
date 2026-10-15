@@ -46,7 +46,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
-import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 import com.shilapi.xcertplay.backup.SettingsBackupCodec
 import com.shilapi.xcertplay.backup.SettingsBackupEndpoint
@@ -128,6 +127,7 @@ internal object SettingsInformationArchitecture {
 /** DiAuto's visual language, with a connection flow for an independent CarPlay receiver. */
 class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val handler = Handler(Looper.getMainLooper())
+    private var wheelTakeoverStatusView: TextView? = null
     private var appNight = true
     override val currentAppNight: Boolean get() = appNight
     private var palette = DiPlayPalette.DARK
@@ -135,9 +135,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var appearanceUpdatesResumed = false
     private var appearanceRenderPending = false
     private var appearanceButtonFocusPending = false
-    private var windowLearning: WindowKeyLearning? = null
-    private val windowLearningPresses = WheelKeyPresses()
-    private val endWindowLearning = Runnable { cancelKeyLearning() }
     private var page = "home"
     private var settingsCategory = SettingsCategory.CONNECTION
     private var connectionSettingsReturnCategory: SettingsCategory? = null
@@ -215,7 +212,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         connect(notificationTransport)
     }
     private val tick = object : Runnable {
-        override fun run() { refreshStatus(); handler.postDelayed(this, 1000) }
+        override fun run() { refreshStatus(); refreshWheelTakeoverStatus(); handler.postDelayed(this, 1000) }
     }
     private val appearancePoll = object : Runnable {
         override fun run() {
@@ -1308,7 +1305,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // Tapping elsewhere closes the list and keeps the query; tapping the box reopens it.
             isOutsideTouchable = true
             inputMethodMode = PopupWindow.INPUT_METHOD_NEEDED
-            setIsLaidOutInScreen(true)
+            if (Build.VERSION.SDK_INT >= 29) setIsLaidOutInScreen(true)
+            else runCatching {
+                PopupWindow::class.java.getMethod("setLayoutInScreenEnabled", Boolean::class.javaPrimitiveType)
+                    .invoke(this, true)
+            }
             positionSettingsSearchResults(box, this)
         }
     }
@@ -1551,22 +1552,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     .putExtra("picture_controls", true).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
             }, matchButton(0, 56).apply { bottomMargin = dp(24) })
             carPlaySizeControl(card)
-            resolutionSettingControl(
-                card, R.string.resolution, R.string.custom_resolution_hint,
-                CarPlayDisplayScale.MIN_PERCENT..CarPlayDisplayScale.MAX_PERCENT, 100,
-                R.string.custom_resolution_summary,
-                { AirPlayPersistence.loadDisplayScalePercent(this) }, reconnects = true,
-                save = { AirPlayPersistence.saveDisplayScalePercent(this, it) },
-            )
             choice(card, getString(R.string.frame_rate), listOf(getString(R.string.s_30_fps_lighter_load), getString(R.string.s_60_fps_smoother_motion)), if (AirPlayPersistence.loadFps(this) == 60) 1 else 0) { AirPlayPersistence.saveFps(this, if (it == 1) 60 else 30) }
             carPlayDockControl(card)
             addSystemBarControls(
                 hideTopBar = AirPlayPersistence.loadHideTopBar(this),
                 hideBottomBar = AirPlayPersistence.loadHideBottomBar(this),
                 onHideTopBarChanged = { AirPlayPersistence.saveHideTopBar(this, it); applyFullscreenMode() },
-                onHideBottomBarChanged = { AirPlayPersistence.saveHideBottomBar(this, it); applyFullscreenMode() },
+                onHideBottomBarChanged = { AirPlayPersistence.saveHideBottomBar(this, it); markReconnectNeeded(); applyFullscreenMode() },
             ) { label, checked, onChanged ->
-                toggle(card, getString(label), getString(R.string.hide_the_car_s_system_bars_while_carplay_is_open), checked, save = onChanged)
+                toggle(card, getString(label), getString(if (label == R.string.hide_the_navigation_bar)
+                    R.string.settings_fixed_resolution_hint else R.string.hide_the_car_s_system_bars_while_carplay_is_open), checked, save = onChanged)
             }
             card.addView(button("${getString(R.string.settings_interface_size)} · ${InterfaceSize.displayName(this, InterfaceSize.preference(this))}", false) {
                 InterfaceSize.showPicker(this)
@@ -1660,11 +1655,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveSpeechWithout8And16Khz(this, it)
                 reconnectIfRunning()
             }
-            toggle(card, getString(R.string.settings_car_bluetooth_audio), getString(R.string.settings_car_bluetooth_audio_description),
-                AirPlayPersistence.loadCarBluetoothAudio(this)) {
-                AirPlayPersistence.saveCarBluetoothAudio(this, it)
-                reconnectIfRunning()
-            }
         }
         filteredSection(content, SettingsSection.CAR_BUTTON,
             getString(R.string.car_button_in_carplay), R.drawable.ic_dp_car) { card -> carButtonCard = card; carButtonControls(card) }
@@ -1672,14 +1662,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.audio_routing), R.drawable.ic_dp_audio) { card ->
             mediaChannelControl(card)
             navigationChannelControl(card)
-            val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
-            choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
-                bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
-                AirPlayPersistence.saveMediaBufferMillis(this, bufferPresets[it])
-            }
+            musicBufferChoice(card, wireless = true)
+            musicBufferChoice(card, wireless = false)
         }
         filteredSection(content, SettingsSection.NAVIGATION_WHEEL,
-            getString(R.string.settings_navigation_wheel_volume), R.drawable.ic_dp_audio) { card ->
+            getString(R.string.settings_music_wheel_mode), R.drawable.ic_dp_audio) { card ->
             navigationWheelControls(card)
         }
 
@@ -2124,14 +2111,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }.onFailure { openCarWifiSettings() }
     }
 
-    private fun carHotspotOffDialog() {
-        appDialogBuilder().setTitle(getString(R.string.car_hotspot_is_off))
-            .setMessage(getString(R.string.msg_car_hotspot_connect, AirPlayPersistence.loadManualHotspotSsid(this)))
-            .setPositiveButton(getString(R.string.open_car_settings)) { _, _ -> openCarWifiSettings() }
-            .setNeutralButton(getString(R.string.connect)) { _, _ -> connect(true) }
-            .setNegativeButton(getString(R.string.cancel), null).show()
-    }
-
     // so the home screen goes first.
     private fun openCarWifiSettings() {
         val hotspot = Intent("com.android.settings.WIFI_TETHER_SETTINGS")
@@ -2373,18 +2352,96 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     /** E02 volume routing uses the system input observer; accessibility is not a prerequisite. */
     private fun navigationWheelControls(card: LinearLayout) {
-        toggle(card, getString(R.string.settings_navigation_wheel_volume), getString(R.string.settings_navigation_wheel_volume_description),
-            NavigationWheelSettings.enabled(this)) {
-            NavigationWheelSettings.setEnabled(this, it)
+        val modes = MusicWheelMode.entries
+        val mode = MusicWheelMode.load(this)
+        val labels = listOf(R.string.settings_music_wheel_carplay_adaptive,
+            R.string.settings_music_wheel_carplay_system, R.string.settings_music_wheel_bluetooth).map(::getString)
+        choice(card, getString(R.string.settings_music_wheel_mode), labels, modes.indexOf(mode), reconnects = false) {
+            MusicWheelMode.save(this, modes[it])
+            markReconnectNeeded()
             render()
         }
+        (card.getChildAt(card.childCount - 2) as? SettingButton)?.wrapContentHeight = true
+        card.addView(label(getString(when (mode) {
+            MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME -> R.string.settings_music_wheel_adaptive_description
+            MusicWheelMode.CARPLAY_SYSTEM_VOLUME -> R.string.settings_music_wheel_system_description
+            MusicWheelMode.CAR_BLUETOOTH -> R.string.settings_car_bluetooth_audio_description
+        }), 14, MUTED))
+        card.addView(label(getString(R.string.settings_music_wheel_next_connection), 14, MUTED))
     }
 
     /** Shared service setup for Siri and the CarPlay joystick. */
     private fun wheelKeysSettings(card: LinearLayout) {
-        if (WheelZoomSettings.siriKey(this) || WheelZoomSettings.joystick(this)) wheelKeyServiceControls(card)
-        siriKeyControls(card)
+        val siriCode = WheelMediaBindings.key(this, WheelMediaBindings.Action.SIRI)
+        if (WheelZoomSettings.joystick(this) || (siriCode != null && siriCode != WheelMediaBindings.Action.SIRI.defaultCode))
+            wheelKeyServiceControls(card)
+        card.addView(label(getString(R.string.settings_wheel_learning_hint), 14, MUTED))
+        for (action in WheelMediaBindings.Action.entries) {
+            val title = getString(wheelMediaActionTitle(action))
+            val code = WheelMediaBindings.key(this, action)
+            val value = when {
+                code == null -> getString(R.string.settings_wheel_binding_disabled)
+                code == action.defaultCode -> getString(R.string.settings_wheel_binding_default, code)
+                else -> getString(R.string.settings_wheel_binding_learned, code)
+            }
+            card.addView(button("$title · $value", false) {
+                appDialogBuilder().setTitle(title).setItems(arrayOf(
+                    getString(R.string.settings_wheel_learn), getString(R.string.settings_wheel_restore),
+                    getString(R.string.settings_wheel_disable))) { _, selected ->
+                    when (selected) {
+                        0 -> {
+                            cancelKeyLearning()
+                            WheelMediaLearning.start(this, this, action) { result -> runOnUiThread {
+                                toast(getString(when (result) {
+                                    WheelMediaLearning.Result.SAVED -> R.string.settings_wheel_learning_saved
+                                    WheelMediaLearning.Result.CONFLICT -> R.string.settings_wheel_learning_conflict
+                                    WheelMediaLearning.Result.RESERVED -> R.string.settings_wheel_learning_reserved
+                                    WheelMediaLearning.Result.TIMED_OUT -> R.string.settings_wheel_learning_timeout
+                                    WheelMediaLearning.Result.CANCELLED -> R.string.settings_wheel_learning_cancelled
+                                }))
+                                if (result == WheelMediaLearning.Result.SAVED) render()
+                                applyPendingAppearanceRender()
+                            } }
+                            toast(getString(R.string.settings_wheel_learning_press, title))
+                        }
+                        1, 2 -> {
+                            if (!WheelMediaBindings.assign(this, action, if (selected == 1) action.defaultCode else null))
+                                toast(getString(R.string.settings_wheel_learning_conflict))
+                            render()
+                        }
+                    }
+                }.setNegativeButton(getString(R.string.cancel), null).show()
+            }, matchButton(SETTINGS_BLOCK_GAP_DP, 60))
+        }
+        card.addView(label(getString(R.string.settings_wheel_takeover_title), 17, TEXT, true))
+        wheelTakeoverStatusView = label("", 14, MUTED).also { card.addView(it) }
+        refreshWheelTakeoverStatus()
         if (WheelZoomSettings.joystick(this)) wheelKeyControls(card)
+    }
+
+    private fun wheelMediaActionTitle(action: WheelMediaBindings.Action): Int = when (action) {
+        WheelMediaBindings.Action.PREVIOUS -> R.string.settings_wheel_previous
+        WheelMediaBindings.Action.NEXT -> R.string.settings_wheel_next
+        WheelMediaBindings.Action.SIRI -> R.string.settings_wheel_siri
+    }
+
+    private fun refreshWheelTakeoverStatus() {
+        val status = CarPlayMediaKeys.takeoverStatus()
+        val request = getString(when {
+            status.bluetooth -> R.string.settings_wheel_status_bluetooth
+            !status.connected -> R.string.settings_wheel_status_disconnected
+            status.input?.unavailable == true -> R.string.settings_wheel_status_unavailable
+            status.input?.accepted == true -> R.string.settings_wheel_status_requested
+            else -> R.string.settings_wheel_status_idle
+        })
+        val media = getString(when {
+            status.bluetooth -> R.string.settings_wheel_status_bluetooth
+            status.media?.ownsSource == true -> R.string.settings_wheel_source_owned
+            status.media?.registered == true -> R.string.settings_wheel_source_registered
+            else -> R.string.settings_wheel_source_unready
+        })
+        wheelTakeoverStatusView?.text = getString(R.string.settings_wheel_takeover_status,
+            request, status.input?.receivedEvents ?: 0L, media)
     }
 
     private fun wheelKeyControls(card: LinearLayout) {
@@ -2403,21 +2460,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 WheelZoomSettings.Role.ZOOM_OUT, WheelZoomSettings.Role.NEXT -> R.string.wheel_key_role_next
                 WheelZoomSettings.Role.JOYSTICK -> R.string.wheel_key_role_joystick
                 WheelZoomSettings.Role.SELECT -> R.string.wheel_key_role_select
-                WheelZoomSettings.Role.SIRI -> null
             } ?: continue
             wheelKeyAssignButton(card, role, getString(name))
         }
-    }
-
-    /** A wheel key that opens Siri on any car whose key reaches the key service. */
-    private fun siriKeyControls(card: LinearLayout) {
-        toggle(card, getString(R.string.wheel_siri_key), getString(R.string.wheel_siri_key_description),
-            WheelZoomSettings.siriKey(this)) {
-            WheelZoomSettings.setSiriKey(this, it)
-            render()
-        }
-        if (!WheelZoomSettings.siriKey(this)) return
-        wheelKeyAssignButton(card, WheelZoomSettings.Role.SIRI, getString(R.string.wheel_key_role_siri))
     }
 
     private fun wheelKeyServiceControls(card: LinearLayout) {
@@ -2454,90 +2499,32 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 assign.text = current()
                 applyPendingAppearanceRender()
             } }
-            val refused = { taken: WheelZoomSettings.Role ->
+            val refused = {
                 runOnUiThread {
                     assign.text = current()
-                    toast(getString(R.string.wheel_key_in_use, getString(wheelKeyRoleName(taken))))
+                    toast(getString(R.string.settings_wheel_learning_conflict))
                     applyPendingAppearanceRender()
                 }
             }
             val started = WheelKeyService.learn(role, cancelled, refused) { _, key -> runOnUiThread {
                 assign.text = current(key)
                 applyPendingAppearanceRender()
-            } } ||
-                // Without the service the Siri key is learnt from this window, so only keys that reach apps.
-                (role == WheelZoomSettings.Role.SIRI && learnInWindow(role, cancelled, refused) {
-                    assign.text = current(it)
-                    applyPendingAppearanceRender()
-                })
+            } }
             if (started) assign.text = getString(R.string.wheel_key_press, name)
             else toast(getString(R.string.wheel_keys_service_off))
         }
         card.addView(assign, matchButton(10, 56))
     }
 
-    private fun wheelKeyRoleName(role: WheelZoomSettings.Role): Int = when (role) {
-        WheelZoomSettings.Role.MODE -> R.string.wheel_key_role_mode
-        WheelZoomSettings.Role.ZOOM_IN -> R.string.wheel_key_role_zoom_in
-        WheelZoomSettings.Role.ZOOM_OUT -> R.string.wheel_key_role_zoom_out
-        WheelZoomSettings.Role.JOYSTICK -> R.string.wheel_key_role_joystick
-        WheelZoomSettings.Role.PREVIOUS -> R.string.wheel_key_role_previous
-        WheelZoomSettings.Role.NEXT -> R.string.wheel_key_role_next
-        WheelZoomSettings.Role.SELECT -> R.string.wheel_key_role_select
-        WheelZoomSettings.Role.SIRI -> R.string.wheel_key_role_siri
-    }
-
-    private class WindowKeyLearning(
-        val role: WheelZoomSettings.Role,
-        val cancelled: () -> Unit,
-        val refused: (WheelZoomSettings.Role) -> Unit,
-        val done: (WheelKey) -> Unit,
-    )
-
-    private fun learnInWindow(role: WheelZoomSettings.Role, cancelled: () -> Unit,
-        refused: (WheelZoomSettings.Role) -> Unit, done: (WheelKey) -> Unit): Boolean {
-        cancelKeyLearning()
-        windowLearning = WindowKeyLearning(role, cancelled, refused, done)
-        handler.postDelayed(endWindowLearning, WheelKeyService.LEARNING_TIMEOUT_MILLIS)
-        return true
-    }
-
     private fun cancelKeyLearning() {
+        WheelMediaLearning.cancel(this)
         WheelKeyService.cancelLearning()
-        handler.removeCallbacks(endWindowLearning)
-        val cancelled = windowLearning?.cancelled
-        windowLearning = null
-        cancelled?.invoke()
         applyPendingAppearanceRender()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return super.dispatchKeyEvent(event)
-        val action = windowLearningPresses.filter(
-            Triple(event.deviceId, event.keyCode, event.scanCode),
-            event.action == KeyEvent.ACTION_DOWN, event.repeatCount == 0,
-        ) {
-            val learning = windowLearning
-            if (learning == null || event.keyCode == KeyEvent.KEYCODE_BACK) return@filter WheelZoomKeys.Action.PASS
-            if (inCall(this) || !WheelZoomSettings.siriKey(this)) {
-                cancelKeyLearning()
-                return@filter WheelZoomKeys.Action.PASS
-            }
-            handler.removeCallbacks(endWindowLearning)
-            windowLearning = null
-            val key = WheelKey.of(event)
-            val taken = WheelZoomSettings.conflict(this, learning.role, key)
-            if (taken != null) {
-                Log.i(WheelKeyService.TAG, "${learning.role} key $key refused: it is the $taken key (learnt without the service)")
-                learning.refused(taken)
-            } else {
-                WheelZoomSettings.assign(this, learning.role, key)
-                Log.i(WheelKeyService.TAG, "${learning.role} key is now $key (learnt without the service)")
-                learning.done(key)
-            }
-            WheelZoomKeys.Action.CONSUME
-        }
-        return action != WheelZoomKeys.Action.PASS || super.dispatchKeyEvent(event)
+        if (WheelMediaLearning.offer(event)) return true
+        return super.dispatchKeyEvent(event)
     }
 
     /** The 0.2.9 Dashboard song setting, shown once: in the BYD navigation card, or under Advanced vehicle data. */
@@ -2952,13 +2939,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             toast(getString(R.string.save_the_name_and_password_from_the_car_s_hotspot_settings))
             return
         }
-        if (wireless && carHotspotOff()) {
-            appDialogBuilder().setTitle(getString(R.string.car_hotspot_is_off))
-                .setMessage(getString(R.string.settings_manual_hotspot_description))
-                .setPositiveButton(getString(R.string.open_car_settings)) { _, _ -> openCarWifiSettings() }
-                .setNegativeButton(getString(R.string.cancel), null).show()
-            return
-        }
+        // A firmware AP-state flag alone can be stale. ManualHotspotManager still requires
+        // an owned, active and stable interface before opening any CarPlay service.
         if (wireless && DiPlayPreferences.phoneAddress(this) == null) {
             pendingWireless = true; choosePhone(); return
         }
@@ -3101,7 +3083,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             appendLine(CarPlayMediaKeys.report())
             appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
             appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
-            appendLine("Saved resolution preference (may differ from active session): ${AirPlayPersistence.loadDisplayScalePercent(appContext)}%")
+            appendLine("Fixed resolution preference (applies at next connection): ${if (AirPlayPersistence.loadHideBottomBar(appContext)) "1920x720" else "1760x720"}; canvas scaling disabled")
             appendLine("Session: ${if (CarPlayBackgroundSession.active) "active" else if (CarPlayBackgroundSession.hasSession()) "connecting" else "stopped"}")
             appendLine(PhoneWakeDiagnostics.report(appContext))
             appendLine("Head-unit board: ${Build.BOARD}; hardware: ${Build.HARDWARE}; build: ${Build.DISPLAY}")
@@ -3117,6 +3099,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             appendLine()
             appendLine(UpdateAvailability.report(appContext, System.currentTimeMillis()))
             appendLine()
+            appendLine("--- Last crash recorded by DiPlay ---")
+            appendLine(CrashRecord.report(appContext))
+            appendLine(WheelKeyLog.report(WheelKeyService.connected()).joinToString("\n"))
             appendLine("--- Recent own-app process exits (Android 11+) ---")
             appendLine(ProcessExitDiagnostics.report(appContext))
             appendLine()
@@ -3367,6 +3352,27 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         parent.addView(result.rowView)
         return result.switch
     }
+    /** Independent transport buffers; saved changes apply at the next connection. */
+    private fun musicBufferChoice(card: LinearLayout, wireless: Boolean) {
+        val buffer = com.shilapi.xcertplay.media.MediaAudioBuffer
+        val presets = if (wireless) buffer.wirelessPresets else buffer.wiredPresets
+        val labels = presets.map { millis ->
+            when (millis) {
+                buffer.DEFAULT_MILLIS -> getString(R.string.s_300_ms_default)
+                buffer.MOST_STABLE_MILLIS -> getString(R.string.s_1000_ms_most_stable)
+                else -> getString(R.string.settings_music_buffer_ms, millis)
+            }
+        }
+        val title = getString(if (wireless) R.string.settings_music_buffer_wireless else R.string.settings_music_buffer_wired)
+        card.addView(label(getString(R.string.settings_music_buffer_next_connection), 14, MUTED))
+        choice(card, title, labels,
+            presets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this, wireless)).coerceAtLeast(0),
+            reconnects = false) {
+            AirPlayPersistence.saveMediaBufferMillis(this, wireless, presets[it])
+            markReconnectNeeded()
+        }
+    }
+
     private fun choice(parent: LinearLayout, title: String, options: List<String>, current: Int, reconnects: Boolean = true,
         announcesReconnect: Boolean = reconnects, enabled: Boolean = true, save: (Int) -> Unit) {
         var selection = current
@@ -3707,7 +3713,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         appearanceRenderPending = true
         appearanceButtonFocusPending = appearanceButtonFocusPending || focusAppearanceButton
         if (!appearanceUpdatesResumed || shouldDeferAppearanceRender(
-                windowKeyLearning = windowLearning != null,
+                windowKeyLearning = WheelMediaLearning.active(this),
                 serviceKeyLearning = WheelKeyService.isLearning(),
             )
         ) return
@@ -3725,7 +3731,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         handler.post {
             if (appearanceRenderPending && appearanceUpdatesResumed &&
                 !shouldDeferAppearanceRender(
-                    windowKeyLearning = windowLearning != null,
+                    windowKeyLearning = WheelMediaLearning.active(this),
                     serviceKeyLearning = WheelKeyService.isLearning(),
                 )
             ) {

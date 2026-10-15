@@ -130,13 +130,11 @@ class CarPlayHostDisplaySizeTest {
     }
 
 
-    @Test fun connectingInANarrowWindowRebuildsWhenTheCameraCloses() {
-        startSession(windowWidth = 700)
-        applySize(1920, 990)
-        assertEquals(size(1920, 990), getField("activeDisplaySize"))
-        assertEquals(1, getField("restartGeneration"))
-        assertTrue(getField("handshakeResetInProgress") as Boolean)
-        assertNull(getField("sessionDisplay"))
+    @Test fun connectingInANarrowWindowKeepsTheSessionWhenTheCameraCloses() {
+        val display = startSession(windowWidth = 960, windowHeight = 720)
+        applySize(1920, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
     }
 
     @Test fun wirelessStartupWidthGrowthKeepsTheControllerAndItsHotspot() {
@@ -151,21 +149,26 @@ class CarPlayHostDisplaySizeTest {
         org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
     }
 
-    @Test fun establishedWirelessSessionStillRenegotiatesWhenTheOriginalWindowGrows() {
-        startSession(windowWidth = 1760, windowHeight = 720)
-        setField("controller", org.mockito.Mockito.mock(CarPlayController::class.java))
+    @Test fun establishedWirelessSessionKeepsItsHotspotAcrossWindowRestoration() {
+        val display = startSession(windowWidth = 1760, windowHeight = 720,
+            canvasWidth = 1920, canvasHeight = 720)
+        val controller = org.mockito.Mockito.mock(CarPlayController::class.java)
+        setField("controller", controller)
         setField("wirelessEnabled", true)
         setField("activeAirPlaySession", org.mockito.Mockito.mock(AirPlaySession::class.java))
         applySize(1920, 720)
-        assertEquals(1, getField("restartGeneration"))
-        assertNull(getField("sessionDisplay"))
+        applySize(1760, 720)
+        applySize(1920, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
     }
 
-    @Test fun connectingInAReducedHeightWindowRebuildsWhenTheCameraCloses() {
-        startSession(windowHeight = 942)
-        applySize(1920, 990)
-        assertEquals(1, getField("restartGeneration"))
-        assertNull(getField("sessionDisplay"))
+    @Test fun connectingInAReducedHeightWindowKeepsTheSessionWhenTheCameraCloses() {
+        val display = startSession(windowHeight = 672)
+        applySize(1920, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
     }
 
     @Test fun aScaledDownCanvasKeepsTheSessionWhenTheOriginalWindowReturns() {
@@ -176,11 +179,12 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(0, getField("restartGeneration"))
     }
 
-    @Test fun aScaledUpCanvasStillRebuildsWhenTheStartupWindowGrows() {
-        startSession(windowWidth = 700, canvasWidth = 1400, canvasHeight = 1980)
-        applySize(1000, 990)
-        assertEquals(1, getField("restartGeneration"))
-        assertNull(getField("sessionDisplay"))
+    @Test fun aScaledUpCanvasKeepsTheSessionWhenTheStartupWindowGrows() {
+        val display = startSession(windowWidth = 960, windowHeight = 720,
+            canvasWidth = 1920, canvasHeight = 720)
+        applySize(1760, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
     }
 
     @Test fun actualScreenRotationStillRebuildsTheSession() {
@@ -198,14 +202,15 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(1, getField("restartGeneration"))
     }
 
-    @Test fun anExplicitBarLayoutChangeStillRebuildsTheSession() {
-        startSession()
-        setField("hideTopBar", false)
-        applySize(1920, 942)
-        assertEquals(1, getField("restartGeneration"))
+    @Test fun barPreferenceChangesWaitForAnExplicitReconnect() {
+        val display = startSession(windowHeight = 720)
+        setField("hideBottomBar", false)
+        applySize(1760, 720)
+        assertSame(display, getField("sessionDisplay"))
+        assertEquals(0, getField("restartGeneration"))
     }
 
-    @Test fun resumingReadsSavedBarsAndRebuildsEvenWhenTheWindowSizeIsUnchanged() {
+    @Test fun resumingReadsSavedBarsWithoutDroppingTheSession() {
         startSession()
         // 测试窗口未挂载，使用主线程队列执行布局后的刷新。
         val video = object : TextureView(activity) {
@@ -221,8 +226,8 @@ class CarPlayHostDisplaySizeTest {
         assertEquals(true, getField("hideTopBar"))
         assertEquals(false, getField("hideBottomBar"))
         assertWindowBars(true, false)
-        assertEquals(1, getField("restartGeneration"))
-        assertTrue(getField("handshakeResetInProgress") as Boolean)
+        assertEquals(0, getField("restartGeneration"))
+        assertFalse(getField("handshakeResetInProgress") as Boolean)
     }
 
     @Test fun resumingWithUnchangedBarsKeepsTheSession() {
@@ -316,7 +321,7 @@ class CarPlayHostDisplaySizeTest {
 
     @Test @Config(sdk = [30]) fun rotatingBackDuringTeardownStartsWithTheLatestSize() {
         allowStartup()
-        startSession(windowWidth = 2250, windowHeight = 1080)
+        startSession(rotation = Surface.ROTATION_90, windowWidth = 2250, windowHeight = 1080)
         applySize(1080, 2250)
         assertTrue(getField("handshakeResetInProgress") as Boolean)
         applySize(2250, 1080)
@@ -330,7 +335,7 @@ class CarPlayHostDisplaySizeTest {
 
     @Test @Config(sdk = [30]) fun teardownWaitsForAPendingRotationToSettle() {
         allowStartup()
-        startSession(windowWidth = 2250, windowHeight = 1080)
+        startSession(rotation = Surface.ROTATION_90, windowWidth = 2250, windowHeight = 1080)
         applySize(1080, 2250)
         scheduleSize(2250, 1080)
 
@@ -345,7 +350,7 @@ class CarPlayHostDisplaySizeTest {
 
     @Test @Config(sdk = [30]) fun cancellingAPendingRotationResumesStartup() {
         allowStartup()
-        startSession(windowWidth = 2250, windowHeight = 1080)
+        startSession(rotation = Surface.ROTATION_90, windowWidth = 2250, windowHeight = 1080)
         applySize(1080, 2250)
         scheduleSize(2250, 1080)
         finishTeardown()
@@ -376,7 +381,7 @@ class CarPlayHostDisplaySizeTest {
 
     @Test @Config(sdk = [30]) fun teardownRechecksStartupPrerequisites() {
         allowStartup()
-        startSession()
+        startSession(rotation = Surface.ROTATION_90)
         applySize(990, 1920)
         setField("microphonePermissionResolved", false)
 
@@ -494,8 +499,8 @@ class CarPlayHostDisplaySizeTest {
             assertSame(display, getField("sessionDisplay"))
             assertEquals(0, getField("restartGeneration"))
             applySize(2000, 990)
-            assertEquals(1, getField("restartGeneration"))
-            assertNull(getField("sessionDisplay"))
+            assertEquals(0, getField("restartGeneration"))
+            assertSame(display, getField("sessionDisplay"))
         } finally {
             controller.close()
             controller.awaitClosed(1000)
@@ -537,8 +542,8 @@ class CarPlayHostDisplaySizeTest {
         assertNotNull("CarPlay must resume after the display settles", display)
         assertEquals(width, display!!.windowWidth)
         assertEquals(height, display.windowHeight)
-        assertEquals(width, display.width)
-        assertEquals(height, display.height)
+        assertEquals(1920, display.width)
+        assertEquals(720, display.height)
     }
 
     private fun size(width: Int, height: Int): Any = sizeClass

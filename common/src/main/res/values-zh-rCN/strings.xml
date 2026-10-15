@@ -401,11 +401,7 @@
     <string name="wheel_key_role_previous">上一项</string>
     <string name="wheel_key_role_next">下一项</string>
     <string name="wheel_key_role_select">确认</string>
-    <string name="wheel_key_role_siri">Siri</string>
     <string name="wheel_key_none">无</string>
-    <string name="wheel_key_in_use">该按键已用于%1$s。请选择其他按键。</string>
-    <string name="wheel_siri_key">方向盘 Siri 按键</string>
-    <string name="wheel_siri_key_description">在 CarPlay 显示于屏幕时，用你选择的方向盘按键打开 Siri。车辆自身保留的按键只能配合方向盘按键服务使用，该服务在 CarPlay 处于后台时也可使用。未连接 CarPlay 或通话时，该按键保留车辆原有功能。</string>
     <string name="wheel_key_role_back">返回</string>
     <string name="wheel_key_service_label">CarPlay 方向盘按键</string>
     <string name="wheel_key_service_description">可选方向盘按键过滤，用于导航播报音量、仪表地图缩放、CarPlay摇杆及通话控制。不读取屏幕内容。</string>
@@ -420,8 +416,8 @@
     <string name="carplay_dock_hint">CarPlay 显示应用、时钟和状态的位置。在“驾驶员一侧”和“底部”之间切换立即生效；“自动”由 iPhone 决定，重新连接后生效。</string>
     <string name="main_buffered_audio">缓冲音乐（实验性）</string>
     <string name="main_buffered_audio_description">支持此功能的应用（如 Apple Music）会提前发送约两分钟的音乐，因此短暂的 Wi-Fi 中断不会被听到。其他应用保持原样。会重新连接 CarPlay。</string>
-    <string name="settings_car_bluetooth_audio">通过车辆蓝牙播放 CarPlay 音频（实验性）</string>
-    <string name="settings_car_bluetooth_audio_description">CarPlay 不向 iPhone 提供 CarPlay 音频，因此音乐、导航和通话应通过 iPhone 与车辆的蓝牙连接传输。请保持 iPhone 与车辆配对，并将车辆音源设为蓝牙。如果声音改从 iPhone 播放，请关闭此选项。会重新连接 CarPlay。</string>
+    <string name="settings_car_bluetooth_audio">音乐和方控走原车蓝牙（实验性）</string>
+    <string name="settings_car_bluetooth_audio_description">请先将 iPhone 连接原车蓝牙音乐，并将车机音源切到蓝牙。音乐和媒体方控交给原车，应用不再转发切歌或申请音乐焦点，保留 CarPlay 画面和触摸。此模式不提供 CarPlay 音频，导航、通话及 Siri 的声音路由也可能改变；无声或声音从手机播放时请改回 CarPlay 方式。</string>
     <string name="call_echo_cancellation">通话回声消除（实验性）</string>
     <string name="call_echo_cancellation_description">尝试减少 CarPlay 通话中发送给对方的扬声器回声。效果取决于车载主机。下次连接 CarPlay 时生效。</string>
     <string name="call_voice_filter">更清晰的通话人声（实验性）</string>
@@ -493,4 +489,9 @@
     <string name="settings_cluster_music_vertical">音乐卡片 · 垂直位置</string>
     <string name="settings_cluster_music_size">音乐卡片 · 大小</string>
     <string name="settings_cluster_music_unknown">未知艺人</string>
+    <string name="settings_fixed_resolution_hint">隐藏导航栏时固定为 1920×720；显示导航栏时固定为 1760×720。CarPlay 分辨率变更在下次连接时生效。</string>
+    <string name="settings_music_buffer_wireless">音乐缓冲（无线）</string>
+    <string name="settings_music_buffer_wired">音乐缓冲（USB 有线）</string>
+    <string name="settings_music_buffer_ms">%1$d 毫秒</string>
+    <string name="settings_music_buffer_next_connection">音乐缓冲变更在下次连接时生效。</string>
 </resources>

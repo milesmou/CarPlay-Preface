@@ -11,6 +11,35 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
 class PrefaceTrackKeyInterceptionTest {
+    @Test fun requestReceiptAndExclusivityAreSeparateAndRetiredCallbacksDoNotConfirmANewRequest() {
+        val input = Input()
+        val wheel = PrefaceTrackKeyInterception(input) {}
+        wheel.update(true)
+        assertTrue(wheel.status().accepted)
+        assertEquals(0L, wheel.status().receivedEvents)
+        assertFalse(wheel.status().exclusiveConfirmed)
+        input.callback(true, 305)
+        assertEquals(1L, wheel.status().receivedEvents)
+        assertFalse(wheel.status().exclusiveConfirmed)
+        val retired = input.callback
+        wheel.close(); wheel.update(true)
+        retired(true, 305)
+        assertEquals(0L, wheel.status().receivedEvents)
+        input.callback(true, 87)
+        assertEquals(1L, wheel.status().receivedEvents)
+        assertTrue(wheel.report().contains("exclusiveHandling=unconfirmed"))
+        wheel.close()
+    }
+
+    @Test fun failedRequestCannotBeReportedAsAcceptedEvenIfReleaseSucceeds() {
+        val input = Input().apply { denied = true }
+        val wheel = PrefaceTrackKeyInterception(input) {}
+        wheel.update(true)
+        assertFalse(wheel.status().accepted)
+        assertFalse(wheel.status().requested)
+        assertTrue(wheel.status().unavailable)
+        assertFalse(wheel.status().exclusiveConfirmed)
+    }
     @Test fun volumePermissionDenialRetriesMediaOnlyAndOldCallbacksCannotAdjustVolume() {
         val callbacks = mutableListOf<(Boolean, Int) -> Unit>()
         val requests = mutableListOf<Boolean>()

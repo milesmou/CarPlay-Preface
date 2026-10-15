@@ -29,10 +29,11 @@ internal data class HotspotSelection(val name: String, val index: Int, val addre
 }
 
 internal fun selectHotspotInterface(snapshot: HotspotNetworkSnapshot, log: (String) -> Unit): HotspotSelection? {
-    if (!snapshot.consistent || snapshot.apEnabled == false) {
+    if (!snapshot.consistent || snapshot.apEnabled == false && snapshot.apInterfaces.isNullOrEmpty()) {
         log("hotspot sample rejected: network_changed=${!snapshot.consistent} apEnabled=${snapshot.apEnabled}")
         return null
     }
+    if (snapshot.apEnabled == false) log("hotspot state reports off; requiring an explicitly owned active AP interface")
     val candidates = snapshot.interfaces.mapNotNull { iface ->
         val owned = snapshot.apInterfaces?.contains(iface.name) == true
         val upstream = snapshot.wifiUpstreams?.contains(iface.name) == true

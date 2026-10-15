@@ -68,6 +68,7 @@ object SettingsBackupCodec {
         "diplay" to Policy.Allow(DIPLAY_KEYS),
         "carplay_picture" to Policy.All,
         "diplay_phone_audio" to Policy.All,
+        "diplay_media_wheel" to Policy.Allow(setOf("PREVIOUS", "NEXT", "SIRI")),
     )
 
     private sealed interface Policy {

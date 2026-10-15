@@ -78,6 +78,29 @@ class CarPlayMediaStartupRegistrationTest {
         assertTrue(CarPlayMediaKeys.report().contains("registered=true sourceOwned=false"))
     }
 
+    @Test fun bluetoothRouteDoesNotClaimMusicFocusSourceOrMediaKeysEvenOnUnexpectedAudio() {
+        initialize(); drain()
+        val phone = mock(CarPlayController::class.java)
+        controller = phone
+        `when`(phone.usesCarBluetoothAudio).thenReturn(true)
+        `when`(phone.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying(title = "Bluetooth track", playing = true))
+        `when`(phone.mediaPlayingSnapshot()).thenReturn(true)
+        CarPlayMediaKeys.attach(app, phone) { true }
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, phone)
+        phone.playbackListener?.invoke(true)
+        drain()
+        assertEquals(0, backend.requests)
+        assertFalse(backend.command(CarPlayMediaButton.NEXT))
+        assertTrue(CarPlayMediaKeys.report().contains("carBluetoothRoute=true"))
+        assertTrue(CarPlayMediaKeys.report().contains("mediaSessionActive=false"))
+        assertTrue(CarPlayMediaKeys.report().contains("focusRequested=false"))
+        assertTrue(CarPlayMediaKeys.report().contains("broadcastRegistered=false"))
+        assertNull(ReflectionHelpers.getField<Any?>(CarPlayMediaKeys, "trackInterception"))
+        assertNull(CarPlayMediaKeys.onWindowMediaKey(android.view.KeyEvent(0, 87)))
+        verify(phone, never()).sendMediaButton(anyInt())
+    }
+
     @Test fun firstConnectionAdoptsTheStartupTokenAndOnlyRealPlaybackClaimsTheSource() {
         initialize(); drain()
         val registered = ReflectionHelpers.getField<PrefaceMediaCenter>(CarPlayMediaKeys, "mediaCenter")
@@ -114,19 +137,106 @@ class CarPlayMediaStartupRegistrationTest {
         assertEquals(1, backend.requests)
     }
 
-    @Test fun disconnectClosesTheAdoptedTokenAndLateSdkCallbacksCannotReachTheNextController() {
+    @Test fun disconnectRetainsTheProcessTokenAndTheNextSessionMustClaimPlaybackAgain() {
         initialize(); drain()
         val first = attach()
         CarPlayBackgroundSession.active = true
         CarPlayMediaKeys.onMediaAudioChanged(true, first); drain()
+        val before = backend.disconnections
         CarPlayMediaKeys.detach(first); drain()
-        assertEquals(1, backend.unregistrations)
+        assertEquals(before + 1, backend.disconnections)
+        assertEquals(0, backend.unregistrations)
         assertFalse(backend.command(CarPlayMediaButton.PAUSE))
         backend.ready(true); drain()
         assertEquals(1, backend.registrations)
-        val next = attach()
+        val next = attach(); drain()
+        assertEquals(1, backend.registrations)
         assertFalse(backend.command(CarPlayMediaButton.NEXT))
         verify(next, never()).sendMediaButton(anyInt())
+        CarPlayMediaKeys.onMediaAudioChanged(true, next); drain()
+        assertTrue(backend.command(CarPlayMediaButton.NEXT))
+        verify(next).sendMediaButton(CarPlayMediaButton.NEXT)
+        assertEquals(2, backend.requests)
+    }
+
+    @Test fun audioStopPausesTheOemRecordEvenBeforeThePhoneUpdatesItsPlayingFlag() {
+        initialize(); drain()
+        val phone = attach()
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, phone); drain()
+        assertTrue(backend.publications.last().playing)
+        val requests = backend.requests
+        CarPlayMediaKeys.onMediaAudioChanged(false, phone); drain()
+        assertFalse(backend.publications.last().playing)
+        assertEquals(requests, backend.requests)
+        assertEquals(0, backend.unregistrations)
+    }
+
+    @Test fun binderKeyReturnsBeforeMainRunsAndCannotCrossAControllerReplacement() {
+        initialize(); drain()
+        val first = attach()
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, first); drain()
+        val accepted = java.util.concurrent.atomic.AtomicReference<Boolean>()
+        val thread = Thread { accepted.set(backend.command(CarPlayMediaButton.NEXT)) }.apply { start() }
+        thread.join(1000)
+        assertFalse("Binder callback must not wait for the paused main looper", thread.isAlive)
+        assertEquals(true, accepted.get())
+        verify(first, never()).sendMediaButton(anyInt())
+        CarPlayMediaKeys.detach(first)
+        val next = attach()
+        CarPlayMediaKeys.onMediaAudioChanged(true, next); drain()
+        verify(first, never()).sendMediaButton(anyInt())
+        verify(next, never()).sendMediaButton(anyInt())
+    }
+
+    @Test fun binderKeysAreAcknowledgedImmediatelyAndDispatchedInOrderOnMain() {
+        initialize(); drain()
+        val phone = attach()
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, phone); drain()
+        val thread = Thread {
+            assertTrue(backend.command(CarPlayMediaButton.NEXT))
+            assertTrue(backend.command(CarPlayMediaButton.PREVIOUS))
+        }.apply { start() }
+        thread.join(1000)
+        assertFalse(thread.isAlive)
+        verify(phone, never()).sendMediaButton(anyInt())
+        drain()
+        val ordered = inOrder(phone)
+        ordered.verify(phone).sendMediaButton(CarPlayMediaButton.NEXT)
+        ordered.verify(phone).sendMediaButton(CarPlayMediaButton.PREVIOUS)
+    }
+
+    @Test fun defaultSdkExecutionUsesMainAndRegistersWithinTheReadyCallbackWithoutHoldingTheKeyMonitor() {
+        val events = mutableListOf<String>()
+        var insideReady = false
+        val direct = object : PrefaceMediaCenter.Backend {
+            override fun init(snapshot: () -> PrefaceMediaCenter.Snapshot, command: (Int) -> Boolean,
+                ready: (Boolean) -> Unit) {
+                assertSame(Looper.getMainLooper(), Looper.myLooper())
+                assertFalse(Thread.holdsLock(CarPlayMediaKeys))
+                events.add("init")
+                insideReady = true
+                ready(true)
+                insideReady = false
+                events.add("init-return")
+            }
+            override fun register(): Any {
+                assertTrue(insideReady)
+                events.add("register")
+                return Any()
+            }
+            override fun requestPlay(token: Any) = false
+            override fun publish(token: Any, info: CarPlayNowPlaying) = true
+            override fun unregister(token: Any) = true
+        }
+        val caller = Thread { CarPlayMediaKeys.initialize(app, backendFactory = { _, _ -> direct }) }
+        caller.start(); caller.join(1000)
+        assertFalse(caller.isAlive)
+        assertTrue(events.isEmpty())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(listOf("init", "register", "init-return"), events)
     }
 
     private fun release() {
@@ -142,6 +252,8 @@ class CarPlayMediaStartupRegistrationTest {
         var registrations = 0
         var requests = 0
         var unregistrations = 0
+        var disconnections = 0
+        val publications = mutableListOf<CarPlayNowPlaying>()
         private val token = Any()
         override fun init(snapshot: () -> PrefaceMediaCenter.Snapshot, command: (Int) -> Boolean,
             ready: (Boolean) -> Unit) {
@@ -150,7 +262,8 @@ class CarPlayMediaStartupRegistrationTest {
         }
         override fun register(): Any { registrations++; return token }
         override fun requestPlay(token: Any): Boolean { requests++; return true }
-        override fun publish(token: Any, info: CarPlayNowPlaying) = true
+        override fun publish(token: Any, info: CarPlayNowPlaying): Boolean { publications.add(info); return true }
+        override fun disconnect() { disconnections++ }
         override fun unregister(token: Any): Boolean { assertSame(this.token, token); unregistrations++; return true }
     }
 }

@@ -15,6 +15,7 @@ class DiPlayApplication : Application() {
         super.onCreate()
         Locale.setDefault(Locale.SIMPLIFIED_CHINESE)
         AppLocale.enforce(this)
+        PhoneBluetoothReceiver.register(this)
         CarPlayMediaKeys.initialize(this)
     }
 

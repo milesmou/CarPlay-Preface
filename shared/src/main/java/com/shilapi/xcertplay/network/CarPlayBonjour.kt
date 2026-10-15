@@ -142,6 +142,7 @@ class CarPlayBonjour(
     private val useInterfaceMdns: Boolean = false,
     private val onEvent: (CarPlayBonjourEvent) -> Unit = {},
     additionalAddresses: List<InetAddress> = emptyList(),
+    private val onCloseDiagnostic: (String) -> Unit = {},
 ) : Closeable {
     // Interface-bound mDNS does not need Android's NSD service, which may be absent on some head units.
     private val nsdManager: NsdManager by lazy {
@@ -317,7 +318,7 @@ class CarPlayBonjour(
                 }
                 worker?.interrupt()
                 worker = null
-                interfaceMdns.forEach { dns -> runCatching { dns.close() } }
+                closeInterfaceRegistries(interfaceMdns.toList())
                 interfaceMdns.clear()
                 publishedFamilies = "none"
                 if (multicastLock.isHeld) multicastLock.release()
@@ -353,8 +354,20 @@ class CarPlayBonjour(
             workerToJoin?.interrupt()
             if (multicastLock.isHeld) multicastLock.release()
         }
-        dnsToClose.forEach { dns -> runCatching { dns.close() } }
+        closeInterfaceRegistries(dnsToClose)
         workerToJoin?.let(::joinWorker)
+    }
+
+    private fun closeInterfaceRegistries(registries: List<JmDNS>) {
+        registries.forEachIndexed { index, dns ->
+            runCatching {
+                InterfaceMdnsShutdown.close(dns) { message ->
+                    runCatching { onCloseDiagnostic("registry=$index $message") }
+                }
+            }.onFailure { error ->
+                runCatching { onCloseDiagnostic("registry=$index finalizerFailure=${error.javaClass.simpleName}") }
+            }
+        }
     }
 
     @Suppress("DEPRECATION")

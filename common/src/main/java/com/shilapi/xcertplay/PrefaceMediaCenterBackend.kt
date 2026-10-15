@@ -24,6 +24,7 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
     private lateinit var client: Any
     private lateinit var registration: Method
     private lateinit var publication: Method
+    private var concreteDisconnect: (() -> Unit)? = null
     private var concreteInfo: ((CarPlayNowPlaying) -> Any)? = null
     private var registrationPath = "not-selected"
     @Volatile private var registrationAttempted = false
@@ -55,6 +56,13 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
         apiType = resolve("com.ecarx.sdk.mediacenter.MediaCenterAPI")
         val callbackType = resolve("com.ecarx.sdk.openapi.ECarXApiClient\$Callback")
         require(callbackType.isInterface)
+        // Linkco obtains the API singleton before constructing any MusicClient/PlaybackInfo.
+        api = apiType.getMethod("get", Context::class.java).invoke(null, context)
+            ?: error("MediaCenterAPI returned null")
+        sdkVersion = runCatching {
+            (apiType.getMethod("getVersionInt").invoke(api) as? Number)?.toInt()?.toString() ?: "unavailable"
+        }
+            .getOrDefault("unavailable")
         // A missing overload may fall back; a real ready/permission/register rejection never does.
         val observedCommand: (Int) -> Boolean = { index ->
             val accepted = command(index)
@@ -74,13 +82,8 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
         }.getOrNull()
         lyricInfoSupported = infoType.methods.any { it.name == "getCurrentLyricSentence" } &&
             infoType.methods.any { it.name == "getLyricContent" }
-        api = apiType.getMethod("get", Context::class.java).invoke(null, context)
-            ?: error("MediaCenterAPI returned null")
-        sdkVersion = runCatching {
-            (apiType.getMethod("getVersionInt").invoke(api) as? Number)?.toInt()?.toString() ?: "unavailable"
-        }
-            .getOrDefault("unavailable")
-        diagnostic("OEM media center init path=$registrationPath sdkVersion=$sdkVersion")
+        diagnostic("OEM media center init path=$registrationPath sdkVersion=$sdkVersion " +
+            "mainThread=${Looper.myLooper() === Looper.getMainLooper()} processRegistration=true")
         val callback = proxy(callbackType) { method, args ->
             if (method.name == "onAPIReady") {
                 val available = args?.firstOrNull() == true
@@ -126,6 +129,7 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
             registration = register
             publication = publish
             concreteInfo = bridge::playbackInfo
+            concreteDisconnect = bridge::disconnect
             registrationPath = "package-music-client"
             return true
         } catch (error: ReflectiveOperationException) {
@@ -186,6 +190,9 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
     }
     override fun requestPlay(token: Any): Boolean {
         val started = SystemClock.elapsedRealtime()
+        // A process-owned record may still say source=-1 from the previous disconnection.
+        // Restore the external-player identity before the SDK queries it during requestPlay.
+        concreteInfo?.invoke(snapshot().info)
         val accepted = call("requestPlay", token) == true
         if (accepted) publishedToken = null
         diagnostic("OEM media diagnostic requestPlay accepted=$accepted elapsedMs=${SystemClock.elapsedRealtime() - started}")
@@ -229,7 +236,17 @@ internal class PrefaceMediaCenterBackend(private val context: Context,
         return true
     }
 
-    override fun unregister(token: Any): Boolean = call("unregister", token) == true
+    override fun disconnect() {
+        concreteDisconnect?.invoke()
+        publishedToken = null
+        publishedInfo = null
+        publishedPosition = null
+    }
+
+    override fun unregister(token: Any): Boolean {
+        disconnect()
+        return call("unregister", token) == true
+    }
     private fun call(name: String, token: Any): Any? = apiType.getMethod(name, Any::class.java).invoke(api, token)
 
     private fun playbackInfo(info: CarPlayNowPlaying): Any = concreteInfo?.invoke(info) ?: proxy(infoType) { method, _ ->

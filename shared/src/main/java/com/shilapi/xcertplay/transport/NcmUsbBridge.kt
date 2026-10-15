@@ -102,7 +102,10 @@ class NcmUsbBridge internal constructor(
         // timeout, and each USBMUX write of the iAP2 handshake finished only when one expired:
         // ~2 s per step on Android 8.1–14 (#634, #335, #301). Until the phone takes its first
         // frame, a frame that cannot go out at once is dropped, as it was after the full timeout.
-        val effectiveTimeout = if (bulkOutAccepted) timeoutMillis else minOf(timeoutMillis, NOT_READY_WRITE_TIMEOUT_MILLIS)
+        // The diagnostic sends only after authentication and the post-claim StartSession.
+        // Give its bounded probe the requested 100 ms rather than the pre-start 20 ms budget.
+        val effectiveTimeout = if (bulkOutAccepted || frameDiagnostics) timeoutMillis
+            else minOf(timeoutMillis, NOT_READY_WRITE_TIMEOUT_MILLIS)
         val started = if (frameDiagnostics) System.nanoTime() else 0L
         val transferred = try {
             connection.bulkTransfer(outEndpoint, block, block.size, effectiveTimeout)

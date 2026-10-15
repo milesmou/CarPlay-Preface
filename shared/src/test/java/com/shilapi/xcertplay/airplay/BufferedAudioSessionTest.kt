@@ -22,6 +22,33 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class BufferedAudioSessionTest {
     @Test
+    fun bluetoothOutputDeclinesLegacyAudioButKeepsTheCarPlayScreen() {
+        for (disabled in listOf(false, true)) {
+            var audioSetups = 0
+            var screenSetups = 0
+            val session = session(disabled = disabled, media = object : AirPlayMediaHandler {
+                override fun onAudio(session: AirPlaySession, type: Int, stream: Map<String, Any?>): Map<String, Any?> {
+                    audioSetups++
+                    return mapOf("type" to type, "dataPort" to 1234)
+                }
+                override fun onScreen(session: AirPlaySession, type: Int, stream: Map<String, Any?>): Int {
+                    screenSetups++
+                    return 1235
+                }
+            })
+            try {
+                val streams = listOf(100, 101, 102, 110).map { mapOf("type" to it) }
+                val response = handle(session, "SETUP", BplistCodec.encode(mapOf("streams" to streams)))
+                val decoded = BplistCodec.decode(response.body) as Map<*, *>
+                val accepted = (decoded["streams"] as List<*>).map { (it as Map<*, *>)["type"] }
+                assertEquals(if (disabled) listOf(110L) else listOf(100L, 101L, 102L, 110L), accepted)
+                assertEquals(if (disabled) 0 else 3, audioSetups)
+                assertEquals(1, screenSetups)
+            } finally { session.close() }
+        }
+    }
+
+    @Test
     fun disabledOutputDeclinesType103BeforeCallingTheMediaHandler() {
         var setups = 0
         val session = session(disabled = true, media = object : AirPlayMediaHandler {

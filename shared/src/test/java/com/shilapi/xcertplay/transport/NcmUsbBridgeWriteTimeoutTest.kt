@@ -98,7 +98,7 @@ class NcmUsbBridgeWriteTimeoutTest {
         val writes = diagnostics.filter { it.startsWith("NCM frame test write ") }
         assertEquals(12, writes.size)
         assertTrue(writes[0].contains("return=-1 outcome=negative_api_result"))
-        assertTrue(writes[0].contains("requestedTimeoutMs=100 effectiveTimeoutMs=20"))
+        assertTrue(writes[0].contains("requestedTimeoutMs=100 effectiveTimeoutMs=100"))
         assertTrue(writes[1].contains("outcome=zero"))
         assertTrue(writes[2].contains("outcome=partial"))
         assertTrue(writes[3].contains("outcome=full"))
@@ -118,6 +118,15 @@ class NcmUsbBridgeWriteTimeoutTest {
         }
         assertTrue(diagnostics.any { it.contains("outcome=exception failureClass=SecurityException") })
         assertFalse(diagnostics.any { it.contains("private USB identity") })
+    }
+
+    @Test fun diagnosticProbesKeepTheirBoundedBudgetEvenWhenFirstWritesFail() {
+        NcmWriteReplay.results.addAll(listOf(-1, -1, NcmWriteReplay.ALL))
+        withBridge { ncm ->
+            ncm.prepareFrameDiagnostics(2)
+            repeat(3) { ncm.sendAccepted(frame, 100) }
+        }
+        assertEquals(listOf(100, 100, 100), NcmWriteReplay.timeouts)
     }
 
     private fun withBridge(block: (NcmUsbBridge) -> Unit): List<String> {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_hotspot_dialog_hint">Match the name, password and security type in the car hotspot settings. Changes apply at the next connection.</string>
-    <string name="settings_manual_hotspot_title">Manual head unit hotspot (recommended)</string>
+    <string name="settings_manual_hotspot_title">Manual head unit hotspot</string>
     <string name="settings_hotspot_password">Hotspot password</string>
     <string name="settings_hotspot_empty_name">Enter the hotspot SSID.</string>
     <string name="settings_hotspot_long_name">The SSID must be at most 32 UTF-8 bytes.</string>

@@ -28,10 +28,10 @@ class PrefaceConcreteMediaCenterTest {
 
     @Before fun reset() { Api.current = Api() }
 
-    private fun backend(apiType: Class<*> = Api::class.java, missingList: Boolean = false) = PrefaceMediaCenterBackend(app, log::add) { name ->
+    private fun backend(apiType: Class<*> = Api::class.java, missingList: Boolean = false, beforeClient: () -> Unit = {}) = PrefaceMediaCenterBackend(app, log::add) { name ->
         when (name.substringAfterLast('.')) {
             "MediaCenterAPI" -> apiType
-            "MusicClient" -> MusicClient::class.java
+            "MusicClient" -> MusicClient::class.java.also { beforeClient() }
             "MusicPlaybackInfo" -> MusicPlaybackInfo::class.java
             "MediaListInfo" -> if (missingList) throw ClassNotFoundException(name) else MediaListInfo::class.java
             "IMusicClient" -> PrefaceMediaCenterBackendTest.Client::class.java
@@ -160,9 +160,62 @@ class PrefaceConcreteMediaCenterTest {
         assertTrue(log.any { it.contains("ready=false path=package-music-client phase=after-registration-attempt") })
     }
 
+    @Test fun apiSingletonIsObtainedBeforeConstructingTheConcreteClient() {
+        val backend = backend(beforeClient = { assertTrue(Api.current.singletonRead) })
+        backend.init({ snapshot }, { true }, {})
+        assertNotNull(backend.register())
+    }
+
+    @Test fun cachedPlaybackRecordReflectsPauseDisconnectAndResumeWithoutChangingIdentity() {
+        val backend = backend()
+        backend.init({ snapshot }, { true }, {})
+        val token = backend.register()!!
+        val client = Api.current.client!!
+        val record = client.musicPlaybackInfo!!
+        backend.requestPlay(token)
+        backend.publish(token, song)
+        assertSame(record, Api.current.info)
+        snapshot = snapshot.copy(info = song.copy(playing = false))
+        assertSame(record, client.musicPlaybackInfo)
+        assertEquals(0, record.playbackStatus)
+        backend.disconnect()
+        assertEquals(-1, record.sourceType)
+        assertEquals(-1, client.currentSourceType)
+        assertEquals(0, record.playbackStatus)
+        assertNull(Api.current.unregistered)
+        snapshot = snapshot.copy(info = song.copy(title = "Next"))
+        backend.requestPlay(token)
+        backend.publish(token, snapshot.info)
+        assertSame(record, client.musicPlaybackInfo)
+        assertEquals("Next", record.title)
+        assertEquals(6, record.sourceType)
+        assertEquals(1, record.playbackStatus)
+        backend.unregister(token)
+        assertEquals(-1, record.sourceType)
+        assertEquals(0, record.playbackStatus)
+    }
+
+    @Test fun referencePlaybackCapabilitiesDoNotAdvertiseUnsupportedCarFunctions() {
+        val backend = backend()
+        backend.init({ snapshot }, { true }, {})
+        backend.register()
+        val info = Api.current.client!!.musicPlaybackInfo!!
+        assertNull(info.appIcon)
+        assertEquals("carplay", info.artwork.toString())
+        assertEquals(info.artwork, info.nextArtwork)
+        assertEquals(info.artwork, info.previousArtwork)
+        assertEquals(0, info.playingMediaListType)
+        assertFalse(info.isCollected)
+        assertFalse(info.isSupportCollect)
+        assertFalse(info.isSupportDownload)
+        assertFalse(info.isSupportLoopModeSwitch)
+        assertFalse(info.isSupportVrCtrlPlayStatus)
+    }
+
     interface Ready { fun onAPIReady(ready: Boolean) }
     class Api {
         var ready = true
+        var singletonRead = false
         var version = 331
         var callback: Ready? = null
         var rejectRegistration = false
@@ -186,7 +239,10 @@ class PrefaceConcreteMediaCenterTest {
         fun registerMusic(client: PrefaceMediaCenterBackendTest.Client): Any {
             interfaceRegistrations++; error("Concrete path must not register the interface")
         }
-        fun requestPlay(token: Any): Boolean { events.add("request"); return true }
+        fun requestPlay(token: Any): Boolean {
+            assertEquals(6, client!!.musicPlaybackInfo!!.sourceType)
+            events.add("request"); return true
+        }
         fun updateMediaList(token: Any, info: MediaListInfo) { events.add("list"); list = info }
         fun updateCurrentSourceType(token: Any, source: Int) { assertEquals(6, source); events.add("source") }
         fun updateMusicPlaybackState(token: Any, info: MusicPlaybackInfo): Boolean {
@@ -195,7 +251,7 @@ class PrefaceConcreteMediaCenterTest {
         fun unregister(token: Any): Boolean { unregistered = token; return true }
         companion object {
             lateinit var current: Api
-            @JvmStatic fun get(context: Context): Api = current
+            @JvmStatic fun get(context: Context): Api = current.also { it.singletonRead = true }
         }
     }
 

@@ -76,12 +76,35 @@ class PrefaceMediaCenterTest {
         assertTrue(api.command(4))
     }
 
-    @Test fun aCallBeforeReadyCancelsTheQueuedStart() {
+    @Test fun sourceLossBeforeReadyCancelsTheQueuedStart() {
         center.start(); drain(); play()
         center.update(song, false); drain()
         api.ready(true); drain()
         center.update(song, true); drain()
         assertEquals(0, api.requests)
+    }
+
+    @Test fun temporaryCommandSuppressionRetainsTheSourceAndResumesWithoutRequestingPlay() {
+        ready(); play()
+        center.update(song, true, commandsAllowed = false)
+        assertTrue(center.status().ownsSource)
+        assertFalse(api.command(4))
+        drain()
+        center.update(song, true, commandsAllowed = true); drain()
+        assertTrue(api.command(4))
+        assertEquals(1, api.requests)
+    }
+
+    @Test fun suppressionBeforeApiReadyDoesNotStartPlaybackAfterThePriorityStateEnds() {
+        center.start(); drain(); play()
+        center.update(song, true, commandsAllowed = false); drain()
+        api.ready(true); drain()
+        center.update(song, true, commandsAllowed = true); drain()
+        assertEquals(0, api.requests)
+        assertFalse(api.command(4))
+        play()
+        assertEquals(1, api.requests)
+        assertTrue(api.command(4))
     }
 
     @Test fun closeRejectsLateCallbacksAndUnregistersExactlyOnce() {
@@ -135,6 +158,32 @@ class PrefaceMediaCenterTest {
         assertFalse(api.command(4))
     }
 
+    @Test fun disconnectKeepsRegistrationButRevokesPlaybackAndReusesItOnlyAfterAnotherRealStart() {
+        ready(); play()
+        center.disconnect()
+        assertFalse(api.command(4))
+        drain()
+        assertEquals(1, api.disconnections)
+        assertEquals(0, api.unregistrations)
+        assertEquals(1, api.registrations)
+        center.update(song, true); drain()
+        assertFalse(api.command(4))
+        play()
+        assertEquals(2, api.requests)
+        assertEquals(1, api.registrations)
+        assertTrue(api.command(4))
+    }
+
+    @Test fun aQueuedDisconnectCannotResetTheReplacementPlaybackRecord() {
+        ready(); play()
+        center.disconnect()
+        center.update(song, true, requestSource = true)
+        drain()
+        assertEquals(0, api.disconnections)
+        assertEquals(2, api.requests)
+        assertTrue(api.command(4))
+    }
+
     private class FakeBackend : PrefaceMediaCenter.Backend {
         lateinit var ready: (Boolean) -> Unit
         lateinit var command: (Int) -> Boolean
@@ -146,12 +195,14 @@ class PrefaceMediaCenterTest {
         var registrations = 0
         var requests = 0
         var unregistrations = 0
+        var disconnections = 0
         val publications = mutableListOf<CarPlayNowPlaying>()
         override fun init(snapshot: () -> PrefaceMediaCenter.Snapshot, command: (Int) -> Boolean,
             ready: (Boolean) -> Unit) { this.command = command; this.ready = ready }
         override fun register(): Any? { registrations++; failure?.let { throw it }; onRegister(); return token }
         override fun requestPlay(token: Any): Boolean { requests++; onRequest(); return acceptPlay }
         override fun publish(token: Any, info: CarPlayNowPlaying): Boolean { publications.add(info); return true }
+        override fun disconnect() { disconnections++ }
         override fun unregister(token: Any): Boolean { unregistrations++; return true }
     }
 }

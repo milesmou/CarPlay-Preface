@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="settings_music_wheel_mode">Music and wheel mode (experimental)</string>
+    <string name="settings_music_wheel_carplay_adaptive">CarPlay · volume follows playback</string>
+    <string name="settings_music_wheel_carplay_system">CarPlay · car volume control</string>
+    <string name="settings_music_wheel_bluetooth">Car Bluetooth · music and wheel controls</string>
+    <string name="settings_music_wheel_adaptive_description">Use CarPlay audio and media keys. When the app can handle volume keys, adjust music volume during playback and navigation volume while paused. Private wheel volume keys still handled by the car remain with the car. Calls and Siri take priority; vehicle validation is pending.</string>
+    <string name="settings_music_wheel_system_description">Use CarPlay audio and media keys. Leave volume control to the car; do not switch between music and navigation volume based on playback.</string>
+    <string name="settings_music_wheel_next_connection">Choose one mode. Changes apply at the next connection and do not interrupt the current session.</string>
     <string name="settings_navigation_wheel_volume">方控按媒体播放状态调节音量（实验性）</string>
     <string name="settings_navigation_wheel_volume_description">默认启用，连接 CarPlay 后生效。应用能接管音量键时，媒体播放调节媒体音量；暂停或未播放调节导航音量，未播报时也可预先调节。音量由车机系统控制，共用音频流时同步变化。原车仍处理的私有方控音量键保留原车调节，避免同时改变两路音量。通话、Siri、原车音源、地图缩放和摇杆优先。星瑞 E02 实车效果待验证。</string>
 </resources>
