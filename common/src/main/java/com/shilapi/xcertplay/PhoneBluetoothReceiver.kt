@@ -19,11 +19,11 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         val source = ACTIONS[intent.action] ?: return
         if (!DiPlayPreferences.connectOnPhoneBluetooth(context)) return
         fun skip(reason: String) { PhoneWakeDiagnostics.observe(context, source, reason) }
-        if (intent.action != BluetoothDevice.ACTION_ACL_CONNECTED &&
+        val disconnected = intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED
+        if (!disconnected && intent.action != BluetoothDevice.ACTION_ACL_CONNECTED &&
             intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1) != BluetoothProfile.STATE_CONNECTED) {
             skip("not-connected"); return
         }
-        if (CarPlayBackgroundSession.hasSession()) { skip("session-present"); return }
         val selected = DiPlayPreferences.phoneAddress(context)
         if (selected == null) { skip("no-selected-phone"); return }
         if (Build.VERSION.SDK_INT >= 31 &&
@@ -41,19 +41,37 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         if (address == null) { skip("address-unavailable"); return }
         if (!address.equals(selected, ignoreCase = true)) { skip("other-phone"); return }
 
+        val prefs = context.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE)
+        if (disconnected) {
+            prefs.edit().remove("last_launch_elapsed").apply()
+            skip("disconnected"); return
+        }
+
+        // A retained failed controller is not a connected CarPlay session. Let its owner resume
+        // bounded recovery without replacing USB, a live session, or the hotspot reservation.
+        CarPlayBackgroundSession.phoneBluetoothConnected(address)?.let { outcome ->
+            skip(outcome)
+            PhoneWakeDiagnostics.record(context, outcome)
+            return
+        }
+
         // The car can send several ACL events during one wake-up. Commit before launching so
         // another receiver instance cannot open a second connection from the same event burst.
-        val prefs = context.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE)
         val now = SystemClock.elapsedRealtime()
         val previous = prefs.getLong("last_launch_elapsed", 0)
-        if (prefs.contains("last_launch_elapsed") && now >= previous && now - previous < 15_000) {
+        val boot = android.provider.Settings.Global.getInt(context.contentResolver, "boot_count", -1)
+        if (prefs.getString("phone", null).equals(address, ignoreCase = true) &&
+            prefs.getInt("boot", -2) == boot && prefs.contains("last_launch_elapsed") &&
+            now >= previous && now - previous < 15_000) {
             skip("debounced"); return
         }
-        prefs.edit().putLong("last_launch_elapsed", now).commit()
+        prefs.edit().putLong("last_launch_elapsed", now).putString("phone", address).putInt("boot", boot).commit()
         PhoneWakeDiagnostics.observe(context, source, "matched")
         PhoneWakeDiagnostics.record(context, "matched")
         val launch = Intent(context, DiPlayActivity::class.java).apply {
             putExtra(EXTRA_AUTO_CONNECT, true)
+            putExtra(EXTRA_PHONE_ADDRESS, address)
+            putExtra(EXTRA_WAKE_ELAPSED, now)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         runCatching { context.startActivity(launch) }
@@ -68,8 +86,11 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
 
     companion object {
         const val EXTRA_AUTO_CONNECT = "com.shihab.diplay.AUTO_CONNECT_SELECTED_PHONE"
+        internal const val EXTRA_PHONE_ADDRESS = "com.shihab.diplay.AUTO_CONNECT_PHONE_ADDRESS"
+        internal const val EXTRA_WAKE_ELAPSED = "com.shihab.diplay.AUTO_CONNECT_WAKE_ELAPSED"
         internal val ACTIONS = mapOf(
             BluetoothDevice.ACTION_ACL_CONNECTED to "acl",
+            BluetoothDevice.ACTION_ACL_DISCONNECTED to "acl-disconnected",
             "android.bluetooth.a2dp-sink.profile.action.CONNECTION_STATE_CHANGED" to "a2dp-sink",
             "android.bluetooth.avrcp-controller.profile.action.CONNECTION_STATE_CHANGED" to "avrcp-controller",
             "android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED" to "headset-client")

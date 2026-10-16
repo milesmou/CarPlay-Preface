@@ -28,6 +28,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
                 <action android:name="android.bluetooth.a2dp-sink.profile.action.CONNECTION_STATE_CHANGED" />
                 <action android:name="android.bluetooth.avrcp-controller.profile.action.CONNECTION_STATE_CHANGED" />
                 <action android:name="android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED" />

@@ -1,5 +1,18 @@
 {
   "schemaVersion": 1,
+  "bluetoothAutoReconnect20261016": {
+    "scope": "Application state-machine changes only; not new firmware capability evidence",
+    "documentation": "docs/BLUETOOTH_AUTO_RECONNECT_2026-10-16.md",
+    "phoneSelection": "saved wireless phone_address; explicit user selection takes precedence",
+    "retainedFailedController": "matching Bluetooth connection resumes bounded recoverable startup through its owner",
+    "activeUsbAndAirPlayProtected": true,
+    "validTemporaryHotspotRetained": true,
+    "wakeRequestRevalidatedAtExecution": true,
+    "staleRetryCallbacksInvalidated": true,
+    "targetedTestsPassed": 94,
+    "vehicleVerified": false,
+    "apkBuilt": false
+  },
   "wheelDesignFixes20261015": {
     "scope": "Application fixes for all six reviewed issues; not firmware capability or vehicle proof",
     "documentation": "docs/WHEEL_DESIGN_FIXES_2026-10-15.md",
@@ -429,7 +442,10 @@
       "physicalKey": 298,
       "adapterKey": 200231,
       "orderedBroadcast": "ecarx.intent.action.ECARX_KEY_RVOICEASSIST_EVENT",
-      "applicationAction": "request Siri once on release; ordered broadcast fallback consumed only on accepted request"
+      "broadcastActionSemantics": "0=short click, 1=long click; reference E02 long-press implementation calls short-click broadcast too; not DOWN/UP",
+      "applicationAction": "request Siri on release or accepted ordered broadcast; retain handled state for observed held presses until release to avoid duplicate long-press requests",
+      "echoFixDocumentation": "docs/WHEEL_ECHO_FIXES_2026-10-16.md",
+      "voiceActionSourceSha256": "d060a3daef9ebc319bf03a33f62380602122f023b1aaf8649e31a8d8e93a62b6"
     },
     "volume": { "physicalKeys": [301, 302], "applicationAction": "Private observer volume writes withdrawn after build 57: preserve vehicle handling; consumable standard keys choose system media/navigation stream by iPhone playing state, including idle guidance preadjustment; shared routes share system volume", "thirdPartyVolumeInterception": "exclusive_handling_not_established", "hicarVolumeInterception": "not_requested_in_reference_sdk" },
     "hotwordObserver": "SDK implementation empty; not ported",

@@ -132,6 +132,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var reconnectAttempts = 0
     private val startupRetryBudget = WirelessStartupRetryBudget()
     private var startupRetryStopped = false
+    private var bluetoothRecoveryAllowed = false
     private var startupRetryButton: View? = null
     private var startupFailureGeneration = -1
     private lateinit var airPlayIdentity: AirPlayIdentity
@@ -443,6 +444,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var startAfterHandshakeReset = false
     private var restartGeneration = 0
     private var reconnectScheduled = false
+    private var reconnectTicket = 0L
     private var sessionLog: SessionLogFile? = null
     private var gestureFingerCount = 3
     private var settingsGestureHint: TextView? = null
@@ -3078,6 +3080,13 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeAirPlaySession = session
                     CarPlayBackgroundSession.active = true
+                    // A late successful handshake supersedes pending recovery, including a stopped
+                    // startup budget. Keep the budget until stable video, but allow future loss recovery.
+                    ++reconnectTicket
+                    reconnectScheduled = false
+                    startupRetryStopped = false
+                    bluetoothRecoveryAllowed = false
+                    startupRetryButton?.visibility = View.GONE
                     showConnectionHelp(null)
                     reconnectAttempts = 0
                     logThemeState(ThemeModeDiagnostics.Source.SESSION_ACTIVE, resources.configuration)
@@ -3165,6 +3174,10 @@ class CarPlayHostActivity : ComponentActivity() {
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = report@{ status ->
         if (controllerGeneration != restartGeneration) return@report
+        if (status is CarPlayStatus.Failed && !startupRetryStopped) {
+            bluetoothRecoveryAllowed = status.retryable && !status.wifiResetRequired &&
+                status.startupFailure?.retryable != false
+        }
         if (status == CarPlayStatus.TestingUsbNcm) {
             // Detaching the failed listener may still deliver a queued transport-error callback.
             // It must not replace this diagnostic run with another complete USB attempt.
@@ -3604,6 +3617,8 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         reconnectScheduled = true
+        val ticket = ++reconnectTicket
+        val sessionAtSchedule = activeAirPlaySession
         val generation = restartGeneration
         val delayMillis = if (startupDelay != null) {
             startupDelay
@@ -3616,6 +3631,7 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog("$reason; retrying in ${delayMillis}ms generation=$generation startupFailure=$startupFailure startupRetries=${startupRetryBudget.retries}")
         mainHandler.postDelayed(
             {
+                if (ticket != reconnectTicket || generation != restartGeneration) return@postDelayed
                 reconnectScheduled = false
                 if (menuOpen && generation == restartGeneration) recoveryPendingAfterMenu = true
                 if (
@@ -3626,15 +3642,33 @@ class CarPlayHostActivity : ComponentActivity() {
                 ) {
                     return@postDelayed
                 }
-                if ((retainedStartup || startupFailure != null) && activeAirPlaySession != null) return@postDelayed
+                if (activeAirPlaySession != null &&
+                    (retainedStartup || startupFailure != null || activeAirPlaySession !== sessionAtSchedule)) return@postDelayed
                 retryStartupOrRestart("Reconnecting after $reason")
             },
             delayMillis,
         )
     }
 
+    /** A connected Bluetooth profile may arrive after the initial wireless retry budget ran out. */
+    internal fun onPhoneBluetoothConnected(address: String): String {
+        if (!CarPlayBackgroundSession.isOwner(this) || shuttingDown.get()) return "session-stopping"
+        if (controller?.matchesWirelessPhone(address) != true) return "session-other-transport-or-phone"
+        if (activeAirPlaySession != null || CarPlayBackgroundSession.active) return "session-active"
+        if (menuOpen || handshakeResetInProgress) return "session-busy"
+        if (!startupRetryStopped) return "connection-in-progress"
+        if (!bluetoothRecoveryAllowed) return "requires-user-action"
+        startupRetryBudget.manualRetry()
+        startupRetryStopped = false
+        reconnectAttempts = 0
+        retryStartupOrRestart("Selected iPhone Bluetooth connected; resuming wireless startup")
+        return "wireless-retry-resumed"
+    }
+
     private fun retryStartupOrRestart(reason: String) {
         if (!CarPlayBackgroundSession.isOwner(this) || shuttingDown.get() || menuOpen || handshakeResetInProgress) return
+        ++reconnectTicket
+        reconnectScheduled = false
         if (controller?.retryWirelessStartup() == true) {
             startupFailureGeneration = -1
             startupRetryButton?.visibility = View.GONE
@@ -3648,6 +3682,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress) return
         val size = activeDisplaySize ?: return
+        ++reconnectTicket
+        reconnectScheduled = false
         startupRetryBudget.disconnected()
         startupRetryButton?.visibility = View.GONE
         appendLog(reason)
@@ -4329,6 +4365,15 @@ internal object CarPlayBackgroundSession {
     private var owner: Any? = null
     @Synchronized fun isOwner(candidate: Any): Boolean = owner === candidate
     @Synchronized fun hasSession(): Boolean = stopAction != null || stopping
+    /** Receiver and activity callbacks run on the main thread; never replace the current owner. */
+    fun phoneBluetoothConnected(address: String): String? {
+        val current = synchronized(this) {
+            if (stopping) return "session-stopping"
+            if (stopAction == null) return null
+            owner as? CarPlayHostActivity
+        }
+        return current?.onPhoneBluetoothConnected(address) ?: "session-present"
+    }
     private val stopWaiters = mutableListOf<() -> Unit>()
 
     fun stop(completion: () -> Unit = {}) {

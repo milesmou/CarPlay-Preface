@@ -441,6 +441,9 @@ class CarPlayController(
     /** The actual immutable connection mode, independent of preferences saved for a future attempt. */
     fun connectionTransport(): CarPlayTransport = config.transport
 
+    fun matchesWirelessPhone(address: String): Boolean = config.transport == CarPlayTransport.WIRELESS &&
+        config.wirelessBluetoothDeviceAddress?.equals(address, ignoreCase = true) == true
+
     /** Nonblocking identity for wheel controls: only an unclosed phone with an accepted primary stream. */
     fun activeAirPlaySessionToken(): Any? {
         if (closed) return null

@@ -150,6 +150,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var pendingWireless = false
     private var initialLaunch = true
     private var notificationTransport = true
+    private var bluetoothAutoConnectPhone: String? = null
+    private var notificationBluetoothPhone: String? = null
     private var exportInProgress = false
     internal var selectedMtkDecoderName: (String) -> String? = MtkDecoderTuning::selectedDecoderName
     private var navigationStreamType = com.shilapi.xcertplay.network.PrefaceE02HeadUnit.NAVIGATION_STREAM
@@ -209,7 +211,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (CarHotspotTethering.permitted(this)) enableManualCarHotspot()
     }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        connect(notificationTransport)
+        val phone = notificationBluetoothPhone
+        notificationBluetoothPhone = null
+        if (phone != null) connectFromBluetooth(phone) else connect(notificationTransport)
     }
     private val tick = object : Runnable {
         override fun run() { refreshStatus(); refreshWheelTakeoverStatus(); handler.postDelayed(this, 1000) }
@@ -305,6 +309,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.setup_error_auth)
         }
         pendingCarHotspotSetup = savedInstanceState?.getBoolean("pending_car_hotspot") ?: false
+        bluetoothAutoConnectPhone = savedInstanceState?.getString("bluetooth_auto_connect_phone")
+        notificationBluetoothPhone = savedInstanceState?.getString("notification_bluetooth_phone")
+        notificationTransport = savedInstanceState?.getBoolean("notification_transport") ?: true
+        if (notificationBluetoothPhone != null) initialLaunch = false
         settingsCategory = savedInstanceState?.getString("settings_category")
             ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
             ?: SettingsCategory.CONNECTION
@@ -315,12 +323,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             ?.takeIf { it in setOf("home", "settings", "backup", "wireless-recovery") } ?: "home"
         render()
         handleWirelessRecovery()
-        if (consumeBluetoothAutoConnectIntent(intent)) {
+        if (consumeBluetoothAutoConnectIntent(intent) ||
+            (savedInstanceState != null && bluetoothAutoConnectPhone != null && notificationBluetoothPhone == null)) {
             if (initialLaunch) {
                 initialLaunch = false
                 startCarHotspotOnLaunch()
             }
-            handler.post { connect(true) }
+            val phone = bluetoothAutoConnectPhone!!
+            handler.post { connectFromBluetooth(phone) }
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -345,15 +355,42 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 initialLaunch = false
                 startCarHotspotOnLaunch()
             }
-            handler.post { connect(true) }
+            val phone = bluetoothAutoConnectPhone!!
+            handler.post { connectFromBluetooth(phone) }
         }
     }
     private fun consumeBluetoothAutoConnectIntent(intent: Intent): Boolean {
         val requested = intent.getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false)
         intent.removeExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT)
-        return requested && DiPlayPreferences.connectOnPhoneBluetooth(this) &&
-            DiPlayPreferences.phoneAddress(this) != null && setupError == null &&
-            !CarPlayBackgroundSession.hasSession()
+        if (!requested) return false
+        val phone = intent.getStringExtra(PhoneBluetoothReceiver.EXTRA_PHONE_ADDRESS)
+        val age = android.os.SystemClock.elapsedRealtime() -
+            intent.getLongExtra(PhoneBluetoothReceiver.EXTRA_WAKE_ELAPSED, Long.MIN_VALUE)
+        val accepted = phone != null && age in 0..60_000 &&
+            DiPlayPreferences.connectOnPhoneBluetooth(this) &&
+            phone.equals(DiPlayPreferences.phoneAddress(this), ignoreCase = true) && setupError == null
+        bluetoothAutoConnectPhone = if (accepted) phone else null
+        // A rejected Bluetooth request must not fall through to the unrelated connect-on-open path.
+        if (!accepted) initialLaunch = false
+        PhoneWakeDiagnostics.record(this, if (accepted) "activity-received" else "activity-request-rejected")
+        return accepted
+    }
+
+    private fun connectFromBluetooth(phone: String) {
+        if (isFinishing || isDestroyed || !phone.equals(bluetoothAutoConnectPhone, ignoreCase = true) ||
+            !DiPlayPreferences.connectOnPhoneBluetooth(this) ||
+            !phone.equals(DiPlayPreferences.phoneAddress(this), ignoreCase = true)) {
+            if (phone.equals(bluetoothAutoConnectPhone, ignoreCase = true)) bluetoothAutoConnectPhone = null
+            PhoneWakeDiagnostics.record(this, "activity-request-cancelled")
+            return
+        }
+        CarPlayBackgroundSession.phoneBluetoothConnected(phone)?.let { outcome ->
+            bluetoothAutoConnectPhone = null
+            PhoneWakeDiagnostics.record(this, outcome)
+            return
+        }
+        PhoneWakeDiagnostics.record(this, "wireless-start-requested")
+        connect(true, fromBluetooth = true)
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
@@ -361,6 +398,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         outState.putString("settings_category", settingsCategory.name)
         connectionSettingsReturnCategory?.let { outState.putString("connection_settings_return_category", it.name) }
         outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup)
+        outState.putString("bluetooth_auto_connect_phone", bluetoothAutoConnectPhone)
+        outState.putString("notification_bluetooth_phone", notificationBluetoothPhone)
+        outState.putBoolean("notification_transport", notificationTransport)
         super.onSaveInstanceState(outState)
     }
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -2926,7 +2966,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         parent.addView(space(12))
     }
 
-    private fun connect(wireless: Boolean) {
+    private fun connect(wireless: Boolean) = connect(wireless, fromBluetooth = false)
+
+    private fun connect(wireless: Boolean, fromBluetooth: Boolean) {
+        if (!fromBluetooth) bluetoothAutoConnectPhone = null
         startupHotspotCancelled = true
         if (wireless && pendingCarHotspotSetup) { page = "settings"; settingsCategory = SettingsCategory.CONNECTION; render(); return }
         if (setupError != null) { toast(setupError!!); return }
@@ -2948,10 +2991,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED && !preferences.getBoolean("notification_asked", false)) {
             preferences.edit().putBoolean("notification_asked", true).apply()
             notificationTransport = wireless
+            notificationBluetoothPhone = if (fromBluetooth) bluetoothAutoConnectPhone else null
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
         val open = {
+            bluetoothAutoConnectPhone = null
             AirPlayPersistence.saveWirelessEnabled(this, wireless)
             openProjection()
         }

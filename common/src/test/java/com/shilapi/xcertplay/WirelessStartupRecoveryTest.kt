@@ -43,6 +43,7 @@ class WirelessStartupRecoveryTest {
 
     @After fun cleanup() {
         ReflectionHelpers.getField<Handler>(activity, "mainHandler").removeCallbacksAndMessages(null)
+        ReflectionHelpers.getField<java.util.concurrent.ExecutorService>(activity, "airPlayCommandExecutor").shutdownNow()
         CarPlayBackgroundSession.clear()
     }
 
@@ -187,5 +188,98 @@ class WirelessStartupRecoveryTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2))
         verify(controller, never()).retryWirelessStartup()
         verify(controller, never()).close()
+    }
+
+    private fun stoppedWirelessController(): CarPlayController {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.matchesWirelessPhone("phone")).thenReturn(true)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        `when`(controller.retryWirelessStartup()).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        repeat(6) {
+            ReflectionHelpers.setField(activity, "reconnectScheduled", false)
+            report(status = CarPlayStatus.Failed("control channel closed"))
+        }
+        assertTrue(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        return controller
+    }
+
+    @Test fun bluetoothAfterExhaustionResumesSameHotspotOnceAndInvalidatesOldTimers() {
+        val controller = stoppedWirelessController()
+        assertEquals("wireless-retry-resumed", activity.onPhoneBluetoothConnected("phone"))
+        assertEquals("connection-in-progress", activity.onPhoneBluetoothConnected("phone"))
+        assertEquals(0, budget().retries)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(40))
+        verify(controller, times(1)).retryWirelessStartup()
+        verify(controller, never()).close()
+    }
+
+    @Test fun bluetoothCannotReplaceOtherPhoneUsbLiveSessionOrSettings() {
+        val controller = stoppedWirelessController()
+        assertEquals("session-other-transport-or-phone", activity.onPhoneBluetoothConnected("other"))
+        ReflectionHelpers.setField(activity, "activeAirPlaySession", mock(AirPlaySession::class.java))
+        assertEquals("session-active", activity.onPhoneBluetoothConnected("phone"))
+        ReflectionHelpers.setField(activity, "activeAirPlaySession", null)
+        ReflectionHelpers.setField(activity, "menuOpen", true)
+        assertEquals("session-busy", activity.onPhoneBluetoothConnected("phone"))
+        verify(controller, never()).retryWirelessStartup()
+    }
+
+    @Test fun bluetoothCannotRestartPermissionOrConfigurationFailure() {
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.matchesWirelessPhone("phone")).thenReturn(true)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        report(status = CarPlayStatus.Failed("Configuration missing",
+            startupFailure = WirelessStartupFailure.HOTSPOT_CONFIGURATION))
+        assertEquals("requires-user-action", activity.onPhoneBluetoothConnected("phone"))
+        verify(controller, never()).retryWirelessStartup()
+        verify(controller, never()).close()
+    }
+
+    @Test fun genericRetryDoesNotCloseASessionThatConnectedDuringItsDelay() {
+        val controller = mock(CarPlayController::class.java)
+        ReflectionHelpers.setField(activity, "controller", controller)
+        report(status = CarPlayStatus.Failed("Bluetooth not ready"))
+        ReflectionHelpers.setField(activity, "activeAirPlaySession", mock(AirPlaySession::class.java))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(40))
+        verify(controller, never()).close()
+        verify(controller, never()).retryWirelessStartup()
+    }
+
+    @Test fun receiverRoutesToRetainedOwnerWithoutOpeningAnotherActivity() {
+        val controller = stoppedWirelessController()
+        val address = "12:34:56:78:9A:BC"
+        `when`(controller.matchesWirelessPhone(address)).thenReturn(true)
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        DiPlayPreferences.savePhone(app, address, "iPhone")
+        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        val stop: ((() -> Unit) -> Unit) = { fail("Must not stop existing owner") }
+        ReflectionHelpers.setField(CarPlayBackgroundSession, "stopAction", stop)
+        val context = object : android.content.ContextWrapper(app) {
+            override fun startActivity(intent: android.content.Intent) { fail("Must not launch another activity") }
+        }
+        val device = android.bluetooth.BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address)
+        val event = android.content.Intent(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED)
+            .putExtra(android.bluetooth.BluetoothDevice.EXTRA_DEVICE, device)
+        PhoneBluetoothReceiver().onReceive(context, event)
+        PhoneBluetoothReceiver().onReceive(context, event)
+        verify(controller, times(1)).retryWirelessStartup()
+        verify(controller, never()).close()
+    }
+
+    @Test fun lateSuccessfulHandshakeClearsStoppedStateAndOldRetries() {
+        val controller = stoppedWirelessController()
+        val listener = ReflectionHelpers.callInstanceMethod<com.shilapi.xcertplay.airplay.AirPlaySessionListener>(
+            activity, "createSessionListener", from(Int::class.javaPrimitiveType, 0))
+        listener.onSessionActive(mock(AirPlaySession::class.java))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(40))
+        assertFalse(ReflectionHelpers.getField(activity, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(activity, "reconnectScheduled"))
+        assertTrue(CarPlayBackgroundSession.active)
+        assertEquals(View.GONE, retry.visibility)
+        // Successful authentication alone must not reset the stable-video retry budget.
+        assertEquals(5, budget().retries)
+        verify(controller, never()).close()
+        verify(controller, never()).retryWirelessStartup()
     }
 }

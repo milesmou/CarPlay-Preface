@@ -65,6 +65,9 @@ internal object CarPlayMediaKeys {
     private var mediaAudioActive = false
     private var adaptiveVolumeForSession = true
     private val learnedHeld = mutableSetOf<Pair<String, Int>>()
+    // A long-click broadcast can precede physical UP by seconds. Retain its acceptance
+    // until each observed press is released, independently of the short echo window.
+    private val siriHandledPresses = mutableSetOf<Pair<String, Int>>()
     private var mediaAudioOwner: Any? = null
     private var nowPlaying = CarPlayNowPlaying()
     private var elapsedUpdatedAt = 0L
@@ -135,6 +138,7 @@ internal object CarPlayMediaKeys {
         if (controller !== next) {
             releaseLocked(keepStartupRegistration = true)
             learnedHeld.clear()
+            siriHandledPresses.clear()
             adaptiveVolumeForSession = NavigationWheelSettings.enabled(context)
             artworkOwner = artworkQueue.newSession()
             mediaAudioOwner = mediaOwner
@@ -384,6 +388,7 @@ internal object CarPlayMediaKeys {
         mediaAudioOwner = null
         callback = null
         learnedHeld.clear()
+        siriHandledPresses.clear()
         wheelMediaEchoes.clear()
         mainHandler.removeCallbacks(trackOwnershipCheck)
         trackInterception?.close()
@@ -464,8 +469,8 @@ internal object CarPlayMediaKeys {
             source == "preface-intercept" -> PrefaceMediaKeyEchoes.Source.INPUT
             source == "preface-wheel" -> PrefaceMediaKeyEchoes.Source.ANDROID_KEY
             source == "preface-media-center" -> PrefaceMediaKeyEchoes.Source.MEDIA_CENTER
-            (index == CarPlayMediaButton.NEXT || index == CarPlayMediaButton.PREVIOUS) &&
-                (source.startsWith("next caller=") || source.startsWith("previous caller=")) ->
+            source.startsWith("next caller=") || source.startsWith("previous caller=") ||
+                source.startsWith("play caller=") || source.startsWith("pause caller=") ->
                 PrefaceMediaKeyEchoes.Source.SESSION_CONTROL
             else -> null
         }
@@ -533,6 +538,7 @@ internal object CarPlayMediaKeys {
         mainHandler.post {
             synchronized(this) {
                 learnedHeld.clear()
+                siriHandledPresses.clear()
                 wheelMediaEchoes.clear()
                 trackInterception?.close()
                 refreshTrackOwnership()
@@ -547,13 +553,14 @@ internal object CarPlayMediaKeys {
         if (!WheelMediaBindings.known(context, code)) return null
         val press = source to WheelMediaBindings.canonical(code)
         val released = if (!down) learnedHeld.remove(press) else false
+        val siriAlreadyHandled = if (!down) siriHandledPresses.remove(press) else false
         val action = WheelMediaBindings.resolve(context, code) ?: return false
         if (!(if (action == WheelMediaBindings.Action.SIRI) siriKeyEligible() else mediaCommandsEligible()))
             return if (released) true else false
         if (WheelKeyService.mediaKeyReserved(code)) return true
         if (action == WheelMediaBindings.Action.SIRI) {
             if (down && first) learnedHeld.add(press)
-            if (!down && released) requestPrefaceSiri()
+            if (!down && released && !siriAlreadyHandled) requestSiriForPress(press.second)
             return true
         }
         if (!down || !first) return true
@@ -577,7 +584,10 @@ internal object CarPlayMediaKeys {
             PrefaceInputInterceptionBackend(deliver = { task -> mainHandler.post { task() } }, diagnostic = ::reportDiagnostic,
                 additionalKeys = { WheelMediaBindings.requestedCodes(context) }),
             diagnostic = ::reportDiagnostic,
-            releaseKeys = { learnedHeld.removeAll { it.first == "preface-intercept" } },
+            releaseKeys = {
+                learnedHeld.removeAll { it.first == "preface-intercept" }
+                siriHandledPresses.removeAll { it.first == "preface-intercept" }
+            },
             handleKey = { down, key -> handleLearnedMediaKey(down, key, "preface-intercept") != null },
             siri = { requestPrefaceSiri() },
         ) { index ->
@@ -588,7 +598,8 @@ internal object CarPlayMediaKeys {
         if (prefaceVoiceReceiver == null) {
             val voiceReceiver = PrefaceVoiceButtonReceiver {
                 if (WheelMediaLearning.offer(true, 298)) false
-                else if (WheelMediaBindings.resolve(context, 298) == WheelMediaBindings.Action.SIRI) requestPrefaceSiri()
+                else if (WheelMediaBindings.resolve(context, 298) == WheelMediaBindings.Action.SIRI)
+                    requestSiriForPress(WheelMediaBindings.canonical(298))
                 else false
             }
             runCatching {
@@ -675,6 +686,14 @@ internal object CarPlayMediaKeys {
             !WheelKeyService.volumeKeysReserved() &&
             !com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive &&
             (lastPrefaceSiriRequest?.let { SystemClock.uptimeMillis() - it < 1500L } != true)
+
+    private fun requestSiriForPress(code: Int): Boolean {
+        if (!siriKeyEligible()) return false
+        if (siriHandledPresses.any { it.second == code }) return true
+        if (!requestPrefaceSiri()) return false
+        siriHandledPresses.addAll(learnedHeld.filter { it.second == code })
+        return true
+    }
 
     private fun requestPrefaceSiri(): Boolean {
         val context = appContext ?: return false

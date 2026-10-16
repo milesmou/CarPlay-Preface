@@ -250,6 +250,100 @@ class WheelCommandRoutingTest {
         verify(controller).sendMediaButton(CarPlayMediaButton.NEXT)
     }
 
+    private fun voiceBroadcast(action: Int = 0) {
+        val receiver: PrefaceVoiceButtonReceiver = ReflectionHelpers.getField(CarPlayMediaKeys, "prefaceVoiceReceiver")
+        receiver.onReceive(app, android.content.Intent(PrefaceVoiceButtonReceiver.ACTION)
+            .putExtra(PrefaceVoiceButtonReceiver.KEY_TYPE, 200231)
+            .putExtra(PrefaceVoiceButtonReceiver.KEY_ACTION, action))
+    }
+
+    @Test fun longVoiceBroadcastAndDelayedReleasesInvokeSiriOncePerPress() {
+        repeat(2) {
+            CarPlayMediaKeys.handleLearnedMediaKey(true, 298, "preface-intercept")
+            CarPlayMediaKeys.onWindowMediaKey(key(231, true))
+            advance(1000)
+            // Reference E02 firmware uses short-click action 0 for its long-press callback too.
+            voiceBroadcast()
+            advance(2000)
+            voiceBroadcast(1)
+            CarPlayMediaKeys.handleLearnedMediaKey(false, 298, "preface-intercept")
+            advance(600)
+            CarPlayMediaKeys.onWindowMediaKey(key(231, false))
+            eventTime += 100
+        }
+        verify(controller, times(2)).requestSiri()
+    }
+
+    @Test fun releaseBeforeVoiceBroadcastAndBroadcastOnlyFallbackStillWork() {
+        CarPlayMediaKeys.handleLearnedMediaKey(true, 298, "preface-intercept")
+        CarPlayMediaKeys.handleLearnedMediaKey(false, 298, "preface-intercept")
+        voiceBroadcast()
+        verify(controller).requestSiri()
+        advance(600)
+        voiceBroadcast()
+        verify(controller, times(2)).requestSiri()
+    }
+
+    @Test fun rejectedVoiceBroadcastDoesNotConsumeLaterPhysicalRelease() {
+        CarPlayMediaKeys.handleLearnedMediaKey(true, 298, "preface-intercept")
+        `when`(controller.requestSiri()).thenReturn(false)
+        voiceBroadcast()
+        advance(600)
+        `when`(controller.requestSiri()).thenReturn(true)
+        CarPlayMediaKeys.handleLearnedMediaKey(false, 298, "preface-intercept")
+        verify(controller, times(2)).requestSiri()
+    }
+
+    @Test fun handledVoicePressCannotAcknowledgeBroadcastDuringCallOrLeakPastRelease() {
+        CarPlayMediaKeys.handleLearnedMediaKey(true, 298, "preface-intercept")
+        voiceBroadcast()
+        advance(600)
+        app.getSystemService(AudioManager::class.java).mode = AudioManager.MODE_IN_COMMUNICATION
+        voiceBroadcast()
+        CarPlayMediaKeys.handleLearnedMediaKey(false, 298, "preface-intercept")
+        verify(controller).requestSiri()
+        app.getSystemService(AudioManager::class.java).mode = AudioManager.MODE_NORMAL
+        CarPlayMediaKeys.handleLearnedMediaKey(true, 298, "preface-intercept")
+        CarPlayMediaKeys.handleLearnedMediaKey(false, 298, "preface-intercept")
+        verify(controller, times(2)).requestSiri()
+    }
+
+    @Test fun sessionPlayPauseAndRawToggleSendOnceInEitherOrder() {
+        for (play in listOf(false, true)) for (sessionFirst in listOf(false, true)) {
+            advance(800)
+            clearInvocations(controller)
+            eventTime += 100
+            val semantic = { if (play) callback().onPlay() else callback().onPause() }
+            if (sessionFirst) semantic()
+            CarPlayMediaKeys.onWindowMediaKey(key(85, true))
+            CarPlayMediaKeys.onWindowMediaKey(key(85, false))
+            if (!sessionFirst) semantic()
+            verify(controller, times(1)).sendMediaButton(anyInt())
+            verify(controller).sendMediaButton(if (!sessionFirst) CarPlayMediaButton.PLAY_PAUSE
+                else if (play) CarPlayMediaButton.PLAY else CarPlayMediaButton.PAUSE)
+        }
+    }
+
+    @Test fun rapidSemanticCommandsAndTheirPairedTogglesKeepSeparatePresses() {
+        callback().onPause()
+        CarPlayMediaKeys.onWindowMediaKey(key(85, true))
+        eventTime += 100
+        callback().onPlay()
+        CarPlayMediaKeys.onWindowMediaKey(key(85, true))
+        callback().onPlay()
+        verify(controller).sendMediaButton(CarPlayMediaButton.PAUSE)
+        verify(controller, times(2)).sendMediaButton(CarPlayMediaButton.PLAY)
+        verify(controller, never()).sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
+    }
+
+    @Test fun failedSemanticPauseLeavesRawToggleAvailable() {
+        `when`(controller.sendMediaButton(CarPlayMediaButton.PAUSE)).thenReturn(false)
+        callback().onPause()
+        CarPlayMediaKeys.onWindowMediaKey(key(85, true))
+        verify(controller).sendMediaButton(CarPlayMediaButton.PAUSE)
+        verify(controller).sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
+    }
+
     private class MediaBackend : PrefaceMediaCenter.Backend {
         lateinit var command: (Int) -> Boolean
         var requests = 0
