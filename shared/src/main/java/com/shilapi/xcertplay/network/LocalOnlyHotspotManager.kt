@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 @RequiresApi(Build.VERSION_CODES.O)
 class LocalOnlyHotspotManager(
     context: Context,
-    private val onDiagnostic: (String) -> Unit = {},
+    @Volatile private var onDiagnostic: (String) -> Unit = {},
     private val interfaceProvider: () -> List<NetworkInterface> = {
         NetworkInterface.getNetworkInterfaces()?.let { Collections.list(it) }.orEmpty()
     },
@@ -92,7 +92,7 @@ class LocalOnlyHotspotManager(
                 deadlineNanos = deadlineNanos,
             )
             val liveRadio = awaitRadioInfo(radioInfo, apInterface, configuration, attempt, deadlineNanos)
-            radioInfo.watch(apInterface.bssid ?: configuration.bssid, onDiagnostic)
+            radioInfo.watch(apInterface.bssid ?: configuration.bssid) { onDiagnostic(it) }
 
             synchronized(stateLock) {
                 ensureStartActiveLocked(attempt)
@@ -180,6 +180,10 @@ class LocalOnlyHotspotManager(
         }
     }
 
+    internal fun updateDiagnosticListener(listener: (String) -> Unit) {
+        onDiagnostic = listener
+    }
+
     override fun validateReady() {
         val ap = synchronized(stateLock) {
             if (closed || stopped || reservation == null) throw IOException("Temporary hotspot is no longer active")
@@ -215,7 +219,10 @@ class LocalOnlyHotspotManager(
 
         releaseMulticastLock(activeMulticastLock)
         activeObserver?.close()
-        activeReservation?.close()
+        if (activeReservation != null) {
+            onDiagnostic("LocalOnlyHotspot releasing application reservation; system stop may be asynchronous")
+            activeReservation.close()
+        }
     }
 
     private fun createCallback(attempt: StartAttempt): WifiManager.LocalOnlyHotspotCallback =
@@ -241,6 +248,7 @@ class LocalOnlyHotspotManager(
             }
 
             override fun onFailed(reason: Int) {
+                onDiagnostic("LocalOnlyHotspot system callback failed reason=${failureReason(reason)}")
                 synchronized(stateLock) {
                     if (startAttempt === attempt && attempt.failure == null) {
                         attempt.failure = IOException(
@@ -252,6 +260,7 @@ class LocalOnlyHotspotManager(
             }
 
             override fun onStopped() {
+                onDiagnostic("LocalOnlyHotspot system callback stopped applicationClosed=$closed")
                 var lockToRelease: WifiManager.MulticastLock? = null
                 synchronized(stateLock) {
                     if (startAttempt === attempt) attempt.stopped = true

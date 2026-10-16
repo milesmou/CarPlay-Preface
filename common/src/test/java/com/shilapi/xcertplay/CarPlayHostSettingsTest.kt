@@ -5,6 +5,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.view.MotionEvent
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -37,14 +38,16 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.android.util.concurrent.PausedExecutorService
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [29])
+@Config(sdk = [29], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
 @LooperMode(LooperMode.Mode.PAUSED)
 class CarPlayHostSettingsTest {
     private lateinit var activity: CarPlayHostActivity
+    private lateinit var activityLifecycle: org.robolectric.android.controller.ActivityController<CarPlayHostActivity>
     private lateinit var controllers: MockedConstruction<CarPlayController>
 
     @Before fun setUp() {
-        activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
+        activityLifecycle = Robolectric.buildActivity(CarPlayHostActivity::class.java)
+        activity = activityLifecycle.get()
         controllers = mockConstruction(CarPlayController::class.java) { controller, _ ->
             org.mockito.Mockito.`when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         }
@@ -74,7 +77,7 @@ class CarPlayHostSettingsTest {
     @Test fun hotspotStatusShowsNetworkDetailsWithoutExportingThePassword() {
         setField("wirelessEnabled", true)
         invoke("openSettingsMenu")
-        val status = field("hotspotStatusView") as TextView
+        val status = (field("hotspotStatusView") as? TextView ?: TextView(activity).also { setField("hotspotStatusView", it) })
         fun update(value: CarPlayStatus) {
             activity.javaClass.getDeclaredMethod("updateHotspotStatus", CarPlayStatus::class.java)
                 .apply { isAccessible = true }.invoke(activity, value)
@@ -89,16 +92,171 @@ class CarPlayHostSettingsTest {
         assertFalse(status.text.contains("AndroidShare_test"))
     }
 
+    @Test @Config(sdk = [28, 33])
+    fun systemBackKeepsTheCarPlayPageAndItsGestureMenu() {
+        activityLifecycle.create().start().resume()
+        // Startup may launch the permission controller; measure only navigation caused by Back.
+        while (shadowOf(activity).nextStartedActivity != null) { }
+        val controller = attachController()
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        CarPlayBackgroundSession.active = true
+        for (open in listOf(false, true)) {
+            if (open) invoke("openSettingsMenu")
+            for (action in listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+                assertTrue(activity.dispatchKeyEvent(KeyEvent(action, KeyEvent.KEYCODE_BACK)))
+            }
+            activity.onBackPressedDispatcher.onBackPressed()
+            assertNull(shadowOf(activity).nextStartedActivity)
+            assertFalse(activity.isFinishing)
+            assertEquals(open, field("menuOpen"))
+            assertSame(controller, field("controller"))
+            assertTrue(CarPlayBackgroundSession.active)
+        }
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+        activityLifecycle.pause().stop().destroy()
+    }
+
+    @Test fun menuHomeButtonReturnsToHomeAndKeepsTheConnection() {
+        val controller = attachController()
+        CarPlayBackgroundSession.active = true
+        invoke("openSettingsMenu")
+        homeButton().performClick()
+        val destination = shadowOf(activity).nextStartedActivity
+        assertEquals(DiPlayActivity::class.java.name, destination.component?.className)
+        assertEquals("home", destination.getStringExtra("page"))
+        assertFalse(field("menuOpen") as Boolean)
+        assertSame(controller, field("controller"))
+        assertTrue(CarPlayBackgroundSession.active)
+        assertFalse(activity.isFinishing)
+        assertEquals(0, field("restartGeneration"))
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+    }
+
+    @Test fun menuHomeButtonConfirmsUnsavedChangesBeforeNavigating() {
+        val controller = attachController()
+        invoke("openSettingsMenu")
+        val original = AirPlayPersistence.loadFps(activity)
+        setField("fps", if (original == 30) 60 else 30)
+        homeButton().performClick()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertTrue(field("menuOpen") as Boolean)
+        discardPendingEdits()
+        assertEquals("home", shadowOf(activity).nextStartedActivity.getStringExtra("page"))
+        assertEquals(original, AirPlayPersistence.loadFps(activity))
+        assertSame(controller, field("controller"))
+        assertEquals(0, field("restartGeneration"))
+    }
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullGestureMenuHomeLargeFontScreenshot() = captureGestureMenuHome("full")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactGestureMenuHomeLargeFontScreenshot() = captureGestureMenuHome("compact")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun standardGestureMenuScreenshot() = captureGestureMenuHome("standard")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun narrowGestureMenuLargeFontScreenshot() = captureGestureMenuHome("narrow")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "ar-rEG-w960dp-h360dp-land-xhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun rtlGestureMenuHomeLargeFontScreenshot() = captureGestureMenuHome("rtl")
+
+    private fun captureGestureMenuHome(name: String) {
+        val audio = mock(android.media.AudioManager::class.java)
+        `when`(audio.getStreamMaxVolume(org.mockito.ArgumentMatchers.anyInt())).thenReturn(20)
+        `when`(audio.getStreamVolume(3)).thenReturn(7)
+        `when`(audio.getStreamVolume(12)).thenReturn(9)
+        var base: android.content.Context = activity
+        while (base is android.content.ContextWrapper) base = base.baseContext
+        org.robolectric.shadow.api.Shadow.extract<org.robolectric.shadows.ShadowContextImpl>(base)
+            .setSystemService(android.content.Context.AUDIO_SERVICE, audio)
+        val config = android.content.res.Configuration(activity.resources.configuration).apply {
+            fontScale = if (name == "standard") 1f else 1.5f
+            if (name == "rtl") {
+                val locale = java.util.Locale.forLanguageTag("ar-EG")
+                setLocale(locale)
+                setLayoutDirection(locale)
+            }
+        }
+        activity.resources.updateConfiguration(config, activity.resources.displayMetrics)
+        if (name == "rtl") {
+            // This library's test manifest does not inherit the mobile app's supportsRtl flag.
+            activity.applicationInfo.flags = activity.applicationInfo.flags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
+            activity.applicationInfo.targetSdkVersion = maxOf(17, activity.applicationInfo.targetSdkVersion)
+        }
+        val root = invoke("buildContentView") as View
+        root.layoutDirection = if (name == "rtl") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        attachController()
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        invoke("openSettingsMenu")
+        if (name == "narrow") {
+            (menu().layoutParams as android.widget.FrameLayout.LayoutParams).apply {
+                width = (520 * activity.resources.displayMetrics.density).toInt()
+                gravity = android.view.Gravity.CENTER
+            }
+        }
+        (field("connectionPanel") as View).visibility = View.GONE
+        views(root).forEach { it.layoutDirection = root.layoutDirection }
+        if (name == "rtl") assertEquals(View.LAYOUT_DIRECTION_RTL, root.layoutDirection)
+        repeat(3) {
+            views(root).forEach { it.forceLayout() }
+            root.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            root.layout(0, 0, 1920, 720)
+        }
+        val bounds = android.graphics.Rect()
+        for (button in views(menu()).filterIsInstance<Button>()) {
+            assertTrue(button.text.toString(), button.getGlobalVisibleRect(bounds))
+            assertTrue(button.text.toString(), bounds.top >= 0 && bounds.bottom <= 720)
+            assertEquals(button.height, bounds.height())
+            for (line in 0 until button.layout.lineCount) assertEquals(0, button.layout.getEllipsisCount(line))
+        }
+        for (slider in views(menu()).filterIsInstance<SeekBar>()) {
+            assertTrue(slider.isEnabled)
+            assertTrue(slider.contentDescription.toString(), slider.getGlobalVisibleRect(bounds))
+            assertEquals(slider.height, bounds.height())
+        }
+        val heading = views(menu()).filterIsInstance<TextView>().first {
+            it.text == activity.getString(R.string.settings_quick_menu)
+        }
+        assertTrue(heading.getGlobalVisibleRect(bounds))
+        val contentTop = bounds.top
+        val contentBottom = views(menu()).filter { it is Button || it is SeekBar }.maxOf {
+            assertTrue(it.getGlobalVisibleRect(bounds))
+            bounds.bottom
+        }
+        assertTrue("Menu content should be vertically centered", kotlin.math.abs(contentTop + contentBottom - 720) <= 4)
+        val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+        root.draw(android.graphics.Canvas(bitmap))
+        val directory = java.io.File("../agent_docs/screenshots/carplay-blank-dismiss").apply { mkdirs() }
+        val font = if (name == "standard") 100 else 150
+        java.io.File(directory, "$name-font$font.png").outputStream().use {
+            assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+        bitmap.recycle()
+    }
+
     @Test fun switchingToUsbReplacesWirelessStatus() {
         setField("wirelessEnabled", true)
         invoke("openSettingsMenu")
+        val status = TextView(activity).also { setField("hotspotStatusView", it) }
         activity.javaClass.getDeclaredMethod("updateHotspotStatus", CarPlayStatus::class.java)
             .apply { isAccessible = true }.invoke(activity,
                 CarPlayStatus.HotspotReady("AndroidShare_test", "2.4 GHz", 0,
                     "02:00:00:00:00:01", "192.0.2.1", "LocalOnlyHotspot", "test-password"))
         setField("wirelessEnabled", false)
         invoke("updateHotspotStatusBlock")
-        val status = field("hotspotStatusView") as TextView
         assertEquals(activity.getString(R.string.wireless_hotspot_off), status.text.toString())
     }
 
@@ -132,23 +290,159 @@ class CarPlayHostSettingsTest {
         bitmap.recycle()
     }
 
-    @Test fun experimentalMediaControlsAreInsideACollapsedMenu() {
+    @Test fun quickMenuContainsOnlyImmediateActions() {
         invoke("openSettingsMenu")
-        val button = views(menu()).filterIsInstance<Button>()
-            .single { it.text == activity.getString(R.string.settings_advanced) }
-        val container = (button.parent as ViewGroup).let { parent ->
-            parent.getChildAt(parent.indexOfChild(button) + 1) as ViewGroup
-        }
-        val labels = views(container).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        assertTrue("HEVC (H.265)" in labels)
-        assertTrue(activity.getString(R.string.hevc_software_decoder) in labels)
-        assertEquals(View.GONE, container.visibility)
-        button.performClick()
-        assertEquals(View.VISIBLE, container.visibility)
-        button.performClick()
-        assertEquals(View.GONE, container.visibility)
+        val buttons = views(menu()).filterIsInstance<Button>().map { it.text.toString() }.toList()
+        assertEquals(listOf(R.string.settings_return_to_home, R.string.settings_all_settings,
+            R.string.picture_adjustments, R.string.exit_application)
+            .map { activity.getString(it) }, buttons)
+        assertEquals(2, views(menu()).filterIsInstance<SeekBar>().count())
+        assertFalse(views(menu()).any { it is RadioButton || it is android.widget.Switch })
+        assertFalse(buttons.contains(activity.getString(R.string.save_and_reconnect)))
     }
 
+    @Test fun menuVolumeUsesTheCurrentSinkAndDoesNotUndoLiveVolumeOnClose() {
+        val audio = mock(android.media.AudioManager::class.java)
+        val levels = mutableMapOf(3 to 7, 12 to 9)
+        `when`(audio.getStreamMaxVolume(org.mockito.ArgumentMatchers.anyInt())).thenReturn(20)
+        `when`(audio.getStreamVolume(org.mockito.ArgumentMatchers.anyInt())).thenAnswer {
+            levels[it.getArgument<Int>(0)] ?: 0
+        }
+        org.mockito.Mockito.doAnswer { levels[it.getArgument(0)] = it.getArgument(1); null }
+            .`when`(audio).setStreamVolume(org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt())
+        var base: android.content.Context = activity
+        while (base is android.content.ContextWrapper) base = base.baseContext
+        org.robolectric.shadow.api.Shadow.extract<org.robolectric.shadows.ShadowContextImpl>(base)
+            .setSystemService(android.content.Context.AUDIO_SERVICE, audio)
+        val sink = mock(com.shilapi.xcertplay.media.AndroidMediaSink::class.java)
+        `when`(sink.configuredVolumeStream(true)).thenReturn(12)
+        `when`(sink.configuredVolumeStream(false)).thenReturn(3)
+        setField("sink", sink)
+        val controller = attachController()
+        AirPlayPersistence.saveNavigationAudioChannel(activity, 9) // Saved for the next connection.
+        invoke("openSettingsMenu")
+        val navigation = views(menu()).filterIsInstance<SeekBar>().first()
+        assertTrue(navigation.performAccessibilityAction(
+            android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
+            android.os.Bundle().apply {
+                putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 14f)
+            }))
+        invoke("cancelSettingsEdits")
+        assertEquals(14, levels[12])
+        assertEquals(7, levels[3])
+        assertEquals(9, AirPlayPersistence.loadNavigationAudioChannel(activity))
+        assertSame(controller, field("controller"))
+        assertEquals(0, field("restartGeneration"))
+        org.mockito.Mockito.verify(audio).setStreamVolume(12, 14, 0)
+    }
+
+    @Test fun returningToCarPlayClosesTheMenuWithoutChangingSettingsOrRestarting() {
+        val controller = attachController()
+        val before = activity.getSharedPreferences("xcertplay_airplay", 0).all.toMap()
+        mountMenuForTouch()
+        tapMenu(10f, 10f)
+        assertFalse(field("menuOpen") as Boolean)
+        assertSame(controller, field("controller"))
+        assertEquals(0, field("restartGeneration"))
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertEquals(before, activity.getSharedPreferences("xcertplay_airplay", 0).all)
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+    }
+
+    @Test fun blankGapsInsideTheMenuAlsoDismissWithoutForwardingTheTap() {
+        val controller = attachController()
+        mountMenuForTouch()
+        val home = menuBounds(homeButton())
+        val settings = menuBounds(fullSettingsButton())
+        tapMenu((home.right + settings.left) / 2f, home.exactCenterY())
+        assertFalse(field("menuOpen") as Boolean)
+        assertSame(controller, field("controller"))
+        assertTrue(org.mockito.Mockito.mockingDetails(controller).invocations
+            .filter { it.method.name == "sendTouch" }
+            .all { (it.arguments[0] as List<*>).isEmpty() })
+        assertNull(shadowOf(activity).nextStartedActivity)
+    }
+
+    @Test fun menuPaddingAndTheGapBetweenActionsAndVolumeDismiss() {
+        attachController()
+        for (target in listOf("padding", "panes")) {
+            mountMenuForTouch()
+            val home = menuBounds(homeButton())
+            val volume = menuBounds(views(menu()).filterIsInstance<SeekBar>().first())
+            val x = if (target == "padding") home.left - 8f else
+                (menuBounds(fullSettingsButton()).right + volume.left) / 2f
+            tapMenu(x, home.exactCenterY())
+            assertFalse(target, field("menuOpen") as Boolean)
+        }
+    }
+
+    @Test fun touchingButtonsOrDisabledSlidersDoesNotBecomeABlankTap() {
+        activityLifecycle.create().start().resume().visible()
+        while (shadowOf(activity).nextStartedActivity != null) { }
+        attachController()
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        mountMenuForTouch()
+        val slider = views(menu()).filterIsInstance<SeekBar>().first()
+        slider.isEnabled = false
+        val sliderBounds = menuBounds(slider)
+        tapMenu(sliderBounds.exactCenterX(), sliderBounds.exactCenterY())
+        assertTrue(field("menuOpen") as Boolean)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        val home = menuBounds(homeButton())
+        tapMenu(home.exactCenterX(), home.exactCenterY())
+        assertFalse(field("menuOpen") as Boolean)
+        assertEquals("home", shadowOf(activity).nextStartedActivity.getStringExtra("page"))
+        activityLifecycle.pause().stop().destroy()
+    }
+
+    @Test fun blankDragsAndCancelledGesturesKeepTheMenuOpen() {
+        attachController()
+        mountMenuForTouch()
+        menuTouch(MotionEvent.ACTION_DOWN, 20f, 20f)
+        menuTouch(MotionEvent.ACTION_MOVE, 120f, 20f)
+        menuTouch(MotionEvent.ACTION_UP, 120f, 20f)
+        assertTrue(field("menuOpen") as Boolean)
+        menuTouch(MotionEvent.ACTION_DOWN, 20f, 20f)
+        menuTouch(MotionEvent.ACTION_CANCEL, 20f, 20f)
+        assertTrue(field("menuOpen") as Boolean)
+        // A drag ending over blank space must not convert a control gesture into dismissal.
+        val slider = menuBounds(views(menu()).filterIsInstance<SeekBar>().first())
+        menuTouch(MotionEvent.ACTION_DOWN, slider.exactCenterX(), slider.exactCenterY())
+        menuTouch(MotionEvent.ACTION_MOVE, 20f, 20f)
+        menuTouch(MotionEvent.ACTION_UP, 20f, 20f)
+        assertTrue(field("menuOpen") as Boolean)
+    }
+
+    @Test fun pictureShortcutOpensLiveAdjustmentsAndKeepsTheConnection() {
+        activityLifecycle.create().start().resume().visible()
+        while (shadowOf(activity).nextStartedActivity != null) { }
+        val controller = attachController()
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        invoke("openSettingsMenu")
+        views(menu()).filterIsInstance<Button>().single {
+            it.text == activity.getString(R.string.picture_adjustments)
+        }.performClick()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertFalse(field("menuOpen") as Boolean)
+        assertNotNull(field("picturePanel"))
+        val contrast = views(field("picturePanel") as View).filterIsInstance<SeekBar>().toList()[1]
+        assertTrue(contrast.performAccessibilityAction(
+            android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id,
+            android.os.Bundle().apply {
+                putFloat(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, 125f)
+            }))
+        assertEquals(125, CarPlayPicture.value(CarPlayPicture.preferences(activity), CarPlayPicture.CONTRAST))
+        invoke("openSettingsMenu")
+        assertNull(field("picturePanel"))
+        invoke("cancelSettingsEdits")
+        assertEquals(125, CarPlayPicture.value(CarPlayPicture.preferences(activity), CarPlayPicture.CONTRAST))
+        assertSame(controller, field("controller"))
+        assertEquals(0, field("restartGeneration"))
+        assertNull(shadowOf(activity).nextStartedActivity)
+        org.mockito.Mockito.verify(controller, org.mockito.Mockito.never()).close()
+        activityLifecycle.pause().stop().destroy()
+    }
     @Test fun disabledGesturePersistsAndDoesNotOpenTheMenu() {
         AirPlayPersistence.saveSettingsGestureFingers(activity, 0)
         invoke("loadPersistedSettings")
@@ -159,10 +453,6 @@ class CarPlayHostSettingsTest {
             assertFalse(field("gestureSequenceActive") as Boolean)
         }
         invoke("openSettingsMenu")
-        val button = views(menu()).filterIsInstance<Button>()
-            .first { it.text == activity.getString(R.string.settings_gesture_disabled_action) }
-        button.performClick()
-        assertEquals(2, field("gestureFingerCount"))
         invoke("cancelSettingsEdits")
         assertEquals(0, field("gestureFingerCount"))
     }
@@ -180,15 +470,23 @@ class CarPlayHostSettingsTest {
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
                 overlay.layout(0, 0, width, height)
             }
-            val expected = (minOf(720, widthDp - 32) * density + 0.5f).toInt()
+            val expected = (minOf(920, widthDp - 32) * density + 0.5f).toInt()
             assertEquals(expected, panel.width)
             assertTrue(kotlin.math.abs(panel.left - (width - panel.right)) <= 1)
             val title = views(panel).filterIsInstance<TextView>()
-                .first { it.text == activity.getString(R.string.carplay_settings) }
-            val close = views(panel).filterIsInstance<Button>().first { it.text == "X" }
-            val titleBounds = android.graphics.Rect(0, 0, title.width, title.height)
-            (panel as ViewGroup).offsetDescendantRectToMyCoords(title, titleBounds)
-            assertTrue(kotlin.math.abs(titleBounds.exactCenterY() - (close.top + close.height / 2f)) <= 1f)
+                .first { it.text == activity.getString(R.string.settings_quick_menu) }
+            assertTrue(title.width <= panel.width)
+            assertTrue(kotlin.math.abs(panel.top - (height - panel.bottom)) <= 1)
+            val buttons = views(panel).filterIsInstance<Button>().toList()
+            assertTrue(buttons.all { it.width > 0 && it.width <= panel.width })
+            val picture = homeButton()
+            val settings = buttons.single { it.text == activity.getString(R.string.settings_all_settings) }
+            assertEquals(picture.height, settings.height)
+            if (widthDp >= 600) {
+                assertEquals(picture.top, settings.top)
+                assertEquals((12 * density + 0.5f).toInt(), settings.left - picture.right)
+            }
+            else assertTrue(settings.top > picture.top)
         }
     }
     @Test fun configuredFingerCountsOpenTheMountedMenuWithoutLeavingCarPlay() {
@@ -314,7 +612,7 @@ class CarPlayHostSettingsTest {
         invoke("openSettingsMenu")
         val original = AirPlayPersistence.loadFps(activity)
         setField("fps", 30)
-        gestureButton().performClick()
+        setField("gestureFingerCount", 4)
         assertEquals(3, AirPlayPersistence.loadSettingsGestureFingers(activity))
         invoke("cancelSettingsEdits")
         assertSame(controller, field("controller"))
@@ -323,7 +621,7 @@ class CarPlayHostSettingsTest {
         assertEquals(3, field("gestureFingerCount"))
         invoke("openSettingsMenu")
         assertEquals(original, field("fps"))
-        assertEquals(activity.getString(R.string.settings_gesture_fingers, 3), gestureButton().text)
+        assertEquals(3, field("gestureFingerCount"))
     }
 
     @Test fun obsoleteResolutionPreferenceHasNoSliderAndIsNotRewrittenByUnrelatedSave() {
@@ -372,19 +670,19 @@ class CarPlayHostSettingsTest {
         assertNotSame(oldMenu, menu())
         assertEquals(false, field("appNight"))
         assertEquals(
-            DiPlayPalette.LIGHT.overlayBackground,
+            DiPlayPalette.LIGHT.background,
             (menu().background as android.graphics.drawable.ColorDrawable).color,
         )
         val heading = views(menu()).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.carplay_settings) }
-        assertEquals(DiPlayPalette.LIGHT.overlayPrimaryText, heading.currentTextColor)
+            .first { it.text == activity.getString(R.string.settings_quick_menu) }
+        assertEquals(DiPlayPalette.LIGHT.primaryText, heading.currentTextColor)
     }
 
     @Test fun savingPersistsSettingsAndRestartsOnce() {
         attachController()
         invoke("openSettingsMenu")
         setField("fps", 30)
-        gestureButton().performClick()
+        setField("gestureFingerCount", 4)
         invoke("saveSettingsAndReconnect")
         assertFalse(field("menuOpen") as Boolean)
         assertEquals(30, AirPlayPersistence.loadFps(activity))
@@ -452,32 +750,11 @@ class CarPlayHostSettingsTest {
         assertEquals(0, field("restartGeneration"))
     }
 
-    @Test fun authenticationChoicesOnlyExposeLocalAndCh341() {
-        invoke("openSettingsMenu")
-        val options = views(menu()).filterIsInstance<RadioButton>().filter { it.tag is MfiTarget }.toList()
-        assertEquals(listOf(MfiTarget.LOCAL, MfiTarget.USB_CH341), options.map { it.tag })
-        options.first().performClick()
-        invoke("cancelSettingsEdits")
-        assertEquals(MfiTarget.USB_CH341, AirPlayPersistence.loadMfiTarget(activity))
-        assertEquals(MfiTarget.USB_CH341, field("mfiTarget"))
-    }
-
-    @Test fun selectingLocalWithoutIdentityKeepsTheMenuAndSavedUsbChoice() {
-        attachController()
-        invoke("openSettingsMenu")
-        views(menu()).filterIsInstance<RadioButton>().first { it.tag == MfiTarget.LOCAL }.performClick()
-        invoke("saveSettingsAndReconnect")
-        assertTrue(field("menuOpen") as Boolean)
-        assertEquals(MfiTarget.USB_CH341, AirPlayPersistence.loadMfiTarget(activity))
-        assertEquals(View.VISIBLE, (field("mfiErrorView") as View).visibility)
-        assertEquals(0, field("restartGeneration"))
-    }
-
     @Test fun switchingToUsbPersistsAndPassesUsbToTheRuntime() {
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.LOCAL)
         attachController()
         invoke("openSettingsMenu")
-        views(menu()).filterIsInstance<RadioButton>().first { it.tag == MfiTarget.USB_CH341 }.performClick()
+        setField("mfiTarget", MfiTarget.USB_CH341)
         invoke("saveSettingsAndReconnect")
         assertFalse(field("menuOpen") as Boolean)
         assertEquals(MfiTarget.USB_CH341, AirPlayPersistence.loadMfiTarget(activity))
@@ -659,10 +936,36 @@ class CarPlayHostSettingsTest {
     }
 
     private fun menu() = field("settingsMenu") as View
-    private fun gestureButton() = views(menu()).filterIsInstance<Button>()
-        .first { it.text == activity.getString(R.string.settings_gesture_fingers, field("gestureFingerCount")) }
+    private fun mountMenuForTouch() {
+        if (field("menuOpen") as Boolean) invoke("cancelSettingsEdits")
+        val root = invoke("buildContentView") as View
+        activity.window.setContentView(root)
+        invoke("openSettingsMenu")
+        (field("connectionPanel") as View).visibility = View.GONE
+        repeat(3) {
+            views(root).forEach { it.forceLayout() }
+            root.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            root.layout(0, 0, 1920, 720)
+        }
+    }
+    private fun menuBounds(view: View): android.graphics.Rect =
+        android.graphics.Rect(0, 0, view.width, view.height).also {
+            (menu() as ViewGroup).offsetDescendantRectToMyCoords(view, it)
+        }
+    private fun menuTouch(action: Int, x: Float, y: Float) {
+        val event = MotionEvent.obtain(10, 30, action, x, y, 0)
+        try { menu().dispatchTouchEvent(event) } finally { event.recycle() }
+    }
+    private fun tapMenu(x: Float, y: Float) {
+        menuTouch(MotionEvent.ACTION_DOWN, x, y)
+        menuTouch(MotionEvent.ACTION_UP, x, y)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
     private fun fullSettingsButton() = views(menu()).filterIsInstance<Button>()
-        .first { it.text == activity.getString(R.string.app_name) + " " + activity.getString(R.string.settings) }
+        .single { it.text == activity.getString(R.string.settings_all_settings) }
+    private fun homeButton() = views(menu()).filterIsInstance<Button>()
+        .single { it.text == activity.getString(R.string.settings_return_to_home) }
     /** Answers the "Discard your changes?" dialog that an exit with staged edits now shows. */
     private fun discardPendingEdits() {
         val dialog = ShadowAlertDialog.getLatestAlertDialog()

@@ -49,6 +49,7 @@ import com.shilapi.xcertplay.network.SystemUsbSnapshot
 import com.shilapi.xcertplay.network.SystemUsbStartupDiagnostics
 import com.shilapi.xcertplay.network.systemUsbStartupListener
 import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
+import com.shilapi.xcertplay.network.TemporaryHotspotReservationStore
 import com.shilapi.xcertplay.network.HotspotAddressPolicy
 import com.shilapi.xcertplay.network.HotspotAddressRecovery
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
@@ -274,6 +275,7 @@ class CarPlayController(
 
     @Volatile private var hotspot: WirelessHotspotManager? = null
     @Volatile private var retainedHotspotInfo: WirelessHotspotInfo? = null
+    private var retainTemporaryHotspotOnClose = false
     @Volatile private var wirelessSessionEstablished = false
     private val wirelessStartupRetryPending = AtomicBoolean(false)
     @Volatile private var bonjour: CarPlayBonjour? = null
@@ -461,6 +463,10 @@ class CarPlayController(
             if (closed) return
         }
         connectionDiagnostic("start transport=${config.transport}")
+        if (config.transport != CarPlayTransport.WIRELESS ||
+            config.wirelessHotspotMode != WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) {
+            TemporaryHotspotReservationStore.release()
+        }
         if (!hasRequiredUsbService()) return
         videoListener?.let { listener ->
             videoGate = VideoInCarGate(
@@ -502,17 +508,17 @@ class CarPlayController(
         }
     }
 
-    /** Startup recovery keeps the existing temporary-hotspot reservation under this controller. */
+    /** Recovery keeps the existing temporary hotspot after startup failure or session loss. */
     fun canRetryWirelessStartup(): Boolean = !wirelessStartupRetryPending.get() && wirelessStartupRetryEligible()
 
     private fun wirelessStartupRetryEligible(): Boolean =
         !closed && config.transport == CarPlayTransport.WIRELESS &&
             config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT &&
-            phase == Phase.WIRELESS && wirelessFailureReported.get() &&
-            !wirelessSessionEstablished && activeSession == null && mfiSession != null &&
+            phase == Phase.WIRELESS && (wirelessFailureReported.get() || wirelessSessionEstablished) &&
+            activeSession == null && mfiSession != null &&
             hotspot != null && retainedHotspotInfo != null
 
-    /** Returns false for an active/previously established session or a different transport. */
+    /** Returns false while a session is still active or a different transport owns the link. */
     fun retryWirelessStartup(): Boolean {
         // Bonjour cleanup can be slow while it owns the resource lock. Admission must not block
         // the driver's UI; recheck all state on the worker before taking resource ownership.
@@ -660,6 +666,14 @@ class CarPlayController(
             true
         } catch (_: Exception) {
             false
+        }
+    }
+
+    /** Opt-in for manual disconnect/reconnect; ordinary close and full exit still release resources. */
+    fun prepareTemporaryHotspotHandoff() = synchronized(wirelessResourceLock) {
+        if (!closed && config.transport == CarPlayTransport.WIRELESS &&
+            config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) {
+            retainTemporaryHotspotOnClose = true
         }
     }
 
@@ -1702,6 +1716,11 @@ class CarPlayController(
 
             override fun onSessionEnded(session: AirPlaySession) {
                 if (isStaleWirelessRun(generation)) return
+                val readiness = runCatching {
+                    (hotspot ?: throw IOException("Wireless hotspot manager unavailable")).validateReady()
+                }
+                debugLog("wireless session lost hotspotReady=${readiness.isSuccess} " +
+                    "failureClass=${readiness.exceptionOrNull()?.javaClass?.simpleName ?: "none"}")
                 wirelessConnectionProof.end(generation, session)
                 sessionListener.onSessionEnded(session)
             }
@@ -2447,6 +2466,14 @@ class CarPlayController(
         }
         synchronized(wirelessResourceLock) {
             if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot startup cancelled")
+            if (hotspot == null && config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) {
+                TemporaryHotspotReservationStore.take()?.let { retained ->
+                    retained.manager.updateDiagnosticListener(::debugLog)
+                    hotspot = retained.manager
+                    retainedHotspotInfo = retained.info
+                    debugLog("wireless manual reconnect acquired retained application hotspot reservation")
+                }
+            }
             val current = hotspot
             val info = retainedHotspotInfo
             if (current != null && info != null) {
@@ -2685,7 +2712,7 @@ class CarPlayController(
 
     private fun closeFailedWirelessAttempt(generation: Int) = synchronized(wirelessResourceLock) {
         if (generation != wirelessGeneration.get()) return@synchronized
-        val keep = !closed && !wirelessSessionEstablished && activeSession == null &&
+        val keep = !closed && activeSession == null &&
             config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT && retainedHotspotInfo != null
         closeWirelessResources(socketService, generation, keep)
     }
@@ -2712,9 +2739,20 @@ class CarPlayController(
 
             if (!keepHotspot || closed) {
                 val activeHotspot = hotspot
+                val activeInfo = retainedHotspotInfo
                 hotspot = null
                 retainedHotspotInfo = null
-                if (activeHotspot != null) closeBestEffort("wireless hotspot") { activeHotspot.close() }
+                if (activeHotspot != null) closeBestEffort("wireless hotspot") {
+                    val retained = closed && retainTemporaryHotspotOnClose && activeInfo != null &&
+                        activeHotspot is LocalOnlyHotspotManager &&
+                        runCatching { activeHotspot.validateReady() }.isSuccess &&
+                        TemporaryHotspotReservationStore.retain(activeHotspot, activeInfo)
+                    if (retained) {
+                        debugLog("wireless manual disconnect retained application hotspot reservation; credentials unchanged")
+                    } else {
+                        activeHotspot.close()
+                    }
+                }
             } else if (hotspot != null) {
                 debugLog("wireless startup transport cleanup retained temporary hotspot reservation")
             }

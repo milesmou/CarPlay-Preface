@@ -418,9 +418,10 @@ class CarPlayHostDisplaySizeTest {
         allowStartup()
         invoke("maybeStartCarPlay")
         val old = getField("controller") as CarPlayController
+        var waits = 0
         org.mockito.Mockito.`when`(old.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenAnswer {
             (getField("shuttingDown") as AtomicBoolean).set(true)
-            false
+            ++waits >= 2
         }
         activity.javaClass.getDeclaredMethod("restartCarPlay", String::class.java)
             .apply { isAccessible = true }.invoke(activity, "Test cancelled teardown")
@@ -428,6 +429,7 @@ class CarPlayHostDisplaySizeTest {
         finishTeardown()
 
         assertNull(getField("controller"))
+        assertEquals(2, waits)
         assertEquals(1, controllerConstruction.constructed().size)
     }
 

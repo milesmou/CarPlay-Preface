@@ -10,6 +10,24 @@ import org.junit.Test
 
 class AirPlayInfoPlistTest {
     @Test
+    fun bluetoothAudioDoesNotRequestMainAudioWhileRetainingTheScreen() {
+        for (disabled in listOf(false, true)) {
+            val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:01", "1",
+                AirPlayDisplayConfig(1920, 720), disableAudioOutput = disabled, mainBufferedAudio = true)
+            // Assert the actual plist seen by the phone, alongside formats and discovery features.
+            val info = BplistCodec.decode(BplistCodec.encode(AirPlayInfoPlist.build(config))) as Map<*, *>
+            val modes = info["modes"] as Map<*, *>
+            val resources = (modes["resources"] as List<*>).map { (it as Map<*, *>)["resourceID"] }
+            assertEquals(if (disabled) listOf(1L) else listOf(1L, 2L), resources)
+            assertEquals(!disabled, info.containsKey("audioFormats"))
+            assertEquals(!disabled, info.containsKey("audioLatencies"))
+            assertEquals(!disabled, info.containsKey("mainBufferedInfo"))
+            assertEquals(AirPlayInfoPlist.features(config), info["features"])
+            assertEquals(1, (info["displays"] as List<*>).size)
+        }
+    }
+
+    @Test
     fun bothDisplaysDeclareAutomaticAppearanceAtConnection() {
         val config = AirPlayConfig(
             deviceName = "test", deviceId = "02:00:00:00:00:02", btMac = "02:00:00:00:00:02",

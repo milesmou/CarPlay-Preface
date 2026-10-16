@@ -3066,6 +3066,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun resetWirelessGroup() {
+        com.shilapi.xcertplay.network.TemporaryHotspotReservationStore.release()
         if (!isFinishing && !isDestroyed) connect(true)
     }
 

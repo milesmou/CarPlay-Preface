@@ -338,7 +338,7 @@ class SmoothVideoHostLifecycleTest {
     private fun allowStartup(target: CarPlayHostActivity = activity) {
         setField(target, "airPlayIdentity", AirPlayIdentity.generate())
         setField(target, "mfiTarget", MfiTarget.LOCAL)
-        setField(target, "vpnReady", true)
+        setField(target, "wirelessPermissionsReady", true)
         setField(target, "microphonePermissionResolved", true)
     }
 

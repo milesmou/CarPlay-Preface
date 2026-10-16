@@ -314,6 +314,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var picturePanelGeneration = 0
     private var gestureOverlay: View? = null
     private var settingsMenu: View? = null
+    private var menuVolumeControls: CarPlayMenuVolumeControls? = null
     private var mfiTargetGroup: RadioGroup? = null
     private var mfiI2cFields: View? = null
     private var mfiRemoteFields: View? = null
@@ -463,6 +464,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private val pollConfiguration = object : Runnable {
         override fun run() {
             refreshConfiguration(source = ThemeModeDiagnostics.Source.POLL)
+            if (menuOpen) menuVolumeControls?.refresh()
             mainHandler.postDelayed(this, CONFIGURATION_POLL_INTERVAL_MILLIS)
         }
     }
@@ -572,20 +574,7 @@ class CarPlayHostActivity : ComponentActivity() {
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
         applyFullscreenMode()
-        onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    if (picturePanel != null) {
-                        closePicturePanel()
-                    } else if (menuOpen) {
-                        if (safeAreaEditorActive) closeSafeAreaEditor() else leaveSettingsMenu()
-                    } else {
-                        showDiPlayHome()
-                    }
-                }
-            },
-        )
+        registerCarPlayBackHandler()
 
         appendLog(
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
@@ -602,6 +591,17 @@ class CarPlayHostActivity : ComponentActivity() {
         } else {
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    private fun registerCarPlayBackHandler() {
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    // The gesture menu provides explicit navigation; system Back keeps this page.
+                }
+            },
+        )
     }
 
     private fun loadPersistedSettings() {
@@ -820,6 +820,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private val windowMediaPresses = mutableSetOf<Triple<Int, Int, Int>>()
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) return true
         if (WheelMediaLearning.offer(event)) return true
         val physicalKey = Triple(event.deviceId, event.keyCode, event.scanCode)
         val downOrUp = event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP
@@ -940,8 +941,12 @@ class CarPlayHostActivity : ComponentActivity() {
         fallbackVideoView = null
         fallbackVideoBounds = null
         sessionLog?.append("Activity destroyed")
-        sessionLog?.close()
-        sessionLog = null
+        // Disconnect finishes the Activity before the controller's asynchronous teardown ends.
+        // Keep its log alive until the same teardown barrier that admits the next connection.
+        if (!shuttingDown.get() || shutdownComplete) {
+            sessionLog?.close()
+            sessionLog = null
+        }
         super.onDestroy()
     }
 
@@ -1193,506 +1198,196 @@ class CarPlayHostActivity : ComponentActivity() {
         if (gestureFingerCount == 0) getString(R.string.settings_gesture_disabled_action)
         else getString(R.string.settings_gesture_fingers, gestureFingerCount)
     private fun settingsMenuWidth(availableWidth: Int): Int =
-        minOf(dp(MAX_SETTINGS_MENU_WIDTH_DP), (availableWidth - dp(32)).coerceAtLeast(1))
+        minOf(dp(MAX_SETTINGS_MENU_WIDTH_DP),
+            (availableWidth - dp(SETTINGS_MENU_OUTER_GAP_DP * 2)).coerceAtLeast(1))
 
+    /** Quick actions only. Connection-time options live in the full Settings screen. */
     private fun buildSettingsMenu(): View {
+        val palette = overlayPalette
         val overlay = object : FrameLayout(this) {
-            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                getChildAt(0)?.let { panel ->
-                    panel.layoutParams.width = settingsMenuWidth(MeasureSpec.getSize(widthMeasureSpec))
+            private val tapSlop = android.view.ViewConfiguration.get(this@CarPlayHostActivity).scaledTouchSlop
+            private var blankTap = false
+            private var downX = 0f
+            private var downY = 0f
+
+            // Blank-area gestures are handled above; a drag must never become the View's default click.
+            override fun onTouchEvent(event: MotionEvent): Boolean = true
+
+            private fun hitsControl(x: Float, y: Float): Boolean {
+                val origin = IntArray(2)
+                getLocationOnScreen(origin)
+                val bounds = android.graphics.Rect()
+                return findDescendants(this).any { child ->
+                    child !== this && child !is ScrollView &&
+                        (child is Button || child is SeekBar || child.isClickable || child.isLongClickable) &&
+                        child.getGlobalVisibleRect(bounds) &&
+                        bounds.contains((origin[0] + x).toInt(), (origin[1] + y).toInt())
                 }
+            }
+
+            override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.x
+                        downY = event.y
+                        blankTap = !hitsControl(event.x, event.y)
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = event.x - downX
+                        val dy = event.y - downY
+                        if (dx * dx + dy * dy > tapSlop * tapSlop) blankTap = false
+                    }
+                    MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> blankTap = false
+                    MotionEvent.ACTION_UP -> {
+                        val dismiss = blankTap && !hitsControl(event.x, event.y)
+                        blankTap = false
+                        if (dismiss) {
+                            // Cancel the scroll container's touch before hiding it. The tap never reaches CarPlay.
+                            MotionEvent.obtain(event).also { cancel ->
+                                cancel.action = MotionEvent.ACTION_CANCEL
+                                super.dispatchTouchEvent(cancel)
+                                cancel.recycle()
+                            }
+                            performClick()
+                            return true
+                        }
+                    }
+                }
+                return super.dispatchTouchEvent(event)
+            }
+
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                getChildAt(0)?.layoutParams?.width = settingsMenuWidth(MeasureSpec.getSize(widthMeasureSpec))
                 super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             }
         }.apply {
-            setBackgroundColor(MENU_BACKGROUND)
-            isClickable = true
-        }
-        val panel = FrameLayout(this).apply {
-            setBackgroundColor(MENU_BACKGROUND)
+            setBackgroundColor(palette.background)
+            contentDescription = getString(R.string.back_to_diplay)
+            setOnClickListener { leaveSettingsMenu() }
         }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(16), dp(16), dp(16), dp(36))
+            setPadding(dp(SETTINGS_MENU_PADDING_DP), dp(SETTINGS_MENU_PADDING_DP),
+                dp(SETTINGS_MENU_PADDING_DP), dp(SETTINGS_MENU_PADDING_DP))
         }
         content.addView(
-            menuText(getString(R.string.carplay_settings), 24f, MENU_PRIMARY, bold = true).apply {
-                setPadding(dp(56), 0, 0, 0)
-                minHeight = dp(48)
-                gravity = Gravity.CENTER_VERTICAL
+            menuText(getString(R.string.settings_quick_menu), 20f, palette.primaryText, bold = true).apply {
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                textAlignment = View.TEXT_ALIGNMENT_VIEW_START
             },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        content.addView(
-            settingsCategoryHeader(getString(R.string.connection)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(16) },
+            LinearLayout.LayoutParams(-1, -2),
         )
 
-        content.addView(
-            buildMfiTargetSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(14) },
-        )
-
-        val wirelessRowResult = ConnectionSettingsSection.createWirelessCarPlayRow(
-            context = this,
-            checked = wirelessEnabled,
-            theme = settingsOverlayTheme,
-        ) { checked ->
-            if (wirelessEnabled == checked) return@createWirelessCarPlayRow
-            wirelessEnabled = checked
-            hotspotStatus = HotspotStatus(state = if (wirelessEnabled) getString(R.string.hotspot_state_stopped) else getString(R.string.hotspot_state_off))
-            updateHotspotStatusBlock()
-            appendLog(
-                "Wireless CarPlay ${if (wirelessEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            requestStartupPrerequisites()
-        }
-        content.addView(
-            wirelessRowResult.rowView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        content.addView(
-            buildHotspotModeSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        content.addView(
-            menuText(getString(R.string.hotspot_status), 20f, MENU_SECONDARY),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(18) },
-        )
-        val hotspotStatusView = menuText("", 16f, MENU_ACCENT)
-        content.addView(
-            hotspotStatusView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) },
-        )
-
-        content.addView(
-            settingsCategoryHeader(getString(R.string.automatic_connection)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        content.addView(
-            settingsSwitchRow(
-                label = getString(R.string.auto_start_on_boot),
-                checked = autoStartOnBoot,
-                description = getString(R.string.start_carplay_automatically_after_device_boot),
-            ) { checked ->
-                autoStartOnBoot = checked
-                appendLog("Boot auto-start ${if (checked) "enabled" else "disabled"}")
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        content.addView(
-            settingsCategoryHeader(getString(R.string.settings_navigation)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        content.addView(
-            buildLocationReportingSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        content.addView(
-            settingsCategoryHeader(getString(R.string.settings_vehicle)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(36) },
-        )
-        content.addView(
-            buildIdentitySettingsSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        content.addView(
-            buildAirPlayIconSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        content.addView(
-            buildDrivingSideSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        content.addView(
-            buildDockSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(26) },
-        )
-        content.addView(
-            settingsCategoryHeader(getString(R.string.settings_display)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(40) },
-        )
-
-        content.addView(
-            buildStepSliderSection(
-                title = getString(R.string.frame_rate),
-                values = (
-                    AirPlayDisplaySettings.MIN_FPS..AirPlayDisplaySettings.MAX_FPS
-                    step AirPlayDisplaySettings.FPS_STEP
-                    ).toList(),
-                selectedValue = fps,
-                label = { "$it fps" },
-                onValueChanged = { value ->
-                    fps = value
-                    updateResolutionMenu()
-                },
-            ),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(24) },
-        )
-
-        content.addView(
-            settingsChoiceRow(
-                label = getString(R.string.physical_size_basis),
-                options = listOf(
-                    AirPlayPhysicalSizeBasis.WIDTH to getString(R.string.widest_width),
-                    AirPlayPhysicalSizeBasis.HEIGHT to getString(R.string.longest_height),
-                ),
-                selected = physicalSizeBasis,
-            ) { value ->
-                physicalSizeBasis = value
-                updateResolutionMenu()
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(24) },
-        )
-
-        content.addView(
-            buildStepSliderSection(
-                title = getString(R.string.physical_length),
-                values = (
-                    AirPlayDisplaySettings.MIN_WIDTH_PHYSICAL_MM..
-                        AirPlayDisplaySettings.MAX_WIDTH_PHYSICAL_MM
-                    step AirPlayDisplaySettings.WIDTH_PHYSICAL_MM_STEP
-                    ).toList(),
-                selectedValue = widthPhysicalMm,
-                label = { "$it mm" },
-                onValueChanged = { value ->
-                    widthPhysicalMm = value
-                    updateResolutionMenu()
-                },
-            ),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(16) },
-        )
-
-        content.addView(
-            buildSafeAreaSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        content.addView(
-            buildFullscreenSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        val experimentalContent = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = View.GONE
-        }
-        content.addView(DiPlayButton(this).apply {
-            text = getString(R.string.settings_advanced)
-            contentDescription = text
-            minHeight = dp(SETTINGS_EXPERIMENTAL_MENU_CONTROL_HEIGHT_DP)
-            style(DiPlayButtonKind.SECONDARY, overlayPalette, overlay = true)
-            setOnClickListener {
-                val expanded = experimentalContent.visibility != View.VISIBLE
-                experimentalContent.visibility = if (expanded) View.VISIBLE else View.GONE
-                isSelected = expanded
-            }
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(SETTINGS_EXPERIMENTAL_MENU_GAP_DP) })
-        content.addView(experimentalContent, LinearLayout.LayoutParams(-1, -2))
-        if (advancedAudioChannelMappingSupported) {
-            experimentalContent.addView(
-                settingsCategoryHeader(getString(R.string.audio)),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(36) },
-            )
-            experimentalContent.addView(
-                settingsSwitchRow(
-                    label = getString(R.string.advanced_audio_channel_mapping),
-                    checked = advancedAudioChannelMapping,
-                    description = getString(R.string.use_usage_content_type_routing_instead_of_stream_type),
-                ) { checked ->
-                    advancedAudioChannelMapping = checked
-                    appendLog(
-                        "Advanced audio channel mapping ${if (checked) "enabled" else "disabled"}; " +
-                            "applies when settings close",
-                    )
-                    updateResolutionMenu()
-                },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(12) },
-            )
-        }
-
-        val hevcRow = DisplaySettingsSection.createHevcRow(
-            context = this,
-            checked = hevcEnabled,
-            theme = settingsOverlayTheme,
-        ) { checked ->
-            if (hevcEnabled == checked) return@createHevcRow
-            hevcEnabled = checked
-            appendLog(
-                "HEVC (H.265) ${if (hevcEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            updateResolutionMenu()
-        }
-        experimentalContent.addView(
-            hevcRow.rowView,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        val softwareHevcRow = DisplaySettingsSection.createSoftwareHevcRow(
-            context = this,
-            checked = hevcSoftwareDecoderEnabled,
-            theme = settingsOverlayTheme,
-        ) { checked ->
-            if (hevcSoftwareDecoderEnabled == checked) return@createSoftwareHevcRow
-            hevcSoftwareDecoderEnabled = checked
-            appendLog(
-                "HEVC software decoder ${if (hevcSoftwareDecoderEnabled) "enabled" else "disabled"}; " +
-                    "applies when settings close",
-            )
-            updateResolutionMenu()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            experimentalContent.addView(
-                softwareHevcRow.rowView,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(16) },
-            )
-        }
-
-        content.addView(
-            settingsCategoryHeader(getString(R.string.diagnostics)),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(40) },
-        )
-        content.addView(
-            buildDebugLogsSection(),
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            content.addView(
-                settingsCategoryHeader(getString(R.string.android_9_compatibility)),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(40) },
-            )
-            content.addView(
-                menuText(
-                    getString(R.string.settings_android9_compat),
-                    16f,
-                    MENU_SECONDARY,
-                ),
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(12) },
-            )
-        }
-
-        val preview = menuText("", 17f, MENU_SECONDARY)
-        content.addView(
-            preview,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(30) },
-        )
-
-        val save = DiPlayButton(this).apply {
-            text = getString(R.string.save_and_reconnect)
-            textSize = 17f
-            minHeight = dp(52)
-            style(DiPlayButtonKind.PRIMARY, overlayPalette, overlay = true)
-            setOnClickListener { saveSettingsAndReconnect() }
-        }
-        content.addView(
-            save,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(46) },
-        )
-
-        val exitApplicationButton = DiPlayButton(this).apply {
-            text = getString(R.string.exit_application)
-            textSize = 17f
-            minHeight = dp(52)
-            style(DiPlayButtonKind.DANGER, overlayPalette, overlay = true)
-            setOnClickListener { exitApplication() }
-        }
-        content.addView(
-            exitApplicationButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        val gestureButton = DiPlayButton(this).apply {
-            textSize = 17f
-            minHeight = dp(52)
-            style(DiPlayButtonKind.SECONDARY, overlayPalette, overlay = true)
-            setOnClickListener {
-                gestureFingerCount = when (gestureFingerCount) { 0 -> 2; 4 -> 0; else -> gestureFingerCount + 1 }
-                text = settingsGestureButtonText()
-            }
-        }
-        gestureButton.text = settingsGestureButtonText()
-        content.addView(gestureButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
-
-        val openDiPlaySettingsButton = DiPlayButton(this).apply {
-            text = "${getString(R.string.app_name)} ${getString(R.string.settings)}"
-            textSize = 17f
-            minHeight = dp(52)
-            style(DiPlayButtonKind.SECONDARY, overlayPalette, overlay = true)
-            setOnClickListener {
-                leaveSettingsMenu { showDiPlayHome("settings") }
-            }
-        }
-        content.addView(
-            openDiPlaySettingsButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(12) },
-        )
-
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(
-                content,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-        }
-        panel.addView(
-            scroll,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        panel.addView(
+        fun action(label: Int, kind: DiPlayButtonKind = DiPlayButtonKind.SECONDARY, onClick: () -> Unit) =
             DiPlayButton(this).apply {
-                text = "X"
-                textSize = 22f
-                style(DiPlayButtonKind.SECONDARY, overlayPalette, overlay = true)
-                contentDescription = getString(R.string.discard_changes_and_exit_settings)
-                minWidth = 0
-                minHeight = 0
-                setPadding(0, 0, 0, 0)
-                setOnClickListener { cancelSettingsEdits() }
-            },
-            FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.START).apply {
-                leftMargin = dp(16)
-                topMargin = dp(16)
-            },
-        )
-        overlay.addView(
-            panel,
-            FrameLayout.LayoutParams(
-                settingsMenuWidth(resources.displayMetrics.widthPixels),
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER,
-            ),
-        )
-        overlay.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            val desiredWidth = settingsMenuWidth(view.width)
-            val horizontalPadding = dp(if (desiredWidth >= dp(600)) 32 else 16)
-            content.setPadding(horizontalPadding, dp(16), horizontalPadding, dp(36))
-            val params = panel.layoutParams
-            if (params.width != desiredWidth) {
-                params.width = desiredWidth
-                panel.layoutParams = params
+                text = getString(label)
+                textSize = 16f
+                minHeight = dp(SETTINGS_MENU_CONTROL_HEIGHT_DP)
+                setPadding(dp(SETTINGS_MENU_BUTTON_PADDING_DP), 0, dp(SETTINGS_MENU_BUTTON_PADDING_DP), 0)
+                style(kind, palette, overlay = false)
+                setOnClickListener { onClick() }
+            }
+
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun addBlock(view: View) {
+            actions.addView(view, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = if (actions.childCount == 0) 0 else dp(SETTINGS_MENU_ACTION_GAP_DP)
+            })
+        }
+
+        fun actionRow(first: View, second: View): View = object : LinearLayout(this) {
+            init {
+                addView(first, LayoutParams(0, -2, 1f))
+                addView(second, LayoutParams(0, -2, 1f))
+            }
+
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val stacked = MeasureSpec.getSize(widthMeasureSpec) <
+                    dp(SETTINGS_MENU_MIN_ACTION_WIDTH_DP * 2 + SETTINGS_MENU_ACTION_GAP_DP)
+                orientation = if (stacked) VERTICAL else HORIZONTAL
+                for (index in 0 until childCount) {
+                    val params = getChildAt(index).layoutParams as LayoutParams
+                    params.width = if (stacked) LayoutParams.MATCH_PARENT else 0
+                    params.height = LayoutParams.WRAP_CONTENT
+                    params.weight = if (stacked) 0f else 1f
+                    params.marginStart = if (!stacked && index > 0) dp(SETTINGS_MENU_ACTION_GAP_DP) else 0
+                    params.marginEnd = 0
+                    params.resolveLayoutDirection(layoutDirection)
+                    params.topMargin = if (stacked && index > 0) dp(SETTINGS_MENU_ACTION_GAP_DP) else 0
+                }
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                if (!stacked) {
+                    val height = maxOf(first.measuredHeight, second.measuredHeight)
+                    for (child in listOf(first, second)) {
+                        child.measure(MeasureSpec.makeMeasureSpec(child.measuredWidth, MeasureSpec.EXACTLY),
+                            MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY))
+                    }
+                    setMeasuredDimension(measuredWidth, height)
+                }
             }
         }
 
-        resolutionPreviewView = preview
-        this.hotspotStatusView = hotspotStatusView
-        updateHotspotStatusBlock()
-        updateResolutionMenu()
+        addBlock(actionRow(
+            action(R.string.settings_return_to_home) { leaveSettingsMenu { showDiPlayHome() } },
+            action(R.string.settings_all_settings) {
+                leaveSettingsMenu { showDiPlayHome("settings") }
+            },
+        ))
+        addBlock(actionRow(
+            action(R.string.picture_adjustments) {
+                leaveSettingsMenu { openPicturePanel() }
+            },
+            action(R.string.exit_application, DiPlayButtonKind.DANGER) { exitApplication() },
+        ))
+
+        val volumes = CarPlayMenuVolumeControls(this, overlayPalette, CarPlayMenuVolume(
+            audio = getSystemService(android.media.AudioManager::class.java),
+            configuredStream = { navigation ->
+                sink?.configuredVolumeStream(navigation) ?: if (navigation)
+                    AirPlayPersistence.loadNavigationAudioChannel(this) else AirPlayPersistence.loadMediaAudioChannel(this)
+            },
+            bluetoothAudio = { controller?.usesCarBluetoothAudio ?: AirPlayPersistence.loadCarBluetoothAudio(this) },
+            suppressed = { runCatching {
+                inCall(this) || com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive
+            }.getOrDefault(true) },
+            report = ::appendLog,
+        ))
+        menuVolumeControls = volumes
+        val body = object : LinearLayout(this) {
+            init {
+                addView(actions, LayoutParams(-1, -2))
+                addView(volumes, LayoutParams(-1, -2))
+            }
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                val availableWidth = MeasureSpec.getSize(widthMeasureSpec)
+                val wide = availableWidth >= dp(SETTINGS_MENU_SPLIT_MIN_WIDTH_DP)
+                val paneWidth = (availableWidth - dp(SETTINGS_MENU_PANE_GAP_DP)).coerceAtLeast(0)
+                val actionWidth = paneWidth * 3 / 5
+                orientation = if (wide) HORIZONTAL else VERTICAL
+                for (index in 0 until childCount) {
+                    val params = getChildAt(index).layoutParams as LayoutParams
+                    params.width = if (!wide) LayoutParams.MATCH_PARENT else if (index == 0) actionWidth else paneWidth - actionWidth
+                    params.weight = 0f
+                    params.marginStart = if (wide && index > 0) dp(SETTINGS_MENU_PANE_GAP_DP) else 0
+                    params.marginEnd = 0
+                    params.resolveLayoutDirection(layoutDirection)
+                    params.topMargin = if (!wide && index > 0) dp(SETTINGS_MENU_ACTION_GAP_DP) else 0
+                }
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            }
+        }
+        content.addView(body, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(SETTINGS_MENU_ACTION_GAP_DP)
+        })
+
+        // A very narrow or heavily constrained window can scroll; normal landscape windows fit all actions.
+        overlay.addView(
+            ScrollView(this).apply { addView(content, ViewGroup.LayoutParams(-1, -2)) },
+            FrameLayout.LayoutParams(settingsMenuWidth(resources.displayMetrics.widthPixels), -2, Gravity.CENTER).apply {
+                topMargin = dp(SETTINGS_MENU_OUTER_GAP_DP)
+                bottomMargin = dp(SETTINGS_MENU_OUTER_GAP_DP)
+            },
+        )
         return overlay
     }
 
@@ -2970,6 +2665,7 @@ class CarPlayHostActivity : ComponentActivity() {
         safeAreaEditSize = null
         safeAreaEditor?.visibility = View.GONE
         settingsMenu?.visibility = View.VISIBLE
+        menuVolumeControls?.refresh()
         updateSafeAreaSummary()
         updateResolutionMenu()
         appendLog("Safe area editor closed")
@@ -3704,8 +3400,11 @@ class CarPlayHostActivity : ComponentActivity() {
         val diagnosticLog = sessionLog
         teardownExecutor.execute {
             val started = System.nanoTime()
+            oldController?.prepareTemporaryHotspotHandoff()
             oldController?.close()
             var completed: Boolean
+            // Shutdown is queued on this executor too. It must inherit a completed retirement,
+            // rather than treating cancellation of the replacement as completion of the old one.
             do {
                 completed = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
                 AsyncDiagnosticLog.append(
@@ -3714,7 +3413,7 @@ class CarPlayHostActivity : ComponentActivity() {
                         "restart teardownWaitCompleted=$completed " +
                         "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}",
                 )
-            } while (!completed && !shuttingDown.get() && !Thread.currentThread().isInterrupted)
+            } while (!completed && !Thread.currentThread().isInterrupted)
             oldSink?.let(::closeRetiringSink)
             runOnUiThread {
                 if (completed && !shuttingDown.get() && generation == restartGeneration) {
@@ -3744,6 +3443,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun openSettingsMenu() {
         if (menuOpen) return
+        closePicturePanel()
         controller?.sendTouch(emptyList())
         loadPersistedSettings()
         settingsBaseline = captureSettingsBaseline()
@@ -3811,8 +3511,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     /**
-     * The exits that do not announce a discard: the Back gesture and the link to the full settings
-     * screen. The close control's own description says it discards, and a USB attachment is not the
+     * The exits that do not announce a discard: the links to Home and the full settings screen.
+     * The close control's own description says it discards, and a USB attachment is not the
      * driver leaving, so both keep calling [cancelSettingsEdits] without a question.
      *
      * [onLeft] runs only once the menu has actually closed, so nothing navigates behind the dialog.
@@ -3880,33 +3580,64 @@ class CarPlayHostActivity : ComponentActivity() {
         shutdown(terminateProcess = true, reason = "settings exit application")
     }
 
+    private var shutdownComplete = false
+    private val shutdownWaiters = mutableListOf<() -> Unit>()
+
     private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
-        if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
+        if (shutdownComplete) { completion(); return }
+        shutdownWaiters.add(completion)
+        if (!shuttingDown.compareAndSet(false, true)) return
         startupRetryBudget.disconnected()
         restartGeneration += 1
         mainHandler.removeCallbacks(applyDisplaySize)
         val oldController = controller
         val oldSink = sink
         CarPlayMediaKeys.detach(oldController)
-        CarPlayBackgroundSession.clear(oldController)
+        // Retain the owner/stop action while clearing the adoptable snapshot. Manual reconnect
+        // and Bluetooth wake must wait for old sockets and the hotspot reservation to retire.
+        CarPlayBackgroundSession.clear(oldController, keepOwner = true)
         controller = null
         oldSink?.let(retiringSinks::add)
         sink = null
         sessionDisplay = null
         discardLastPicture()
         Log.i(TAG, "shutdown reason=$reason terminateProcess=$terminateProcess")
+        val diagnosticLog = sessionLog
+        AsyncDiagnosticLog.append(diagnosticLog, "Disconnect requested reason=$reason terminateProcess=$terminateProcess")
         teardownExecutor.execute {
+            val started = System.nanoTime()
+            if (!terminateProcess && reason == "DiPlay disconnect") oldController?.prepareTemporaryHotspotHandoff()
             oldController?.close()
-            val clean = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
+            var clean: Boolean
+            do {
+                clean = oldController?.awaitClosed(CONTROLLER_CLOSE_TIMEOUT_MILLIS) ?: true
+                AsyncDiagnosticLog.append(diagnosticLog,
+                    "${CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX} shutdown teardownWaitCompleted=$clean " +
+                        "elapsedMs=${((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0)}")
+            } while (!clean && !Thread.currentThread().isInterrupted)
+            if (!clean) return@execute
             oldSink?.let(::closeRetiringSink)
             airPlayCommandExecutor.shutdown()
             if (terminateProcess) {
+                com.shilapi.xcertplay.network.TemporaryHotspotReservationStore.release()
                 applicationContext.stopService(Intent(applicationContext, com.shilapi.xcertplay.network.CarPlaySocketService::class.java))
             }
             Log.i(TAG, "shutdown complete clean=$clean")
             applicationContext.stopService(Intent(applicationContext, DiPlaySessionService::class.java))
+            AsyncDiagnosticLog.append(diagnosticLog, "Disconnect cleanup complete; next connection may start")
+            AsyncDiagnosticLog.awaitIdle(1_000)
             teardownExecutor.shutdown()
-            mainHandler.post { completion() }
+            mainHandler.post {
+                if (CarPlayBackgroundSession.isOwner(this)) CarPlayBackgroundSession.clear()
+                shutdownComplete = true
+                if (isDestroyed) {
+                    sessionLog?.close()
+                    sessionLog = null
+                }
+                val callbacks = shutdownWaiters.toList()
+                shutdownWaiters.clear()
+                callbacks.forEach { it() }
+            }
             if (terminateProcess) Process.killProcess(Process.myPid())
         }
     }
@@ -4295,7 +4026,14 @@ class CarPlayHostActivity : ComponentActivity() {
         const val PREFACE_CANVAS_WIDTH_WITH_NAVIGATION_BAR = 1760
         const val PREFACE_CANVAS_HEIGHT = 720
         private const val SETTINGS_EXPERIMENTAL_MENU_CONTROL_HEIGHT_DP = 52
-        private const val SETTINGS_EXPERIMENTAL_MENU_GAP_DP = 16
+        private const val SETTINGS_MENU_ACTION_GAP_DP = 12
+        private const val SETTINGS_MENU_CONTROL_HEIGHT_DP = 48
+        private const val SETTINGS_MENU_BUTTON_PADDING_DP = 16
+        private const val SETTINGS_MENU_MIN_ACTION_WIDTH_DP = 240
+        private const val SETTINGS_MENU_OUTER_GAP_DP = 16
+        private const val SETTINGS_MENU_PADDING_DP = 20
+        private const val SETTINGS_MENU_SPLIT_MIN_WIDTH_DP = 840
+        private const val SETTINGS_MENU_PANE_GAP_DP = 24
         const val CLUSTER_SMALL_WINDOW_ON = 1
         const val CLUSTER_SMALL_WINDOW_AUTO = 2
         /** How long the last picture may stand in for the video after returning, and the wait to copy it. */
@@ -4318,7 +4056,7 @@ class CarPlayHostActivity : ComponentActivity() {
         const val PROTOCOL_TRACE_PREFIX = "TRACE "
         const val SETTINGS_SWIPE_DISTANCE_DP = 72
         const val SETTINGS_SWIPE_DIRECTION_RATIO = 1.15f
-        const val MAX_SETTINGS_MENU_WIDTH_DP = 720
+        const val MAX_SETTINGS_MENU_WIDTH_DP = 920
         val NO_VIDEO_BACKGROUND = Color.rgb(0x16, 0x16, 0x18)
     }
 

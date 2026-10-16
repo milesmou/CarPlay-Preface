@@ -48,11 +48,13 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 
 按用户要求，连接设置新增手动车机热点与临时热点二选一；实现范围及验证限制见 [手动热点说明](MANUAL_HOTSPOT.md)。手动模式现按用户要求在选择时尝试开启系统保存的热点，不修改配置或关闭热点；仍保留权限、状态与会话检查，尚未获得实车验证结果。
 
-首次接入失败的临时热点重试现保留同一有效 LocalOnlyHotspot 预约与控制器，失效才重建，断开仍释放本应用预约；定向验证及重试预算见 [热点生命周期](MANUAL_HOTSPOT.md)。这是应用实现，不是参考固件或报告设备的自动接入可用性证据。
+临时热点重试保留同一有效 LocalOnlyHotspot 预约，失效才重建。2026-10-16 按用户补充要求扩展到手动断开／重连：旧连接清理完成后交接本应用有效预约，新连接复核接口和地址再复用，完全退出或改用其他连接方式时释放；定向验证及重试预算见 [热点生命周期](MANUAL_HOTSPOT.md)。这是应用实现，不是参考固件或报告设备的自动接入可用性证据。
 
 第五份 17:50 报告确认私有 305 和标准媒体广播双路发送；用户补充首次自动连接成功、第二次手动点击连接。参考 OTA 底层 `services.vdex` 的五个 CompactDex 方法显示观察者多路分发及原厂互联应用条件，详见 [输入观察者证据](PREFACE_FIRMWARE_327.md#输入观察者不是第三方独占接口2026-10-14)。工程撤回私有音量回调并行写入，补上跨路径去重、无线启动窗口变化保留及待准备预约即时释放；不能据此宣称原车跳页或间歇性自动接入已修复。
 
 ## 后续工程可复用的信息
+
+2026-10-16 [主动断开后的重连与蓝牙音乐复核](DISCONNECT_RECONNECT_AUDIO_2026-10-16.md)：用户确认首次为应用内主动断开；修正退出清理提前放行、重建中退出、会话丢失时临时热点重建及蓝牙模式主音频声明不一致。报告中的运行中 socket 中断根因和修正后蓝牙播放仍待实车验证，未增加原厂接口证据。
 
 2026-10-16 [方控重复触发修正](WHEEL_ECHO_FIXES_2026-10-16.md)：播放／暂停语义回调加入跨入口去重，Siri 长按广播与物理释放共享已处理按压状态。复核语音广播 0/1 为短按／长按语义，参考 E02 长按亦可发送动作 0；应用定向测试通过，未构建 APK 或实车验证。
 
@@ -106,6 +108,7 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 上述值直接读取 `boot-framework.vdex` 中 AudioManager/AudioSystem 的 CompactDex 静态字段；完整 STREAM、USAGE、FLAG 常量保存在 `audio-framework-constants.json`。**stream 与 AudioAttributes usage 是不同参数。14 是提示音，不能套作导航。**
 
 - 原厂音量动作查询 `AudioManager.getStreamTypeInActive()`，只接受 0、3、9、12，其余选媒体 3。使用 `getStreamVolume` / `setStreamVolume(..., flags=5)`，长按每 250 ms 重复。本项目不再提供应用内音量比例，媒体与导航音量均由系统音频流控制。
+- 2026-10-16 用户要求在快捷菜单加入媒体／导航音量滑动条，应用通过公共系统接口调节实际音频通道，保留通话、蓝牙模式、通道支持及写入结果检查，详见 [即时音量调节](CARPLAY_HOME_NAVIGATION.md#即时音量调节构建-73)。这是应用 UI 与系统音量控制实现，沿用已有 3／12 静态常量，不是新增固件接口证据或实车验证。
 - `vendor/etc/audio_policy_configuration.xml` 的 primary output 声明 PCM 16-bit、44.1/48 kHz、立体声；primary input 声明 PCM 16-bit、8/16 kHz、单声道／双声道／语音上下行 mask。
 - 内置前、后麦克风端口声明 8/16 kHz、单／双声道。可用作 Siri 录音排查起点；真实通路、声道布局、并发录音及 HAL 重采样仍需运行时确认。
 - `vendor/etc/audio_effects.xml` 有实际 `aec` effect，并在 `voice_communication` preprocess 中应用。不能据此声称所有 AudioRecord source 自动获得回声消除；需真车确认录音 source、AEC 可用性及通话抢占。

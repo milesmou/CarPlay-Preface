@@ -230,6 +230,9 @@ class AndroidMediaSink(
         onAudioDiagnostic,
     )
 
+    /** Frozen connection settings for volume adjustment before an audio track is created. */
+    fun configuredVolumeStream(navigation: Boolean): Int = if (navigation) navigationChannel else mediaChannel
+
     /** The media-key session may own Android's current focus request for this same sink. */
     fun onMediaAudioFocusChanged(change: Int) {
         audioFocusCoordinator.onExternalFocusChange(change)
