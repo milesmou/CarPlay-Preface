@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.net.VpnService
 import android.os.Handler
 import android.widget.TextView
@@ -21,6 +23,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
@@ -113,6 +116,7 @@ class CarPlayVpnConsentTest {
     }
 
     @Before fun setUp() {
+        UsbAutoConnect.resetForTest()
         VpnConsentTestShadow.failure = null
         VpnConsentTestShadow.consent = Intent().setClassName(
             "com.android.vpndialogs", "com.android.vpndialogs.ConfirmDialog",
@@ -130,6 +134,36 @@ class CarPlayVpnConsentTest {
         ReflectionHelpers.getField<ExecutorService>(activity, "teardownExecutor").shutdownNow()
         ReflectionHelpers.getField<ExecutorService>(activity, "airPlayCommandExecutor").shutdownNow()
         CarPlayBackgroundSession.clear()
+        UsbAutoConnect.resetForTest()
+    }
+
+    @Test fun missingVpnAllowsExplicitWirelessAndLateUsbCallbacksCannotReclaimTheCable() {
+        val device = ReflectionHelpers.newInstance(UsbDevice::class.java).apply {
+            ReflectionHelpers.setField(this, "mName", "usb-vpn-failed")
+            ReflectionHelpers.setField(this, "mVendorId", 0x05ac)
+        }
+        shadowOf(activity.getSystemService(UsbManager::class.java)).addOrUpdateUsbDevice(device, false)
+        replaceLauncher { throw ActivityNotFoundException("Missing OEM VPN dialog") }
+        invoke("requestVpnConsent")
+        assertTrue(UsbAutoConnect.canChooseWireless(activity))
+        assertTrue(UsbAutoConnect.chooseWireless(activity))
+        // The old host still has wirelessEnabled=false until teardown; delayed prerequisites and
+        // consent results must not start a new USB attempt during the wireless handoff.
+        VpnConsentTestShadow.failure = SecurityException("Old USB must not prepare VPN again")
+        invoke("requestStartupPrerequisites")
+        invoke("requestVpnConsent")
+        ReflectionHelpers.setField(activity, "awaitingVpnConsent", true)
+        // Even a recreated host that sees the current generation must respect the driver's
+        // wireless selection, rather than preparing VPN from an old result.
+        ReflectionHelpers.setField(activity, "usbAttemptGeneration", UsbAutoConnect.generation)
+        result(Activity.RESULT_OK)
+        assertFalse(field("vpnReady"))
+        assertFalse(log().contains("operation=result"))
+        assertFalse(log().contains("operation=prepare"))
+        assertTrue(UsbAutoConnect.wirelessSelected(activity))
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
+        invoke("maybeStartCarPlay")
+        assertTrue(field("wirelessEnabled"))
     }
 
     @Test fun missingConsentDialogDoesNotCrashOrLeaveAuthorizationPending() {

@@ -22,7 +22,7 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 85
+        versionCode = 86
         versionName = "0.1.1"
 
     }
@@ -111,6 +111,28 @@ val rejectBundledCredentials by tasks.registering {
     }
 }
 tasks.named("preBuild") { dependsOn(rejectBundledCredentials) }
+
+// Bundle the separate, platform-signed consent APK. Signing inputs remain local and are never assets.
+abstract class PrepareAuthorizationAssets : Exec() {
+    @get:OutputDirectory abstract val assetOutput: DirectoryProperty
+}
+val authorizationAssets = layout.buildDirectory.dir("generated/authorizationAssets")
+val prepareAuthorizationAssets by tasks.registering(PrepareAuthorizationAssets::class) {
+    group = "build"
+    dependsOn(":authorization-components:assembleRelease")
+    val unsigned = rootProject.layout.projectDirectory.file("authorization-components/build/outputs/apk/release/authorization-components-release-unsigned.apk")
+    val metadata = rootProject.layout.projectDirectory.file("authorization-components/build/outputs/apk/release/output-metadata.json")
+    val script = rootProject.layout.projectDirectory.file("scripts/android9_authorization.py")
+    inputs.files(unsigned, metadata, script,
+        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.pk8"),
+        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.x509.pem"))
+    assetOutput.set(authorizationAssets)
+    workingDir(rootProject.projectDir)
+    commandLine("python", script.asFile.absolutePath, "--sign", "--asset-output", authorizationAssets.get().asFile.absolutePath)
+}
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareAuthorizationAssets, PrepareAuthorizationAssets::assetOutput)
+}
 
 // Both ordinary and standalone main-app builds include the selected pair.
 val verifyStandaloneAuthentication by tasks.registering {

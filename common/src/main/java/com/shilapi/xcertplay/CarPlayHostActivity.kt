@@ -402,6 +402,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var wirelessPermissionsReady = false
     private var vpnReady = false
     private var awaitingVpnConsent = false
+    private var usbAttemptGeneration = UsbAutoConnect.generation
     private var wirelessHotspotMode = WirelessHotspotMode.LOCAL_ONLY_HOTSPOT
     private var manualHotspotSsid = ""
     private var manualHotspotPassphrase = ""
@@ -559,6 +560,8 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         awaitingVpnConsent = savedInstanceState?.getBoolean("usb_vpn_pending") ?: false
+        usbAttemptGeneration = savedInstanceState?.getLong("usb_attempt_generation", UsbAutoConnect.generation)
+            ?: UsbAutoConnect.generation
         NavigationWidgetUpdater.attach(applicationContext)
         if (isIphoneUsbAttachment(intent)) {
             AirPlayPersistence.saveWirelessEnabled(this, false)
@@ -677,6 +680,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestStartupPrerequisites() {
+        if (shuttingDown.get() || (!wirelessEnabled && UsbAutoConnect.wirelessSelected(this))) return
         if (locationReportingEnabled && !locationPermissionAvailable) {
             requestLocationPermission()
             return
@@ -689,7 +693,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestVpnConsent() {
-        if (awaitingVpnConsent || shuttingDown.get() || wirelessEnabled) return
+        if (awaitingVpnConsent || shuttingDown.get() || wirelessEnabled || UsbAutoConnect.wirelessSelected(this)) return
+        usbAttemptGeneration = UsbAutoConnect.beginWiredAttempt(this)
         val consent = try {
             com.shilapi.xcertplay.network.CarPlayVpnService.prepare(this)
         } catch (error: RuntimeException) {
@@ -713,7 +718,8 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!awaitingVpnConsent) return
         awaitingVpnConsent = false
         vpnReady = false
-        if (shuttingDown.get() || wirelessEnabled) return
+        if (shuttingDown.get() || wirelessEnabled || UsbAutoConnect.wirelessSelected(this) ||
+            usbAttemptGeneration != UsbAutoConnect.generation) return
         if (resultCode == RESULT_OK) {
             // A result alone does not prove that this package is still the prepared VPN owner.
             requestVpnConsentAfterResult()
@@ -740,6 +746,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun stopVpnStartup(@androidx.annotation.StringRes message: Int) {
+        if (!wirelessEnabled) UsbAutoConnect.wiredFailed(this, usbAttemptGeneration)
         startupRetryStopped = true
         reconnectScheduled = false
         ++reconnectTicket
@@ -810,6 +817,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun isIphoneUsbAttachment(intent: Intent): Boolean {
         if (intent.action != UsbManager.ACTION_USB_DEVICE_ATTACHED) return false
+        if (!UsbAutoConnect.isCurrentRequest(intent) || UsbAutoConnect.wirelessSelected(this)) return false
         val device = androidx.core.content.IntentCompat.getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
         return device?.vendorId == IphoneUsbMatcher.APPLE_VENDOR_ID
     }
@@ -953,6 +961,7 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("carplay_night_active", darkMode)
         outState.putBoolean("usb_vpn_pending", awaitingVpnConsent)
+        outState.putLong("usb_attempt_generation", usbAttemptGeneration)
         super.onSaveInstanceState(outState)
     }
 
@@ -1215,6 +1224,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // VPN denial happens before a controller owns the background session. That initial
         // attempt still needs a working Retry button, without disturbing another owner's session.
         if (!CarPlayBackgroundSession.isOwner(this) && (controller != null || CarPlayBackgroundSession.hasSession())) return
+        if (!wirelessEnabled) usbAttemptGeneration = UsbAutoConnect.beginWiredAttempt(this)
         startupRetryBudget.manualRetry()
         startupRetryStopped = false
         reconnectAttempts = 0
@@ -2897,6 +2907,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeAirPlaySession = session
                     CarPlayBackgroundSession.active = true
+                    if (!wirelessEnabled) UsbAutoConnect.wiredConnected(usbAttemptGeneration)
                     // A late successful handshake supersedes pending recovery, including a stopped
                     // startup budget. Keep the budget until stable video, but allow future loss recovery.
                     ++reconnectTicket
@@ -2991,6 +3002,7 @@ class CarPlayHostActivity : ComponentActivity() {
         controllerGeneration: Int,
     ): (CarPlayStatus) -> Unit = report@{ status ->
         if (controllerGeneration != restartGeneration) return@report
+        if (!wirelessEnabled && status is CarPlayStatus.Failed) UsbAutoConnect.wiredFailed(this, usbAttemptGeneration)
         if (status is CarPlayStatus.Failed && !startupRetryStopped) {
             bluetoothRecoveryAllowed = status.retryable && !status.wifiResetRequired &&
                 status.startupFailure?.retryable != false
@@ -3397,7 +3409,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun maybeStartCarPlay() {
         if (shuttingDown.get()) return
-        if (wirelessEnabled && UsbAutoConnect.attached(this) != null) {
+        if (!wirelessEnabled && UsbAutoConnect.wirelessSelected(this)) return
+        if (wirelessEnabled && UsbAutoConnect.priorityDevice(this) != null) {
             wirelessEnabled = false
             AirPlayPersistence.saveWirelessEnabled(this, false)
             if (controller != null) restartCarPlay("USB attached; switching from wireless")
@@ -3498,7 +3511,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     /** A connected Bluetooth profile may arrive after the initial wireless retry budget ran out. */
     internal fun onPhoneBluetoothConnected(address: String): String {
-        if (UsbAutoConnect.attached(this) != null) return "usb-priority"
+        if (UsbAutoConnect.priorityDevice(this) != null) return "usb-priority"
         if (!CarPlayBackgroundSession.isOwner(this) || shuttingDown.get()) return "session-stopping"
         if (controller?.matchesWirelessPhone(address) != true) return "session-other-transport-or-phone"
         if (activeAirPlaySession != null || CarPlayBackgroundSession.active) return "session-active"

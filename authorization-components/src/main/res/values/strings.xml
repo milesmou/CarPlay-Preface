@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">星瑞系统授权</string>
+    <string name="vpn_title">允许 CarPlay 创建 VPN？</string>
+    <string name="vpn_body">%1$s 请求创建 VPN。VPN 可处理该应用路由的网络流量，请仅在信任此应用时允许。CarPlay 使用本地 VPN 进行 USB 通信；本页只授权，不建立连接。</string>
+    <string name="write_title">修改系统设置</string>
+    <string name="write_body">应用：%1$s\n当前状态：%2$s\n\n允许后，该应用可以修改系统设置。CarPlay 将其用于尝试开启已保存的车机热点；临时热点不需要此权限。</string>
+    <string name="allowed">已允许</string>
+    <string name="denied">未允许</string>
+    <string name="allow">允许</string>
+    <string name="revoke">关闭授权</string>
+    <string name="cancel">取消</string>
+    <string name="close">关闭</string>
+    <string name="unavailable_title">暂时无法授权</string>
+    <string name="unavailable_body">请核对 Android 9 系统版本、平台签名、组件权限和 CarPlay 安装包。系统策略限制或接口不可用时，无法在此授权。</string>
+    <string name="blocked_body">系统限制了 VPN 配置，或其他应用正在使用始终开启的 VPN。请先在系统设置中处理，再返回 CarPlay 重试。</string>
+    <string name="home_body">此补充包提供 CarPlay 所需的 Android 9 VPN 确认窗口和“修改系统设置”授权页。\n\n创建 VPN：请返回 CarPlay → 设置 → 授权 → 创建 VPN，由 CarPlay 发起确认。\n\n修改系统设置：可从 CarPlay 的授权页进入，也可选择下方已安装的应用。安装或打开本页不会自动授权。</string>
+    <string name="open_write">%1$s · 修改系统设置</string>
+</resources>

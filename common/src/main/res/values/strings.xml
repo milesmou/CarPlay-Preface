@@ -13,8 +13,16 @@
     <string name="home_usb_priority">USB takes priority over wireless CarPlay.</string>
     <string name="settings_authorization">Authorization</string>
     <string name="settings_authorization_summary">Manage system authorization for this app.</string>
-    <string name="settings_authorization_native_title">Install native Settings first</string>
-    <string name="settings_authorization_native_description">Install it before authorizing. VPN consent also requires the corresponding system component.</string>
+    <string name="settings_authorization_native_title">System authorization component</string>
+    <string name="settings_authorization_native_description">This APK includes the Android 9 authorization component. If it is missing and compatible with the system, install it below and confirm the system installer. Then grant each permission separately.</string>
+    <string name="settings_authorization_component_available">The bundled component can be installed. Installation does not grant permissions or start a connection.</string>
+    <string name="settings_authorization_component_install">Install authorization component · Open installer</string>
+    <string name="settings_authorization_component_preparing">Preparing authorization component…</string>
+    <string name="settings_authorization_component_ready">Authorization component installed. Use the permission actions below.</string>
+    <string name="settings_authorization_component_existing">A system component already exists and will be preserved. Use the permission actions below.</string>
+    <string name="settings_authorization_component_permission_missing">The component is installed but unavailable or missing system permissions. Check its status in system settings.</string>
+    <string name="settings_authorization_component_unsupported">The bundled component does not match this system or is not included in this build. Use the available system authorization pages below.</string>
+    <string name="settings_authorization_component_install_failed">Cannot open the component installer. Check system compatibility and installer availability, then try again.</string>
     <string name="settings_authorization_system">System authorization</string>
     <string name="settings_authorization_write">Modify system settings</string>
     <string name="settings_authorization_write_description">Allows the app to turn on the configured car hotspot before connecting, if supported by the system. Temporary hotspots do not need this permission.</string>
@@ -27,7 +35,7 @@
     <string name="settings_authorization_last_allowed">Previously authorized</string>
     <string name="settings_authorization_check">Check and authorize</string>
     <string name="settings_authorization_waiting">Awaiting confirmation</string>
-    <string name="settings_authorization_unavailable">Cannot open system authorization. Install native Settings and make sure the required system component is enabled.</string>
+    <string name="settings_authorization_unavailable">Cannot open system authorization. Install the compatible authorization component above, or check the existing system component and its permissions.</string>
     <string name="settings_authorization_cancelled">VPN authorization was cancelled. Tap to retry.</string>
     <string name="settings_authorization_not_completed">System VPN consent has not been granted. Tap to retry.</string>
     <string name="settings_authorization_vpn_checked">This is the last manual check result. Tap to check again.</string>

@@ -13,8 +13,16 @@
     <string name="home_usb_priority">接入 USB 时，优先使用有线 CarPlay。</string>
     <string name="settings_authorization">授权</string>
     <string name="settings_authorization_summary">管理本应用的系统授权。</string>
-    <string name="settings_authorization_native_title">请先安装原生设置</string>
-    <string name="settings_authorization_native_description">安装后再进行以下授权；VPN 授权还需系统提供对应组件。</string>
+    <string name="settings_authorization_native_title">系统授权组件</string>
+    <string name="settings_authorization_native_description">当前 APK 已内置 Android 9 授权组件。组件缺失且系统匹配时，可在下方安装并确认系统安装提示，再分别进行授权。</string>
+    <string name="settings_authorization_component_available">可安装内置授权组件。安装不会自动授权或启动连接。</string>
+    <string name="settings_authorization_component_install">安装授权组件 · 打开安装器</string>
+    <string name="settings_authorization_component_preparing">正在准备授权组件…</string>
+    <string name="settings_authorization_component_ready">授权组件已安装，可使用下方授权入口。</string>
+    <string name="settings_authorization_component_existing">系统已有授权组件，将保留原组件。可使用下方授权入口。</string>
+    <string name="settings_authorization_component_permission_missing">组件已安装，但当前不可用或缺少系统权限，请在系统设置中检查。</string>
+    <string name="settings_authorization_component_unsupported">内置组件与当前系统不匹配，或本构建未包含组件。可使用下方已有系统授权入口。</string>
+    <string name="settings_authorization_component_install_failed">无法打开组件安装器，请检查系统是否匹配、安装器是否可用后重试。</string>
     <string name="settings_authorization_system">系统授权</string>
     <string name="settings_authorization_write">修改系统设置</string>
     <string name="settings_authorization_write_description">用于在连接前自动开启手动车机热点（需系统支持）；临时热点无需此权限。</string>
@@ -27,7 +35,7 @@
     <string name="settings_authorization_last_allowed">上次已授权</string>
     <string name="settings_authorization_check">检查并授权</string>
     <string name="settings_authorization_waiting">等待系统确认</string>
-    <string name="settings_authorization_unavailable">无法打开系统授权页面。请先安装原生设置，并确认对应系统组件已启用。</string>
+    <string name="settings_authorization_unavailable">无法打开系统授权页面。请先安装上方兼容的授权组件，或检查已有系统组件及其权限。</string>
     <string name="settings_authorization_cancelled">已取消 VPN 授权，可点击重试。</string>
     <string name="settings_authorization_not_completed">系统尚未授予 VPN 权限，可点击重试。</string>
     <string name="settings_authorization_vpn_checked">显示最近一次手动检查结果，点击可重新检查。</string>

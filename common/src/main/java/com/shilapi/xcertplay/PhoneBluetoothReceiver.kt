@@ -40,7 +40,7 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         val address = runCatching { device.address }.getOrNull()
         if (address == null) { skip("address-unavailable"); return }
         if (!address.equals(selected, ignoreCase = true)) { skip("other-phone"); return }
-        if (!disconnected && UsbAutoConnect.attached(context) != null) {
+        if (!disconnected && UsbAutoConnect.priorityDevice(context) != null) {
             skip("usb-priority")
             UsbAutoConnect.request(context)
             return

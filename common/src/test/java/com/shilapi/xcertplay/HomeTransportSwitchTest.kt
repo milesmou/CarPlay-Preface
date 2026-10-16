@@ -1,6 +1,8 @@
 package com.shilapi.xcertplay
 
 import android.content.Intent
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
 import android.os.Looper
 import android.view.Surface
 import android.widget.Button
@@ -33,13 +35,55 @@ class HomeTransportSwitchTest {
     private var release: (() -> Unit)? = null
 
     @Before fun setup() {
+        UsbAutoConnect.resetForTest()
         CarPlayBackgroundSession.clear()
         app.getSharedPreferences("diplay", 0).edit().clear().commit()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         DiPlayPreferences.savePhone(app, "12:34:56:78:90:AB", "iPhone")
     }
 
-    @After fun cleanup() { screen?.destroy(); CarPlayBackgroundSession.clear() }
+    @After fun cleanup() { screen?.destroy(); CarPlayBackgroundSession.clear(); UsbAutoConnect.resetForTest() }
+
+    private fun attachFailedUsb() {
+        val device = ReflectionHelpers.newInstance(UsbDevice::class.java).apply {
+            ReflectionHelpers.setField(this, "mName", "usb-failed-phone")
+            ReflectionHelpers.setField(this, "mVendorId", 0x05ac)
+        }
+        shadowOf(app.getSystemService(UsbManager::class.java)).addOrUpdateUsbDevice(device, false)
+        UsbAutoConnect.wiredFailed(app, UsbAutoConnect.beginWiredAttempt(app))
+    }
+
+    @Test fun failedUsbStillPluggedInCanBeReplacedByAnExplicitWirelessSelection() {
+        attachFailedUsb()
+        retain(CarPlayTransport.WIRED)
+        AirPlayPersistence.saveWirelessEnabled(app, false)
+        val activity = home()
+        assertTrue(wireless(activity).isEnabled)
+        wireless(activity).performClick()
+        assertEquals(1, stops)
+        assertNull(shadowOf(activity).nextStartedActivity)
+        release!!()
+        shadowOf(Looper.getMainLooper()).idle()
+        val launch = shadowOf(activity).nextStartedActivity
+        assertEquals(CarPlayHostActivity::class.java.name, launch?.component?.className)
+        assertNull(launch?.action)
+        assertFalse(launch!!.hasExtra(UsbManager.EXTRA_DEVICE))
+        assertTrue(AirPlayPersistence.loadWirelessEnabled(app))
+        assertNotNull(UsbAutoConnect.attached(app))
+        assertFalse(UsbAutoConnect.request(activity))
+    }
+
+    @Test fun failedVpnBeforeAControllerExistsCanAlsoStartWirelessWithoutUnplugging() {
+        attachFailedUsb()
+        AirPlayPersistence.saveWirelessEnabled(app, false)
+        val activity = home()
+        wireless(activity).performClick()
+        assertEquals(0, stops)
+        val launch = shadowOf(activity).nextStartedActivity
+        assertEquals(CarPlayHostActivity::class.java.name, launch?.component?.className)
+        assertNull(launch?.action)
+        assertTrue(AirPlayPersistence.loadWirelessEnabled(app))
+    }
 
     private fun retain(mode: CarPlayTransport, active: Boolean = false, closed: Boolean = false): CarPlayController {
         val controller = mock(CarPlayController::class.java)

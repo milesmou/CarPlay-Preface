@@ -64,6 +64,42 @@ class AuthorizationSettingsUiTest {
         assertEquals(0, AuthorizationVpnShadow.calls)
     }
 
+    @Test fun bundledComponentOnlyOpensInstallerAfterExplicitTapAndDoesNotGrantVpn() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
+        screen.authorizationInstallWorker = { it.run() }
+        var preparations = 0
+        screen.authorizationPrepareInstall = {
+            preparations++
+            Intent(Intent.ACTION_VIEW).setDataAndType(android.net.Uri.parse("content://test/component"), "application/vnd.android.package-archive")
+        }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        assertEquals(0, preparations)
+        assertNull(shadowOf(screen).nextStartedActivity)
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.performClick()
+        assertEquals(1, preparations)
+        assertEquals(Intent.ACTION_VIEW, shadowOf(screen).nextStartedActivity.action)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.READY }
+        controller!!.pause().resume()
+        assertFalse(descendants(screen.window.decorView).any { it.tag == "authorization-component-install" })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_ready) })
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun failedComponentPreparationShowsRetryWithoutOpeningVpnOrInstaller() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
+        screen.authorizationInstallWorker = { it.run() }
+        screen.authorizationPrepareInstall = { throw IllegalStateException("invalid archive") }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.performClick()
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_install_failed) })
+        assertTrue(descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.isEnabled)
+        assertNull(shadowOf(screen).nextStartedActivity)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
     @Test fun writeStatusRefreshesWhenReturningFromSystemSettings() {
         val screen = openAuthorization()
         row(screen, R.string.settings_authorization_write).performClick()
@@ -132,6 +168,8 @@ class AuthorizationSettingsUiTest {
         InterfaceSize.save(context, if (size == "compact") 100 else InterfaceSize.PREFACE_12_3)
         if (rtl) context.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
         val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
         val frame = screen.findViewById<ViewGroup>(android.R.id.content)
         val write = row(screen, R.string.settings_authorization_write)
         val vpn = row(screen, R.string.settings_authorization_vpn)

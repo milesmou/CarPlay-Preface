@@ -24,6 +24,8 @@ f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01
 文件名中的年款与排量是提供者命名，不作为所有星瑞 E02 固件共用接口的依据。新固件先核对产品、型号、API、构建及来源校验值，再比较差异。
 
 - [机器可读的适配事实](firmware/ihu519g-327.json)：身份、音频常量、按键映射、服务、权限和证据校验值，可随仓库保留。
+- [Android 9 授权补充组件](ANDROID9_AUTHORIZATION_COMPONENTS.md)：按用户要求独立补齐 CarPlay VPN 确认和修改系统设置页，已构建并使用匹配参考固件的平台测试签名；安装器及运行时复核实际系统与签名，IHU353G 实车尚未安装验证。
+- [2026-10-16 VPN 固件分析](PREFACE_VPN_FIRMWARE_ANALYSIS_2026-10-16.md)：报告停在 ConfirmDialog 无法启动；参考 OTA 内置 TUN 驱动且平台证书匹配 AOSP 测试证书，存在恢复匹配签名授权组件的候选路径，IHU353G 平台证书与实车可用性待核对。
 - [2026-10-16 热点与蓝牙恢复修正](HOTSPOT_BLUETOOTH_RECOVERY_2026-10-16.md)：构建 85 完整报告确认热点接口失效与真断线；本地 Android 9 框架复现旧预约回收影响新请求，应用隔离预约并完善蓝牙音乐恢复确认。属于工程修正，实车结果待验证，不新增本 OTA 的可用性结论。
 - [v0.2.16.20 与 v0.2.20.1 切歌对照](GEELYPLAY_BLUETOOTH_STEERING_0.2.16.20.md)：核对固定源码与两个正式 APK，确认旧版连接模式不等于本仓库蓝牙音频开关；新 E01 包默认切换方控映射，普通播放不再加载旧学习配置与默认厂商桥接。这是参考项目静态差异，反馈车辆及本车实测结论未确认。
 - [系统授权入口](SYSTEM_AUTHORIZATION.md)：构建 77 按用户要求新增修改系统设置／VPN 手动授权；页面可用性与 VPN/TUN 能力分别验证；构建 81 按用户新要求恢复 [官方 USB VPN](USB_VPN_RESTORE_0.2.20.md)，属于应用实现，不增加参考固件能力结论。
@@ -238,4 +240,4 @@ python scripts/firmware_catalog.py --cache agent_docs/firmware/ihu519g-327 --aap
 4. 逐个确认 SDK 是否加载、服务是否允许本应用绑定、权限是否获授、FunctionStatus 及具体车型分支。拒绝访问时记录错误并回退标准 Android 行为。
 5. 验证 USB 物理口、授权／重连、Wi-Fi 频段／路由，以及熄火休眠、唤醒、冷启动、后台保活。诊断记录应去除 VIN、设备唯一 ID、配对地址和网络凭据。
 
-按用户不能依赖 VPN 的运行约束，当前 USB 改用普通服务承载系统 NCM 网卡 socket，删除 USB VPN 授权与回退；这是应用实现变更，不是新增固件可用性证据，实车端到端连接仍待验证，见 [USB 无 VPN 方案](USB_WITHOUT_VPN.md)。
+2026-10-16 用户最新要求已将当前 USB 恢复为 [官方 v0.2.20 NCM＋本地 VPN 方案](USB_VPN_RESTORE_0.2.20.md)。本页较早的系统网卡优先／VPN 回退及后续无 VPN 方案均为历史工程记录，不再接入当前 USB 主流程；实车端到端连接仍待验证。授权窗口缺失的固件证据与候选修复见 [VPN 固件分析](PREFACE_VPN_FIRMWARE_ANALYSIS_2026-10-16.md)。

@@ -18,6 +18,10 @@ captures/
 # Local agent working notes
 /agent_docs/
 
+# Python helper caches
+__pycache__/
+*.py[cod]
+
 # OS files
 .DS_Store
 Thumbs.db

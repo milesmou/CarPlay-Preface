@@ -18,6 +18,7 @@
     <!-- Optional overlays for other application controls. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <queries>
+        <package android:name="com.android.vpndialogs" />
         <package android:name="com.ecarx.sdk.openapi" />
         <package android:name="ecarx.xsf.mediacenter" />
         <intent>

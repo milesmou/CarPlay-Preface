@@ -11,7 +11,7 @@ Instructions for coding agents that work on CarPlay-Preface.
 5. 无线连接提供“临时热点”和“手动车机热点”二选一，默认使用 Android `LocalOnlyHotspot` 临时热点。手动模式选择后，应用尝试使用系统保存配置开启车机热点；用户保存匹配的 SSID 和密码。保留权限和接口检查，无法开启时提示原因及系统设置入口；不修改热点配置或自动关闭热点，存在 CarPlay 会话时不操作热点开关。临时热点使用公共 API 与系统分配的名称、密码、频段；手动断开 CarPlay 后保留本应用仍有效的预约，手动重连或重建连接前复核接口和地址，有效则复用原名称与密码，失效才重建。完全退出、重置临时热点或改用 USB／手动热点时仅释放本应用的预约，不关闭其他应用或系统持有的热点。预约仅在本进程内保留，进程结束后重新检查并申请。两种模式均保留权限、接口归属和运行状态检查，不猜测信道；不引入 Wi-Fi Direct 或现有 Wi-Fi／同一局域网模式，正式发布前不保留旧配置迁移代码。设置变更在下一次连接生效，不擅自中断正在运行的 CarPlay。
 6. 用户已确认实际车机为 **2023 款星瑞、12.3 英寸中控屏、1920×720 像素、横屏**。应用“界面大小 → 星瑞 12.3 英寸”使用该屏幕的 160 dpi 应用逻辑密度基准（不是硬件物理 PPI，也不修改系统密度），并作为默认选项；界面大小仅保留星瑞 12.3 英寸、75%、100%、125%、150%，移除自动及 200% 模式，缺失或无效保存值使用星瑞选项，保留有效百分比选择与系统字体大小，详见 `docs/PREFACE_SCREEN_LAYOUT.md`。后续车机界面测试和截图固定使用 **1920×720 横屏**，不使用竖屏截图验证车机界面；高密度、大字体和窄可用窗口场景也必须保持横屏，在同一分辨率下通过密度、字体比例或可用窗口约束验证。1920×720 是像素分辨率，不是 dp 尺寸；控件仍使用 dp，并根据运行时密度、系统栏及分屏后的实际可用窗口适配。用户预览优先交付已安装 APK 的原始截图，记录设备、版本、密度、字体及界面大小；单元测试渲染图必须标明来源，不作为实际运行截图交付。可使用 `scripts/capture_ui_preview.py` 检查页面和参数后截图。
 
-7. 按用户 2026-10-16 的最新要求，USB 恢复官方 DiPlay v0.2.20 的 **NCM＋本地 VPN/TUN** 方案（来源提交 `3c95c936859e8a9153f0040caf2337adddb9e3e4`），不依赖 root 或系统预先创建的 NCM 网卡。USB 启动时按需请求系统 VPN 授权，应用仅接管当前 iPhone 的 NCM 接口，TUN 只允许本应用且仅路由 `fe80::/64`，不连接远程 VPN 服务器、不回退为全设备 VPN。保留 USB 授权、活动配置、配对、认证和会话检查；授权拒绝／组件缺失、TUN 建立失败或桥接错误明确失败并停止自动重试，不伪造授权、不自动通过 ADB 修改 VPN app-op。无线继续使用普通 socket 服务，不申请 VPN 或创建 TUN。退出、取消、拔线及授权撤销释放本应用持有的 NCM/TUN/监听资源。旧系统网卡路径与失败后的独立原始帧测试不再接入 USB 主流程，避免与实时桥接争抢接口。设置中的“授权”保留手动系统设置／VPN 入口，顶部提示先安装原生设置；页面渲染、搜索及恢复时不调用 `VpnService.prepare()`，手动 VPN 按钮只授权，不启动连接。USB 启动及该次授权返回可以调用准备接口。详见 `docs/USB_VPN_RESTORE_0.2.20.md`、`docs/SYSTEM_AUTHORIZATION.md`。应用实现与实车验证分别记录，不将恢复上游方案描述为星瑞实车连接已修复。
+7. 按用户 2026-10-16 的最新要求，USB 恢复官方 DiPlay v0.2.20 的 **NCM＋本地 VPN/TUN** 方案（来源提交 `3c95c936859e8a9153f0040caf2337adddb9e3e4`），不依赖 root 或系统预先创建的 NCM 网卡。USB 启动时按需请求系统 VPN 授权，应用仅接管当前 iPhone 的 NCM 接口，TUN 只允许本应用且仅路由 `fe80::/64`，不连接远程 VPN 服务器、不回退为全设备 VPN。保留 USB 授权、活动配置、配对、认证和会话检查；授权拒绝／组件缺失、TUN 建立失败或桥接错误明确失败并停止自动重试，不伪造授权、不自动通过 ADB 修改 VPN app-op。无线继续使用普通 socket 服务，不申请 VPN 或创建 TUN。退出、取消、拔线及授权撤销释放本应用持有的 NCM/TUN/监听资源。旧系统网卡路径与失败后的独立原始帧测试不再接入 USB 主流程，避免与实时桥接争抢接口。设置中的“授权”保留手动系统设置／VPN 入口，顶部说明主 APK 已内置授权组件，兼容且缺失时由用户点击安装并确认系统提示；页面渲染、搜索及恢复时不调用 `VpnService.prepare()`，手动 VPN 按钮只授权，不启动连接。USB 启动及该次授权返回可以调用准备接口。详见 `docs/USB_VPN_RESTORE_0.2.20.md`、`docs/SYSTEM_AUTHORIZATION.md`。应用实现与实车验证分别记录，不将恢复上游方案描述为星瑞实车连接已修复。
 
 8. CarPlay 协商像素严格由“隐藏导航栏”选项决定：勾选为 **1920×720**，不勾选为 **1760×720**。停用分辨率百分比及旧画布缩放，已有保存值不得改变这两档。图标文字物理尺寸调节保留；窗口测量只用于本地显示与触摸映射，不因临时窗口增长／缩小重建连接。导航栏选择引起的分辨率变更在下次连接生效，不擅自中断会话。
 
@@ -52,11 +52,20 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 构建环境与设备安装
 
+独立模块 `authorization-components` 是用户要求补齐的 Android 9 系统授权组件，包名 `com.android.vpndialogs`，不属于 CarPlay 主应用。该模块仅使用匹配参考固件的公开 AOSP 平台测试签名，由 `scripts/android9_authorization.py` 在 Release 构建后本地签名并核对实际设备；原始签名输入只留忽略目录，不扩大凭据白名单、不更换主应用签名。主应用从构建 86 起内置该独立签名 APK 和最小校验元数据，在“设置 → 授权”点击安装按钮后调起系统安装器；不能静默安装、自动授权或创建 VPN/TUN，已有原厂／未知同名组件时保留。新环境先显式使用脚本的 `--prepare-signing-inputs --fetch-public-aosp-key` 准备固定来源及校验值的公开输入，正常主应用构建自动依赖组件构建、签名及生成 assets，签名输入不得打包。只在 API 28、平台签名匹配且无原厂／未知同名组件时安装，不覆盖现有系统 VpnDialogs；实际安装及权限状态分别记录，详见 `docs/ANDROID9_AUTHORIZATION_COMPONENTS.md`。
+
 主应用默认打包 `runtime-assets/offline-mfi/identity.pk8` 和 `certificate.p7b`。这是用户明确要求导入的上游 v0.2.18 公共预览 APK 的实验性配件认证资料；来源和 SHA-256 见 `docs/runtime-authentication-provenance.json`。设置 `DIPLAY_AUTH_ASSETS_DIR` 可为本地构建替换认证目录，替换资料不得入库。
 
 用户明确要求公开现有 APK 签名密钥及签名密码，允许 `signing/carplay-release.p12` 和 `signing/signing.json` 入库。默认发布构建复用这组签名材料，证书指纹不得改变。`scripts/check_public_tree.py` 仅允许以上四个固定路径及已确认内容；其他私钥、令牌、签名密钥和本地配置继续排除，不扩大白名单。公开签名材料不得打包成应用资产。
 
 后续构建 CarPlay 测试 APK（`mobile`／`automotive` 的 Debug 变体，包括 `assembleStandaloneDebug`）也必须使用 `signing/` 中的现有密钥和密码，与 Release 使用同一证书；不要使用 Android 默认 Debug 密钥或另行生成测试密钥。除非用户明确指定其他签名，不设置 `ANDROID_KEYSTORE_*`／`ANDROID_KEY_*` 覆盖参数。构建后核对 APK 证书指纹；旧测试包若使用其他签名导致覆盖安装失败，报告错误，不卸载或清除数据。
+
+### 后续 APK 必须合并交付授权组件
+
+1. 用户已确认：后续交付的 CarPlay 主应用 APK 必须内置独立签名的 Android 9 授权组件，以一个主 APK 分发，由“设置 → 授权 → 安装授权组件”引导用户确认系统安装。不得退回要求用户另外下载、传输两个 APK 的默认交付方式。
+2. `mobile` 的 Debug、Release 和 `assembleStandaloneDebug` 均必须通过现有生成 assets 任务构建、签名并内置组件；用户指定其他 CarPlay 打包模块或新增变体时，也应先接入同等打包流程，再交付，不能遗漏组件。
+3. 构建后必须检查主 APK 内含 `assets/authorization/authorization.apk` 和 `manifest.json`，核对内置 APK 的 SHA-256、包名、版本及平台证书，并核对主 APK 仍使用仓库原有签名。组件构建、签名、校验或打包失败时，修复或明确报告阻塞，不得交付缺少组件的 APK 或用旧组件替代本次应构建的产物。
+4. 主应用和组件保持独立包名及签名；系统安装仍需用户确认，安装后分别授权。已有原厂／未知组件、API 或平台证书不匹配时跳过补装，不静默安装、不自动授权、不覆盖原厂组件。平台签名输入只留本机忽略目录，不入库、不放入任何 APK 资产。
 
 ### 测试 APK 命名
 
@@ -127,7 +136,7 @@ Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(э
 
 ### Settings entry
 
-This branch has no Overview menu or standalone connection setup page. Home lists currently connected Bluetooth phones; tapping a device starts wireless CarPlay. The Settings action is first in the upper-right action group. USB has no connect button: attaching an iPhone starts wired CarPlay and takes priority over wireless, including queued permission callbacks, Bluetooth wake and a running wireless session. A cable replug may retry a failed wired attempt; do not repeatedly launch from home polling after denial. Pairing and permissions appear when needed. Settings opens on Connection, which holds connection readiness and connection preferences. There is no first-launch setup guide or guide entry in Settings.
+This branch has no Overview menu or standalone connection setup page. Home lists currently connected Bluetooth phones; tapping a device starts wireless CarPlay. The Settings action is first in the upper-right action group. USB has no connect button: attaching an iPhone starts wired CarPlay and takes priority over wireless, including queued permission callbacks, Bluetooth wake and a running wireless session. After a failed wired attempt, an explicit home-device selection may start wireless while the cable remains attached, after old USB resources finish closing; polling, duplicate attachment notifications and late authorization callbacks must not reclaim that cable's priority. An active wired session keeps priority. A cable replug or manual wired retry restores USB priority; do not repeatedly launch from home polling after denial. Pairing and permissions appear when needed. Settings opens on Connection, which holds connection readiness and connection preferences. There is no first-launch setup guide or guide entry in Settings.
 Every category is directly accessible through the wide-screen rail or compact horizontal category strip.
 About has its own category. Do not reintroduce Overview, quick-setting duplicates, or a language picker.
 

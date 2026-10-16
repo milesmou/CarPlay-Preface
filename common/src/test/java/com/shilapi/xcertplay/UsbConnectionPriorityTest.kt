@@ -71,6 +71,75 @@ class UsbConnectionPriorityTest {
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
+    @Test fun failedUsbKeepsAutomaticPriorityUntilTheDriverSelectsWireless() {
+        attach()
+        assertTrue(UsbAutoConnect.request(activity))
+        val launch = shadowOf(activity).nextStartedActivity!!
+        UsbAutoConnect.wiredFailed(app, UsbAutoConnect.generation)
+        assertTrue(UsbAutoConnect.canChooseWireless(app))
+        repeat(3) { assertTrue(UsbAutoConnect.request(activity)) }
+        assertNotNull(UsbAutoConnect.priorityDevice(app))
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertTrue(UsbAutoConnect.chooseWireless(app))
+        assertFalse(UsbAutoConnect.isCurrentRequest(launch))
+        assertNull(UsbAutoConnect.priorityDevice(app))
+        assertFalse(UsbAutoConnect.request(activity, force = true))
+    }
+
+    @Test fun anActiveWiredSessionCannotBeOverriddenByAStaleFailure() {
+        attach()
+        val attempt = UsbAutoConnect.beginWiredAttempt(app)
+        UsbAutoConnect.wiredFailed(app, attempt)
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.connectionTransport()).thenReturn(CarPlayTransport.WIRED)
+        CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
+            CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, true, true, 1920, 720)) {}
+        CarPlayBackgroundSession.active = true
+        assertFalse(UsbAutoConnect.canChooseWireless(app))
+        assertFalse(UsbAutoConnect.chooseWireless(app))
+        assertNotNull(UsbAutoConnect.priorityDevice(app))
+    }
+
+    @Test fun usbRetryClearsTheFailureAndRejectsAnOlderFailureCallback() {
+        attach()
+        val oldAttempt = UsbAutoConnect.beginWiredAttempt(app)
+        UsbAutoConnect.wiredFailed(app, oldAttempt)
+        assertTrue(UsbAutoConnect.canChooseWireless(app))
+        val retry = UsbAutoConnect.beginWiredAttempt(app)
+        UsbAutoConnect.wiredFailed(app, oldAttempt)
+        assertFalse(UsbAutoConnect.canChooseWireless(app))
+        UsbAutoConnect.wiredFailed(app, retry)
+        UsbAutoConnect.wiredConnected(retry)
+        assertFalse(UsbAutoConnect.canChooseWireless(app))
+    }
+
+    @Test fun replugAfterWirelessSelectionRestoresUsbAndCancelsDelayedWirelessLaunch() {
+        UsbAutoConnect.register(app)
+        val device = attach()
+        val attempt = UsbAutoConnect.beginWiredAttempt(app)
+        UsbAutoConnect.wiredFailed(app, attempt)
+        assertTrue(UsbAutoConnect.chooseWireless(app))
+        val controller = mock(CarPlayController::class.java)
+        `when`(controller.connectionTransport()).thenReturn(CarPlayTransport.WIRED)
+        var done: (() -> Unit)? = null
+        CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
+            CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, true, true, 1920, 720)) { done = it }
+        requestWireless()
+        assertNotNull(done)
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(app).nextStartedActivity)
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_DETACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(UsbManager.ACTION_USB_DEVICE_ATTACHED, shadowOf(app).nextStartedActivity?.action)
+        assertNotNull(UsbAutoConnect.priorityDevice(app))
+        CarPlayBackgroundSession.clear()
+        done!!()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(activity).nextStartedActivity)
+    }
+
     @Test fun attachmentAndReplugBroadcastsStartUsbWithoutAButton() {
         UsbAutoConnect.register(app)
         val device = attach()

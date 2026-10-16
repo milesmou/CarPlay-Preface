@@ -17,7 +17,7 @@ internal class SystemAuthorization(
     fun canWriteSettings(): Boolean = runCatching { Settings.System.canWrite(context) }.getOrDefault(false)
 
     fun requestWriteSettings(): Result = try {
-        openSettings(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}")))
+        openSettings(AuthorizationComponentInstaller(context).writeSettingsIntent())
         Result.OPENED
     } catch (_: RuntimeException) { Result.UNAVAILABLE }
 

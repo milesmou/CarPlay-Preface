@@ -140,6 +140,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var page = "home"
     private var settingsCategory = SettingsCategory.CONNECTION
     private var writeAuthorizationUnavailable = false
+    private var authorizationInstallPending = false
+    private var authorizationInstallFailed = false
+    internal var authorizationInstallWorker: (Runnable) -> Unit = { Thread(it, "diplay-authorization-install").start() }
+    internal var authorizationComponentState: () -> AuthorizationComponentInstaller.State = { AuthorizationComponentInstaller(this).state() }
+    internal var authorizationPrepareInstall: () -> Intent = { AuthorizationComponentInstaller(applicationContext).prepareInstall() }
     private var vpnAuthorizationResult = SystemAuthorization.Result.UNKNOWN
     // A stable key keeps existing permission launchers' saved result keys unchanged on upgrade.
     private val vpnAuthorization = activityResultRegistry.register(
@@ -979,7 +984,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun refreshHomePhones() {
         val list = homePhoneList ?: return
-        val usb = UsbAutoConnect.attached(this) != null
+        val usb = !UsbAutoConnect.canChooseWireless(this)
         val key = connectedPhoneState to usb
         if (renderedPhoneState == key) return
         renderedPhoneState = key
@@ -1012,9 +1017,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun connectPhone(address: String) {
-        if (UsbAutoConnect.request(this, force = true)) return
         connectedPhoneMonitor?.refresh()
         val phone = connectedPhoneState.phones.firstOrNull { it.address.equals(address, true) } ?: return
+        if (!UsbAutoConnect.chooseWireless(this)) {
+            UsbAutoConnect.request(this, force = true)
+            return
+        }
         DiPlayPreferences.savePhone(this, phone.address, phone.name ?: "iPhone")
         val current = CarPlayBackgroundSession.snapshot()?.controller
         if (canResumeWirelessSession() && current?.matchesWirelessPhone(address) == true) {
@@ -1548,6 +1556,24 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun systemAuthorization(): SystemAuthorization = SystemAuthorization(this,
         openSettings = { startActivity(it) }, openVpnConsent = { vpnAuthorization.launch(it) })
 
+    private fun installAuthorizationComponent() {
+        if (authorizationInstallPending) return
+        authorizationInstallPending = true
+        authorizationInstallFailed = false
+        render()
+        authorizationInstallWorker(Runnable {
+            val prepared = runCatching { authorizationPrepareInstall() }
+            runOnUiThread {
+                authorizationInstallPending = false
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                authorizationInstallFailed = prepared.fold({ launch ->
+                    runCatching { startActivity(launch) }.isFailure
+                }, { true })
+                render()
+            }
+        })
+    }
+
     private fun requestWriteSettingsAuthorization() {
         writeAuthorizationUnavailable = systemAuthorization().requestWriteSettings() == SystemAuthorization.Result.UNAVAILABLE
         render()
@@ -1592,6 +1618,24 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun allSettingsSections(content: LinearLayout) {
         filteredSection(content, SettingsSection.SYSTEM_AUTHORIZATION,
             getString(R.string.settings_authorization_system), R.drawable.ic_dp_permissions) { card ->
+            val componentState = authorizationComponentState()
+            card.addView(label(getString(when (componentState) {
+                AuthorizationComponentInstaller.State.INSTALLABLE -> R.string.settings_authorization_component_available
+                AuthorizationComponentInstaller.State.READY -> R.string.settings_authorization_component_ready
+                AuthorizationComponentInstaller.State.EXISTING -> R.string.settings_authorization_component_existing
+                AuthorizationComponentInstaller.State.PERMISSION_MISSING -> R.string.settings_authorization_component_permission_missing
+                AuthorizationComponentInstaller.State.UNAVAILABLE -> R.string.settings_authorization_component_unsupported
+            }), 14, MUTED))
+            if (componentState == AuthorizationComponentInstaller.State.INSTALLABLE) {
+                card.addView(button(getString(if (authorizationInstallPending) R.string.settings_authorization_component_preparing
+                    else R.string.settings_authorization_component_install), false, ::installAuthorizationComponent).apply {
+                    tag = "authorization-component-install"
+                    isEnabled = !authorizationInstallPending
+                    wrapContentHeight = true
+                }, matchButton())
+            }
+            if (authorizationInstallFailed) card.addView(label(getString(R.string.settings_authorization_component_install_failed), 14, WARNING))
+            card.addView(space(SETTINGS_BLOCK_GAP_DP))
             val writeState = getString(if (systemAuthorization().canWriteSettings())
                 R.string.settings_authorization_allowed else R.string.settings_authorization_not_allowed)
             card.addView(button("${getString(R.string.settings_authorization_write)} · $writeState", false,
@@ -2308,8 +2352,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun requestManualHotspotPermission() {
         runCatching {
-            manualHotspotPermission.launch(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                Uri.parse("package:$packageName")))
+            manualHotspotPermission.launch(AuthorizationComponentInstaller(this).writeSettingsIntent())
         }.onFailure { openCarWifiSettings() }
     }
 
@@ -3131,7 +3174,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun connect(wireless: Boolean) = connect(wireless, fromBluetooth = false)
 
     private fun connect(wireless: Boolean, fromBluetooth: Boolean) {
-        if (wireless && UsbAutoConnect.attached(this) != null) {
+        if (wireless && UsbAutoConnect.priorityDevice(this) != null) {
             bluetoothAutoConnectPhone = null
             UsbAutoConnect.request(this, force = true)
             return
@@ -3167,7 +3210,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         val open = open@{
             if (isFinishing || isDestroyed || request != connectionRequest) return@open
-            if (wireless && (usbGeneration != UsbAutoConnect.generation || UsbAutoConnect.attached(this) != null)) {
+            if (wireless && (usbGeneration != UsbAutoConnect.generation || UsbAutoConnect.priorityDevice(this) != null)) {
                 UsbAutoConnect.request(this)
                 return@open
             }
@@ -3180,7 +3223,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
     private fun openProjection() {
         val launch = Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-        UsbAutoConnect.attached(this)?.let { device ->
+        UsbAutoConnect.priorityDevice(this)?.let { device ->
             launch.action = android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED
             launch.putExtra(android.hardware.usb.UsbManager.EXTRA_DEVICE, device)
         }
