@@ -71,7 +71,8 @@ class CarPlayVpnService : VpnService() {
     @Volatile var lastAttachFailure: String? = null
         private set
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder? =
+        if (intent?.action == SERVICE_INTERFACE) super.onBind(intent) else binder
 
     @Synchronized
     fun attach(
@@ -198,6 +199,16 @@ class CarPlayVpnService : VpnService() {
     override fun onDestroy() {
         detach()
         super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        val listener = synchronized(this) {
+            val current = attachment?.listener
+            releaseLocked()
+            current
+        }
+        listener?.onTransportError("VPN authorization revoked")
+        stopSelf()
     }
 
     /**

@@ -1,4 +1,36 @@
 <resources>
+    <string name="home_connection_hint">请通过车机蓝牙或 USB 连接 iPhone。</string>
+    <string name="settings_quick_dismiss_hint">点击空白处返回 CarPlay</string>
+    <string name="settings_quick_volume">音量调节</string>
+    <string name="settings_volume_unavailable_value">不可用</string>
+    <string name="home_connected_devices">已连接的蓝牙设备</string>
+    <string name="home_bluetooth_connected">已连接</string>
+    <string name="home_bluetooth_empty">将 iPhone 连上车机蓝牙后，设备会显示在这里，点击即可连接 CarPlay。</string>
+    <string name="home_bluetooth_permission">允许“附近的设备”权限后，显示已连接的 iPhone。</string>
+    <string name="home_usb_waiting">等待接入 iPhone</string>
+    <string name="home_usb_attached">iPhone 已通过 USB 接入</string>
+    <string name="home_usb_automatic">将 iPhone 插入支持数据传输的 USB 接口，即可自动连接 CarPlay；出现系统提示时请允许。</string>
+    <string name="home_usb_priority">接入 USB 时，优先使用有线 CarPlay。</string>
+    <string name="settings_authorization">授权</string>
+    <string name="settings_authorization_summary">管理本应用的系统授权。</string>
+    <string name="settings_authorization_native_title">请先安装原生设置</string>
+    <string name="settings_authorization_native_description">安装后再进行以下授权；VPN 授权还需系统提供对应组件。</string>
+    <string name="settings_authorization_system">系统授权</string>
+    <string name="settings_authorization_write">修改系统设置</string>
+    <string name="settings_authorization_write_description">用于在连接前自动开启手动车机热点（需系统支持）；临时热点无需此权限。</string>
+    <string name="settings_authorization_vpn">创建 VPN</string>
+    <string name="settings_authorization_vpn_description">用于 USB 有线连接，通过本地 VPN 传输 CarPlay 数据。此处只授权，选择 USB 连接后才建立连接。</string>
+    <string name="usb_vpn_transport_unavailable">USB 本地 VPN 连接失败，自动重试已停止</string>
+    <string name="connection_help_usb_vpn">请检查“设置 → 授权”中的 VPN 权限及系统 VPN 组件，重新插拔 iPhone 后重试；也可使用无线连接。</string>
+    <string name="settings_authorization_allowed">已允许</string>
+    <string name="settings_authorization_not_allowed">未允许</string>
+    <string name="settings_authorization_last_allowed">上次已授权</string>
+    <string name="settings_authorization_check">检查并授权</string>
+    <string name="settings_authorization_waiting">等待系统确认</string>
+    <string name="settings_authorization_unavailable">无法打开系统授权页面。请先安装原生设置，并确认对应系统组件已启用。</string>
+    <string name="settings_authorization_cancelled">已取消 VPN 授权，可点击重试。</string>
+    <string name="settings_authorization_not_completed">系统尚未授予 VPN 权限，可点击重试。</string>
+    <string name="settings_authorization_vpn_checked">显示最近一次手动检查结果，点击可重新检查。</string>
     <string name="hotspot_hint_local">打开“连接设置”以保存车载热点信息。</string>
     <string name="marker_centre_default">居中 · 默认</string>
     <string name="report_clip_label">诊断报告</string>
@@ -296,7 +328,7 @@
     <string name="use_hevc_leave_off_for_the_widest_head_unit_compatibility">使用 HEVC。关闭后可兼容更多车机。</string>
     <string name="use_software_hevc_decoder">使用 HEVC 软件解码器</string>
     <string name="use_usage_content_type_routing_instead_of_stream_type">使用 usage / content-type 路由代替流类型</string>
-    <string name="vpn_authorization_unavailable">此车机无法打开 VPN 授权界面。请返回 CarPlay 检查连接权限，或使用无线连接。</string>
+    <string name="vpn_authorization_unavailable">无法打开 VPN 授权。请先安装原生设置并确认系统 VPN 组件可用，再到“设置 → 授权”重试；也可使用无线连接。</string>
     <string name="vpn_consent_was_denied">VPN 授权被拒绝</string>
     <string name="waiting_for_iphone_over_usb">正在等待 USB 连接的 iPhone</string>
     <string name="waiting_for_mfi_coprocessor">正在等待 MFi 协处理器</string>
@@ -446,8 +478,8 @@
 
     <string name="settings_ambient_title">氛围灯（实验性）</string>
     <string name="settings_interface_size">界面大小</string>
-    <string name="settings_interface_size_auto">自动</string>
-    <string name="settings_interface_size_hint">CarPlay 自身界面中文字和控件的大小。自动模式会在大尺寸低密度屏幕上放大它们。不影响 CarPlay。</string>
+    <string name="settings_interface_size_preface_12_3">星瑞 12.3 英寸</string>
+    <string name="settings_interface_size_hint" formatted="false">默认适配星瑞 12.3 英寸、1920×720 中控屏，也可选择相对系统大小的 75%～150%。仅调整本应用，不影响 CarPlay 画面。</string>
     <string name="update_check">检查更新</string>
     <string name="update_checking">正在检查…</string>
     <string name="update_up_to_date">已是最新版本</string>
@@ -469,7 +501,7 @@
     <string name="settings_background_update_checks">在后台检查更新</string>
     <string name="settings_background_update_checks_description">CarPlay 每天会在 GitHub 上检查一次新版本，并显示在主屏幕上。未经你点击，绝不会下载。</string>
     <string name="settings_return_to_home">返回主界面</string>
-    <string name="settings_quick_menu">快捷菜单</string>
+    <string name="settings_quick_menu">快捷操作</string>
     <string name="settings_all_settings">全部设置</string>
     <string name="settings_navigation_volume">导航音量</string>
     <string name="settings_media_volume">媒体音量</string>

@@ -42,6 +42,8 @@ class HomeCompactLayoutTest {
         val app = RuntimeEnvironment.getApplication()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         app.getSharedPreferences("diplay", 0).edit().clear().commit()
+        // Keep an explicit system-size profile for the constrained-window layout at 1920x720.
+        if (name.startsWith("narrow")) InterfaceSize.save(app, 100)
         val previousFlags = app.applicationInfo.flags
         if (name.startsWith("rtl")) app.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
@@ -49,6 +51,9 @@ class HomeCompactLayoutTest {
             val activity = controller.get()
             // Authentication assets are absent in the unit-test APK; show the idle UI.
             ReflectionHelpers.setField(activity, "setupError", null)
+            ReflectionHelpers.setField(activity, "connectedPhoneState", ConnectedPhoneState(true, true,
+                listOf(ConnectedPhone("12:34:56:78:90:AB", "iPhone 16 Pro"),
+                    ConnectedPhone("12:34:56:78:90:AC", "驾驶员的 iPhone"))))
             activity.resources.updateConfiguration(Configuration(activity.resources.configuration).apply {
                 this.fontScale = fontScale
                 if (name.startsWith("rtl")) setLocale(java.util.Locale("ar"))
@@ -74,9 +79,12 @@ class HomeCompactLayoutTest {
             val homeScroll = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll")
             homeScroll.scrollTo(0, 0)
             fun text(id: Int) = views(decor).filterIsInstance<TextView>().single { it.text == activity.getString(id) }
-            val wireless = text(R.string.settings_connect_wireless)
-            val usb = text(R.string.settings_connect_usb)
-            val first = wireless.parent as View
+            assertEquals(1, views(decor).filterIsInstance<TextView>().count {
+                it.text == activity.getString(R.string.home_connection_hint)
+            })
+            val wireless = views(decor).filterIsInstance<TextView>().single { it.tag == "home-phone:12:34:56:78:90:AB" }
+            val usb = text(R.string.home_usb_waiting)
+            val first = (wireless.parent as View).parent as View
             val second = usb.parent as View
             assertEquals(first.width, second.width)
             if (columns) {
@@ -87,10 +95,15 @@ class HomeCompactLayoutTest {
                 wireless.getLocationOnScreen(position)
                 assertTrue("Primary connection action must fit on the first screen", position[1] + wireless.height <= height)
             } else assertTrue(second.top >= first.bottom)
-            for (control in listOf(wireless, usb, text(R.string.choose_iphone), text(R.string.settings))) {
+            for (control in listOf(wireless, text(R.string.settings))) {
                 assertTrue("${control.text}: height=${control.height}, minimum=${control.minimumHeight}", control.height >= control.minimumHeight)
                 assertTrue(control.layout.height + control.compoundPaddingTop + control.compoundPaddingBottom <= control.height)
             }
+            val settings = text(R.string.settings)
+            val header = settings.parent as ViewGroup
+            assertSame(settings, (0 until header.childCount).map(header::getChildAt).first { it.isClickable })
+            assertFalse(views(decor).filterIsInstance<TextView>().any { it.text == activity.getString(R.string.settings_connect_usb) })
+            assertFalse(views(decor).filterIsInstance<TextView>().any { it.text == activity.getString(R.string.choose_iphone) })
             assertFalse(views(decor).filterIsInstance<TextView>().any { it.text == activity.getString(R.string.a_familiar_drive) })
             val visibleText = views(decor).filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE }
                 .map { it.text.toString() }.toList()
@@ -104,7 +117,7 @@ class HomeCompactLayoutTest {
                 val scroll = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll")
                 assertTrue("Home must fit without scrolling at normal density", scroll.getChildAt(0).height <= scroll.height)
             }
-            val directory = File("../agent_docs/screenshots/home").apply { mkdirs() }
+            val directory = File("../agent_docs/screenshots/home-devices-test-renders").apply { mkdirs() }
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             decor.draw(Canvas(bitmap))
             File(directory, "1920x720-$name.png").outputStream().use {

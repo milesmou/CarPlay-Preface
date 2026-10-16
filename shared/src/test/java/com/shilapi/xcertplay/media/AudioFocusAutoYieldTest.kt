@@ -50,7 +50,7 @@ class AudioFocusAutoYieldTest {
             assertEquals(listOf(1f), volumes(navigation))
             coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
             coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
-            assertEquals(listOf(1f, 0.2f, 1f), volumes(media))
+            assertEquals(listOf(1f, 0.3f, 1f), volumes(media))
             assertEquals(listOf(1f), volumes(navigation))
         } finally {
             CarPlayAudioOutputs.unregister(media)
@@ -99,8 +99,8 @@ class AudioFocusAutoYieldTest {
         coordinator.acquire(phone, AudioChannel.PHONE, attributes)
         coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
         coordinator.acquire(second, AudioChannel.MEDIA, attributes)
-        assertEquals(listOf(0.2f), volumes(first))
-        assertEquals(listOf(0.2f), volumes(second))
+        assertEquals(listOf(0.3f), volumes(first))
+        assertEquals(listOf(0.3f), volumes(second))
         assertTrue(volumes(phone).isEmpty())
     }
 
@@ -178,6 +178,79 @@ class AudioFocusAutoYieldTest {
         assertSame(abandoned, shadowOf(manager).lastAbandonedAudioFocusRequest)
         assertEquals(listOf(0f), volumes(first))
         assertTrue(volumes(late).isEmpty())
+    }
+
+    @Test fun confirmedNativeMusicYieldsMediaButRetainsPhoneAndRestoresTheSameMediaTrack() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add).also(coordinators::add)
+        val media = track(); val phone = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        val oldListener = coordinator.listener
+        coordinator.setNativeBluetoothPlaying(true)
+        assertEquals(listOf(0f), volumes(media))
+        assertEquals(listOf(true, false), owners)
+        coordinator.acquire(phone, AudioChannel.PHONE, attributes)
+        assertTrue(volumes(phone).isEmpty())
+        assertEquals(true, owners.last())
+        oldListener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        assertEquals(listOf(0f), volumes(media))
+        coordinator.setNativeBluetoothPlaying(false)
+        assertEquals(listOf(0f, 1f), volumes(media))
+        coordinator.close()
+        assertEquals(false, owners.last())
+    }
+
+    @Test fun refusedFocusNeverClaimsBluetoothMusicOwnership() {
+        shadowOf(manager).setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add).also(coordinators::add)
+        coordinator.acquire(track(), AudioChannel.MEDIA, attributes)
+        assertTrue(owners.isEmpty())
+        coordinator.close()
+        assertTrue(owners.isEmpty())
+    }
+
+    @Test fun duckingRetainsMediaOwnershipButPermanentLossMutesUntilAnActualGain() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add).also(coordinators::add)
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
+        assertEquals(listOf(true), owners)
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
+        assertEquals(listOf(true, false), owners)
+        assertEquals(listOf(0.3f, 0f), volumes(media))
+        coordinator.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        assertEquals(listOf(true, false, true), owners)
+        assertEquals(listOf(0.3f, 0f, 1f), volumes(media))
+    }
+
+    @Test fun savedMediaFocusOptOutStillAllowsTransientVoiceFocus() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add,
+            mediaFocusEnabled = false).also(coordinators::add)
+        coordinator.acquire(track(), AudioChannel.MEDIA, attributes)
+        assertTrue(owners.isEmpty())
+        coordinator.acquire(track(), AudioChannel.PHONE, attributes)
+        assertEquals(listOf(true), owners)
+        coordinator.close()
+    }
+
+    @Test fun nativeCallBlocksMusicFocusUntilCallEndsAndCloseCancelsTheRetry() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add).also(coordinators::add)
+        manager.mode = AudioManager.MODE_IN_CALL
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        assertTrue(owners.isEmpty())
+        assertEquals(listOf(0f), volumes(media))
+        manager.mode = AudioManager.MODE_NORMAL
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        assertEquals(listOf(true), owners)
+        assertEquals(listOf(0f, 1f), volumes(media))
+        coordinator.close()
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        assertEquals(listOf(true, false), owners)
     }
 
     private fun coordinator(enabled: Boolean = true, autoYield: Boolean = true) =

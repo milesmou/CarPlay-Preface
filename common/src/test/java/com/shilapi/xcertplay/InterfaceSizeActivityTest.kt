@@ -19,13 +19,88 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
+import org.robolectric.shadows.ShadowAlertDialog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31], qualifiers = "en-sw1333dp-w2666dp-h1225dp-land-mdpi", manifest = Config.NONE)
 class InterfaceSizeActivityTest {
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1280dp-h480dp-land-hdpi")
+    @LooperMode(LooperMode.Mode.PAUSED)
+    fun pickerAppliesPrefaceOnlyAfterConfirmationAndCanSelect75Percent() {
+        val app = RuntimeEnvironment.getApplication()
+        InterfaceSize.save(app, 100)
+        val controller = Robolectric.buildActivity(DiPlayActivity::class.java)
+        controller.get().setTheme(android.R.style.Theme_Material_NoActionBar)
+        controller.setup()
+        try {
+            val original = controller.get()
+            assertEquals(240, original.resources.configuration.densityDpi)
+            InterfaceSize.showPicker(original)
+            val cancelled = ShadowAlertDialog.getLatestAlertDialog()
+            shadowOf(cancelled).clickOnItem(InterfaceSize.CHOICES.indexOf(InterfaceSize.PREFACE_12_3))
+            cancelled.getButton(android.app.Dialog.BUTTON_NEGATIVE).performClick()
+            assertEquals(100, InterfaceSize.preference(original))
+
+            InterfaceSize.showPicker(original)
+            val confirmed = ShadowAlertDialog.getLatestAlertDialog()
+            assertEquals(5, confirmed.listView.count)
+            shadowOf(confirmed).clickOnItem(InterfaceSize.CHOICES.indexOf(InterfaceSize.PREFACE_12_3))
+            confirmed.getButton(android.app.Dialog.BUTTON_POSITIVE).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(InterfaceSize.PREFACE_12_3, InterfaceSize.preference(controller.get()))
+            assertEquals(160, controller.get().resources.configuration.densityDpi)
+
+            InterfaceSize.showPicker(controller.get())
+            val smaller = ShadowAlertDialog.getLatestAlertDialog()
+            shadowOf(smaller).clickOnItem(InterfaceSize.CHOICES.indexOf(75))
+            smaller.getButton(android.app.Dialog.BUTTON_POSITIVE).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(75, InterfaceSize.preference(controller.get()))
+            assertEquals(180, controller.get().resources.configuration.densityDpi)
+        } finally {
+            controller.pause().stop().destroy()
+            AppAppearanceRuntime.resetForTest()
+        }
+    }
+
+    @Test
+    @Config(sdk = [28, 33], qualifiers = "zh-rCN-w1280dp-h480dp-land-hdpi")
+    fun selectedPrefaceSizingIsAppLocalAndTracksASmallerLandscapeWindow() {
+        val app = RuntimeEnvironment.getApplication()
+        InterfaceSize.save(app, InterfaceSize.PREFACE_12_3)
+        val controller = Robolectric.buildActivity(DiPlayActivity::class.java)
+        val activity = controller.get()
+        activity.setTheme(android.R.style.Theme_Material_NoActionBar)
+        controller.setup()
+        try {
+            assertEquals(160, activity.resources.configuration.densityDpi)
+            assertEquals(1920, activity.resources.configuration.screenWidthDp)
+            assertEquals(720, activity.resources.configuration.screenHeightDp)
+            assertEquals(240, app.resources.configuration.densityDpi)
+            assertEquals(1280, app.resources.configuration.screenWidthDp)
+            val installed = ReflectionHelpers.getField<Configuration>(activity, "mOverrideConfiguration")
+            val reported = Configuration(app.resources.configuration).apply {
+                screenWidthDp = 640
+                screenHeightDp = 480
+                smallestScreenWidthDp = 480
+                updateFrom(installed)
+            }
+            activity.onMultiWindowModeChanged(true, reported)
+            activity.onConfigurationChanged(reported)
+            assertEquals(160, activity.resources.configuration.densityDpi)
+            assertEquals(960, activity.resources.configuration.screenWidthDp)
+            assertEquals(720, activity.resources.configuration.screenHeightDp)
+            assertEquals(240, app.resources.configuration.densityDpi)
+        } finally {
+            controller.pause().stop().destroy()
+            AppAppearanceRuntime.resetForTest()
+        }
+    }
+
     @After
     fun resetInterfaceSize() {
-        InterfaceSize.save(RuntimeEnvironment.getApplication(), InterfaceSize.AUTO)
+        InterfaceSize.save(RuntimeEnvironment.getApplication(), InterfaceSize.PREFACE_12_3)
     }
 
     @Test
@@ -144,7 +219,7 @@ class InterfaceSizeActivityTest {
         controller.setup()
         try {
             val configuration = activity.resources.configuration
-            assertEquals(720, configuration.smallestScreenWidthDp)
+            assertEquals(1333, configuration.smallestScreenWidthDp)
             assertEquals("zh-CN", configuration.locales.toLanguageTags())
         } finally {
             controller.pause().stop().destroy()

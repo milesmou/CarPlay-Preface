@@ -77,11 +77,12 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 internal enum class SettingsCategory {
-    CONNECTION, DISPLAY, AUDIO, NAVIGATION, VEHICLE, DIAGNOSTICS, EXPERIMENTAL, ABOUT,
+    CONNECTION, AUTHORIZATION, DISPLAY, AUDIO, NAVIGATION, VEHICLE, DIAGNOSTICS, EXPERIMENTAL, ABOUT,
 }
 
 /** A settings card. Every entry needs one category in [SettingsInformationArchitecture]; see AGENTS.md. */
 internal enum class SettingsSection {
+    SYSTEM_AUTHORIZATION,
     CARPLAY_CONTROLS,
     WHEEL_KEYS,
     CONNECTION_SETUP,
@@ -101,6 +102,7 @@ internal enum class SettingsSection {
 internal object SettingsInformationArchitecture {
     val sectionsByCategory: Map<SettingsCategory, Set<SettingsSection>> = mapOf(
         SettingsCategory.ABOUT to emptySet(),
+        SettingsCategory.AUTHORIZATION to setOf(SettingsSection.SYSTEM_AUTHORIZATION),
         SettingsCategory.CONNECTION to setOf(
             SettingsSection.CONNECTION_SETUP,
             SettingsSection.AUTOMATIC_CONNECTION,
@@ -137,12 +139,31 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var appearanceButtonFocusPending = false
     private var page = "home"
     private var settingsCategory = SettingsCategory.CONNECTION
+    private var writeAuthorizationUnavailable = false
+    private var vpnAuthorizationResult = SystemAuthorization.Result.UNKNOWN
+    // A stable key keeps existing permission launchers' saved result keys unchanged on upgrade.
+    private val vpnAuthorization = activityResultRegistry.register(
+        "system_vpn_authorization", this, ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        vpnAuthorizationResult = systemAuthorization().finishVpnConsent(result.resultCode == RESULT_OK)
+        if (page == "settings" && settingsCategory == SettingsCategory.AUTHORIZATION) render()
+    }
     private var connectionSettingsReturnCategory: SettingsCategory? = null
     private var settingsSectionFilter: Set<SettingsSection>? = null
     private var pendingCarHotspotSetup = false
     private var setupError: String? = null
     private var status: TextView? = null
-    private var connectButton: Button? = null
+    private var connectedPhoneState = ConnectedPhoneState()
+    private var connectedPhoneMonitor: ConnectedBluetoothPhones? = null
+    private var homePhoneList: LinearLayout? = null
+    private var renderedPhoneState: Pair<ConnectedPhoneState, Boolean>? = null
+    private var homeUsbStatus: TextView? = null
+    private var connectionRequest = 0L
+    private var notificationUsbGeneration = 0L
+    private val homeBluetoothPermission = activityResultRegistry.register(
+        "home_bluetooth_devices", this, ActivityResultContracts.RequestPermission(),
+    ) { connectedPhoneMonitor?.refresh() }
+
     private var disconnectButton: Button? = null
     private var phonePickerDialog: PhonePickerDialog? = null
     private var hotspotCredentialsDialog: HotspotCredentialsDialog? = null
@@ -211,12 +232,21 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (CarHotspotTethering.permitted(this)) enableManualCarHotspot()
     }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (notificationTransport && notificationUsbGeneration != UsbAutoConnect.generation) {
+            notificationBluetoothPhone = null
+            bluetoothAutoConnectPhone = null
+            return@registerForActivityResult
+        }
         val phone = notificationBluetoothPhone
         notificationBluetoothPhone = null
         if (phone != null) connectFromBluetooth(phone) else connect(notificationTransport)
     }
     private val tick = object : Runnable {
-        override fun run() { refreshStatus(); refreshWheelTakeoverStatus(); handler.postDelayed(this, 1000) }
+        override fun run() {
+            connectedPhoneMonitor?.refresh()
+            if (page == "home") UsbAutoConnect.request(this@DiPlayActivity)
+            refreshStatus(); refreshWheelTakeoverStatus(); handler.postDelayed(this, 1000)
+        }
     }
     private val appearancePoll = object : Runnable {
         override fun run() {
@@ -309,9 +339,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.setup_error_auth)
         }
         pendingCarHotspotSetup = savedInstanceState?.getBoolean("pending_car_hotspot") ?: false
+        vpnAuthorizationResult = savedInstanceState?.getString("vpn_authorization_result")
+            ?.let { runCatching { SystemAuthorization.Result.valueOf(it) }.getOrNull() } ?: SystemAuthorization.Result.UNKNOWN
+        writeAuthorizationUnavailable = savedInstanceState?.getBoolean("write_authorization_unavailable") ?: false
         bluetoothAutoConnectPhone = savedInstanceState?.getString("bluetooth_auto_connect_phone")
         notificationBluetoothPhone = savedInstanceState?.getString("notification_bluetooth_phone")
         notificationTransport = savedInstanceState?.getBoolean("notification_transport") ?: true
+        notificationUsbGeneration = savedInstanceState?.getLong("notification_usb_generation") ?: UsbAutoConnect.generation
         if (notificationBluetoothPhone != null) initialLaunch = false
         settingsCategory = savedInstanceState?.getString("settings_category")
             ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
@@ -377,6 +411,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun connectFromBluetooth(phone: String) {
+        if (UsbAutoConnect.request(this)) {
+            bluetoothAutoConnectPhone = null
+            PhoneWakeDiagnostics.record(this, "usb-priority")
+            return
+        }
         if (isFinishing || isDestroyed || !phone.equals(bluetoothAutoConnectPhone, ignoreCase = true) ||
             !DiPlayPreferences.connectOnPhoneBluetooth(this) ||
             !phone.equals(DiPlayPreferences.phoneAddress(this), ignoreCase = true)) {
@@ -398,9 +437,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         outState.putString("settings_category", settingsCategory.name)
         connectionSettingsReturnCategory?.let { outState.putString("connection_settings_return_category", it.name) }
         outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup)
+        outState.putString("vpn_authorization_result", vpnAuthorizationResult.name)
+        outState.putBoolean("write_authorization_unavailable", writeAuthorizationUnavailable)
         outState.putString("bluetooth_auto_connect_phone", bluetoothAutoConnectPhone)
         outState.putString("notification_bluetooth_phone", notificationBluetoothPhone)
         outState.putBoolean("notification_transport", notificationTransport)
+        outState.putLong("notification_usb_generation", notificationUsbGeneration)
         super.onSaveInstanceState(outState)
     }
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -432,9 +474,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         super.onStart()
         // Results from the image picker and crop screens arrive before onResume.
         enforceInterfaceSize()
+        connectedPhoneMonitor = ConnectedBluetoothPhones(this) { next ->
+            connectedPhoneState = next
+            refreshHomePhones()
+        }.also { it.start() }
     }
 
     override fun onStop() {
+        connectedPhoneMonitor?.close()
+        connectedPhoneMonitor = null
         phonePickerDialog?.cancel()
         phonePickerDialog = null
         startupHotspotCancelled = true
@@ -459,7 +507,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             startCarHotspotOnLaunch()
             if (setupError == null && !CarPlayBackgroundSession.hasSession() &&
                 DiPlayPreferences.autoConnect(this) && intent.getStringExtra("page") == null && page != "setup") {
-                handler.post { connect(DiPlayPreferences.autoConnectWireless(this)) }
+                handler.post {
+                    val wireless = DiPlayPreferences.autoConnectWireless(this)
+                    if (wireless || UsbAutoConnect.attached(this) != null) connect(wireless)
+                }
             }
         }
     }
@@ -550,6 +601,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun render() = render(appearanceOnly = false)
 
     private fun render(appearanceOnly: Boolean, preferredFocusTag: Any? = null) {
+        if (page !in setOf("home", "settings", "backup", "wireless-recovery")) page = "home"
         enforceInterfaceSize()
         refreshAppearance()
         applyWindowAppearance()
@@ -584,7 +636,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             (settingsSearchExpanded && settingsSearchBox?.hasFocus() == true)
         settingsSearchBox = null
         if (page != "settings") clearSettingsSearchState()
-        status = null; connectButton = null; disconnectButton = null; lastRunning = null; carButtonCard = null
+        status = null; homePhoneList = null; renderedPhoneState = null; homeUsbStatus = null; disconnectButton = null; lastRunning = null; carButtonCard = null
         reconnectBar = null
         readinessCard = null
         exportButton = null
@@ -614,6 +666,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 compact -> 8
                 else -> 24
             }))
+            if (page == "home") content.addView(label(getString(R.string.home_connection_hint), 16, MUTED).apply {
+                setPadding(0, 0, 0, dp(HOME_HINT_GAP_DP))
+            })
             if (page == "settings") content.addView(reconnectBar(), LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(SETTINGS_BLOCK_GAP_DP)
             })
@@ -700,6 +755,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             centreGlyphs = resources.configuration.locales[0].language != "zh").apply {
             setPadding(if (compact) dp(8) else dp(12), 0, 0, 0)
         }, LinearLayout.LayoutParams(0, if (compact) dp(44) else dp(52), 1f))
+        if (page == "home") addView(headerButton(getString(R.string.settings), R.drawable.ic_dp_advanced, compact) {
+            page = "settings"; settingsCategory = SettingsCategory.CONNECTION; render()
+        }.apply { minHeight = dp(if (compact) 44 else 52); minimumHeight = minHeight }, LinearLayout.LayoutParams(-2, dp(if (compact) 44 else 52)).apply {
+            marginEnd = dp(if (compact) 8 else 12)
+        })
         addView(appearanceButton(), LinearLayout.LayoutParams(dp(if (compact) 44 else 52), dp(if (compact) 44 else 52)).apply {
             marginEnd = dp(if (compact) 8 else 12)
         })
@@ -834,13 +894,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val body = column()
         val card = card().apply { setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding)) }
         card.addView(label(getString(R.string.wireless_carplay), titleSize, TEXT, true))
-        connectButton = homeButton(getString(R.string.settings_connect_wireless), true) {
-            if (canResumeWirelessSession()) {
-                AirPlayPersistence.saveWirelessEnabled(this, true)
-                openProjection()
-            } else connect(true)
-        }
-        card.addView(connectButton, homeButtonParams(HOME_TITLE_GAP_DP))
+        card.addView(label(getString(R.string.home_connected_devices), 15, MUTED).apply {
+            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
+        })
+        homePhoneList = column().also { card.addView(it) }
+        refreshHomePhones()
         status = label("", 15, MUTED).apply {
             visibility = View.GONE
             setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
@@ -858,7 +916,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(label(getString(R.string.msg_car_hotspot_off, AirPlayPersistence.loadManualHotspotSsid(this)), 15, WARNING).apply { setPadding(0, dp(14), 0, 0) })
             card.addView(homeButton(getString(R.string.open_car_hotspot_settings), false) { openCarWifiSettings() }, homeButtonParams(CONTROL_GAP_DP))
         }
-        card.addView(homeButton(getString(R.string.choose_iphone), false) { choosePhone() }, homeButtonParams(CONTROL_GAP_DP))
         disconnectButton = homeButton(getString(R.string.disconnect), false) {
             disconnectButton?.isEnabled = false
             CarPlayBackgroundSession.stop { runOnUiThread { refreshStatus() } }
@@ -866,9 +923,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         card.addView(disconnectButton, homeButtonParams(CONTROL_GAP_DP))
         val right = card().apply { setPadding(dp(cardPadding), dp(cardPadding), dp(cardPadding), dp(cardPadding)) }
         right.addView(label(getString(R.string.usb_carplay), titleSize, TEXT, true))
-        right.addView(homeButton(getString(R.string.settings_connect_usb), true) { connect(false) }, homeButtonParams(HOME_TITLE_GAP_DP))
-        right.addView(homeButton(getString(R.string.settings), false) { page = "settings"; render() }, homeButtonParams(CONTROL_GAP_DP))
-        if (!compact) right.addView(label(getString(R.string.plug_your_iphone_into_a_usb_data_port_allow_carplay_when_y), 15, MUTED).apply {
+        homeUsbStatus = label("", 18, ACCENT, true).apply {
+            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
+        }.also { right.addView(it) }
+        right.addView(label(getString(R.string.home_usb_automatic), 15, MUTED).apply {
+            setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
+        })
+        right.addView(label(getString(R.string.home_usb_priority), 15, MUTED).apply {
             setPadding(0, dp(HOME_TITLE_GAP_DP), 0, 0)
         })
         availableUpdate?.let { release ->
@@ -914,6 +975,53 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         setupError?.let { body.addView(label(it, 16, WARNING).apply { setPadding(0, dp(16), 0, 0) }) }
         content.addView(body)
+    }
+
+    private fun refreshHomePhones() {
+        val list = homePhoneList ?: return
+        val usb = UsbAutoConnect.attached(this) != null
+        val key = connectedPhoneState to usb
+        if (renderedPhoneState == key) return
+        renderedPhoneState = key
+        list.removeAllViews()
+        if (connectedPhoneState.phones.isEmpty()) {
+            val message = when {
+                !connectedPhoneState.permitted -> R.string.home_bluetooth_permission
+                !connectedPhoneState.enabled -> R.string.enable_the_car_s_bluetooth_and_pair_your_iphone_first
+                else -> R.string.home_bluetooth_empty
+            }
+            list.addView(label(getString(message), 16, MUTED).apply {
+                setPadding(0, dp(HOME_TITLE_GAP_DP), 0, dp(HOME_TITLE_GAP_DP))
+            })
+            if (!connectedPhoneState.permitted && Build.VERSION.SDK_INT >= 31) {
+                list.addView(button(getString(R.string.nearby_devices), false) {
+                    homeBluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                }, LinearLayout.LayoutParams(-1, dp(CONTROL_HEIGHT_DP)))
+            }
+        } else connectedPhoneState.phones.forEach { phone ->
+            val name = phone.name?.takeIf { it.isNotBlank() } ?: "iPhone"
+            list.addView(button("$name · ${getString(R.string.home_bluetooth_connected)}", false) {
+                connectPhone(phone.address)
+            }.apply {
+                tag = "home-phone:${phone.address}"
+                isEnabled = !usb && setupError == null
+                alpha = if (isEnabled) 1f else .5f
+                wrapContentHeight = true
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(CONTROL_GAP_DP) })
+        }
+    }
+
+    private fun connectPhone(address: String) {
+        if (UsbAutoConnect.request(this, force = true)) return
+        connectedPhoneMonitor?.refresh()
+        val phone = connectedPhoneState.phones.firstOrNull { it.address.equals(address, true) } ?: return
+        DiPlayPreferences.savePhone(this, phone.address, phone.name ?: "iPhone")
+        val current = CarPlayBackgroundSession.snapshot()?.controller
+        if (canResumeWirelessSession() && current?.matchesWirelessPhone(address) == true) {
+            AirPlayPersistence.saveWirelessEnabled(this, true)
+            openProjection()
+        }
+        else connect(true)
     }
 
     // Only the category scrolls, so the rail keeps showing where the driver is.
@@ -991,6 +1099,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun settingsCategoryIcon(category: SettingsCategory): Int = when (category) {
         SettingsCategory.CONNECTION -> R.drawable.ic_dp_connection
+        SettingsCategory.AUTHORIZATION -> R.drawable.ic_dp_permissions
         SettingsCategory.DISPLAY -> R.drawable.ic_dp_display
         SettingsCategory.AUDIO -> R.drawable.ic_dp_audio
         SettingsCategory.NAVIGATION -> R.drawable.ic_dp_navigation
@@ -1002,6 +1111,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun settingsCategoryTitle(category: SettingsCategory): String = getString(when (category) {
         SettingsCategory.CONNECTION -> R.string.connection
+        SettingsCategory.AUTHORIZATION -> R.string.settings_authorization
         SettingsCategory.DISPLAY -> R.string.settings_display
         SettingsCategory.AUDIO -> R.string.audio
         SettingsCategory.NAVIGATION -> R.string.settings_navigation
@@ -1014,6 +1124,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun settingsCategoryContent(content: LinearLayout) {
         when (settingsCategory) {
             SettingsCategory.CONNECTION -> connectionSettings(content)
+            SettingsCategory.AUTHORIZATION -> authorizationSettings(content)
             SettingsCategory.DISPLAY -> displaySettings(content)
             SettingsCategory.AUDIO -> audioSettings(content)
             SettingsCategory.NAVIGATION -> navigationSettings(content)
@@ -1424,6 +1535,35 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         else keyboard.hideSoftInputFromWindow(view.windowToken, 0)
     }
 
+    private fun authorizationSettings(content: LinearLayout) {
+        settingsPageTitle(content, getString(R.string.settings_authorization), getString(R.string.settings_authorization_summary))
+        val notice = card().apply {
+            addView(label(getString(R.string.settings_authorization_native_title), 18, WARNING, true))
+            addView(label(getString(R.string.settings_authorization_native_description), 14, MUTED))
+        }
+        content.addView(notice, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
+        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.AUTHORIZATION))
+    }
+
+    private fun systemAuthorization(): SystemAuthorization = SystemAuthorization(this,
+        openSettings = { startActivity(it) }, openVpnConsent = { vpnAuthorization.launch(it) })
+
+    private fun requestWriteSettingsAuthorization() {
+        writeAuthorizationUnavailable = systemAuthorization().requestWriteSettings() == SystemAuthorization.Result.UNAVAILABLE
+        render()
+    }
+
+    private fun requestVpnAuthorization() {
+        vpnAuthorizationResult = systemAuthorization().requestVpn()
+        render()
+    }
+
+    private fun vpnAuthorizationValue(): String = getString(when (vpnAuthorizationResult) {
+        SystemAuthorization.Result.ALLOWED -> R.string.settings_authorization_last_allowed
+        SystemAuthorization.Result.OPENED -> R.string.settings_authorization_waiting
+        else -> R.string.settings_authorization_check
+    })
+
     private fun advancedSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_advanced), getString(R.string.settings_advanced_subtitle))
         val caution = card().apply {
@@ -1450,6 +1590,28 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun allSettingsSections(content: LinearLayout) {
+        filteredSection(content, SettingsSection.SYSTEM_AUTHORIZATION,
+            getString(R.string.settings_authorization_system), R.drawable.ic_dp_permissions) { card ->
+            val writeState = getString(if (systemAuthorization().canWriteSettings())
+                R.string.settings_authorization_allowed else R.string.settings_authorization_not_allowed)
+            card.addView(button("${getString(R.string.settings_authorization_write)} · $writeState", false,
+                ::requestWriteSettingsAuthorization).apply { wrapContentHeight = true }, matchButton())
+            card.addView(label(getString(R.string.settings_authorization_write_description), 14, MUTED))
+            if (writeAuthorizationUnavailable) card.addView(label(getString(R.string.settings_authorization_unavailable), 14, WARNING))
+            card.addView(space(SETTINGS_BLOCK_GAP_DP))
+            card.addView(button("${getString(R.string.settings_authorization_vpn)} · ${vpnAuthorizationValue()}", false,
+                ::requestVpnAuthorization).apply { wrapContentHeight = true }, matchButton())
+            card.addView(label(getString(R.string.settings_authorization_vpn_description), 14, MUTED))
+            val resultMessage = when (vpnAuthorizationResult) {
+                SystemAuthorization.Result.CANCELLED -> R.string.settings_authorization_cancelled
+                SystemAuthorization.Result.NOT_ALLOWED -> R.string.settings_authorization_not_completed
+                SystemAuthorization.Result.UNAVAILABLE -> R.string.settings_authorization_unavailable
+                SystemAuthorization.Result.ALLOWED -> R.string.settings_authorization_vpn_checked
+                else -> null
+            }
+            resultMessage?.let { card.addView(label(getString(it), 14,
+                if (vpnAuthorizationResult == SystemAuthorization.Result.ALLOWED) MUTED else WARNING)) }
+        }
         filteredSection(content, SettingsSection.CARPLAY_CONTROLS,
             getString(R.string.carplay_controls), R.drawable.ic_dp_controls) { card ->
             val gestureFingers = listOf(0, 2, 3, 4)
@@ -2969,6 +3131,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun connect(wireless: Boolean) = connect(wireless, fromBluetooth = false)
 
     private fun connect(wireless: Boolean, fromBluetooth: Boolean) {
+        if (wireless && UsbAutoConnect.attached(this) != null) {
+            bluetoothAutoConnectPhone = null
+            UsbAutoConnect.request(this, force = true)
+            return
+        }
+        val request = ++connectionRequest
+        val usbGeneration = UsbAutoConnect.generation
         if (!fromBluetooth) bluetoothAutoConnectPhone = null
         startupHotspotCancelled = true
         if (wireless && pendingCarHotspotSetup) { page = "settings"; settingsCategory = SettingsCategory.CONNECTION; render(); return }
@@ -2991,11 +3160,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED && !preferences.getBoolean("notification_asked", false)) {
             preferences.edit().putBoolean("notification_asked", true).apply()
             notificationTransport = wireless
+            notificationUsbGeneration = usbGeneration
             notificationBluetoothPhone = if (fromBluetooth) bluetoothAutoConnectPhone else null
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
-        val open = {
+        val open = open@{
+            if (isFinishing || isDestroyed || request != connectionRequest) return@open
+            if (wireless && (usbGeneration != UsbAutoConnect.generation || UsbAutoConnect.attached(this) != null)) {
+                UsbAutoConnect.request(this)
+                return@open
+            }
             bluetoothAutoConnectPhone = null
             AirPlayPersistence.saveWirelessEnabled(this, wireless)
             openProjection()
@@ -3004,7 +3179,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         else open()
     }
     private fun openProjection() {
-        startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        val launch = Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        UsbAutoConnect.attached(this)?.let { device ->
+            launch.action = android.hardware.usb.UsbManager.ACTION_USB_DEVICE_ATTACHED
+            launch.putExtra(android.hardware.usb.UsbManager.EXTRA_DEVICE, device)
+        }
+        startActivity(launch)
     }
     private fun canResumeWirelessSession(): Boolean {
         val current = CarPlayBackgroundSession.snapshot()?.controller ?: return false
@@ -3076,7 +3256,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             setupError != null -> getString(R.string.setup_needs_attention)
             CarPlayBackgroundSession.active -> getString(R.string.carplay_connected)
             running -> getString(R.string.connecting_to_your_iphone)
-            DiPlayPreferences.phoneAddress(this) != null -> "${getString(R.string.status_ready_for_prefix)}${DiPlayPreferences.phoneName(this)}"
             else -> null
         }
         status?.apply {
@@ -3088,8 +3267,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             disconnectButton?.isEnabled = true
             lastRunning = running
         }
-        connectButton?.text = getString(if (canResumeWirelessSession()) R.string.open_carplay else R.string.settings_connect_wireless)
-        connectButton?.isEnabled = setupError == null
+        homeUsbStatus?.setText(if (UsbAutoConnect.attached(this) != null) R.string.home_usb_attached else R.string.home_usb_waiting)
+        refreshHomePhones()
         refreshReconnectBar()
         refreshReadiness()
     }
@@ -3870,6 +4049,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         private const val BACKUP_QR_MIN_DP = 96
         private const val BACKUP_QR_WINDOW_RESERVE_DP = 144
         private const val HOME_HEADER_GAP_DP = 8
+        private const val HOME_HINT_GAP_DP = 12
         private const val HOME_COMPACT_CARD_PADDING_DP = 12
         private const val HOME_COLUMNS_MIN_WIDTH_DP = 600
         private const val HOME_COLUMN_GAP_DP = 16

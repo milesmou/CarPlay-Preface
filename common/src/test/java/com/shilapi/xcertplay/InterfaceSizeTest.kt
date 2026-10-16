@@ -1,120 +1,132 @@
 package com.shilapi.xcertplay
 
 import android.content.res.Configuration
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.*
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [31], manifest = Config.NONE)
+@Config(sdk = [28, 33], manifest = Config.NONE)
 class InterfaceSizeTest {
+    @After fun resetPreference() = InterfaceSize.save(RuntimeEnvironment.getApplication(), InterfaceSize.PREFACE_12_3)
+
     private fun screen(widthDp: Int, heightDp: Int, densityDpi: Int) = Configuration().apply {
         screenWidthDp = widthDp
         screenHeightDp = heightDp
         smallestScreenWidthDp = minOf(widthDp, heightDp)
         this.densityDpi = densityDpi
+        orientation = Configuration.ORIENTATION_LANDSCAPE
     }
 
-    @Test
-    fun autoEnlargesALowDensityWideScreenToTheTargetWidth() {
-        val override = InterfaceSize.override(screen(2666, 1333, 144), InterfaceSize.AUTO)!!
-
-        assertEquals(720, override.smallestScreenWidthDp)
-        assertEquals(1440, override.screenWidthDp)
-        assertEquals(267, override.densityDpi)
+    @Test fun prefaceChoiceHasConsistentSizeAcrossReportedDensities() {
+        assertNull(InterfaceSize.override(screen(1920, 720, 160), InterfaceSize.PREFACE_12_3))
+        for (base in listOf(screen(1280, 480, 240), screen(960, 360, 320))) {
+            val scaled = InterfaceSize.override(base, InterfaceSize.PREFACE_12_3)!!
+            assertEquals(160, scaled.densityDpi)
+            assertEquals(1920, scaled.screenWidthDp)
+            assertEquals(720, scaled.screenHeightDp)
+        }
     }
 
-    @Test
-    fun autoLeavesOrdinaryScreensAlone() {
-        assertNull(InterfaceSize.override(screen(1280, 720, 160), InterfaceSize.AUTO))
-        assertNull(InterfaceSize.override(screen(400, 800, 420), InterfaceSize.AUTO))
-        assertNull(InterfaceSize.override(screen(2666, 1333, 144), 100))
+    @Test fun savedManualPercentagesStillUseSystemSize() {
+        val base = screen(1280, 480, 240)
+        assertNull(InterfaceSize.override(base, 100))
+        val scaled = InterfaceSize.override(base, 150)!!
+        assertEquals(360, scaled.densityDpi)
+        assertEquals(853, scaled.screenWidthDp)
+        assertEquals(320, scaled.screenHeightDp)
     }
 
-    @Test
-    fun aFixedChoiceScalesBySelf() {
-        val override = InterfaceSize.override(screen(1280, 720, 160), 150)!!
-
-        assertEquals(240, override.densityDpi)
-        assertEquals(853, override.screenWidthDp)
-        assertEquals(480, override.smallestScreenWidthDp)
+    @Test fun smaller75PercentChoiceUsesSystemSize() {
+        val context = RuntimeEnvironment.getApplication()
+        InterfaceSize.save(context, 75)
+        assertEquals(75, InterfaceSize.preference(context))
+        val scaled = InterfaceSize.override(screen(1280, 480, 240), 75)!!
+        assertEquals(180, scaled.densityDpi)
+        assertEquals(1707, scaled.screenWidthDp)
+        assertEquals(640, scaled.screenHeightDp)
     }
 
-    @Test
-    fun enforceRewritesMetricsThatAFrameworkPutBack() {
-        val resources = org.robolectric.RuntimeEnvironment.getApplication().resources
-        val override = InterfaceSize.override(screen(2666, 1333, 144), InterfaceSize.AUTO)!!
-
-        assertEquals(true, InterfaceSize.enforce(resources, override))
-        assertEquals(267, resources.displayMetrics.densityDpi)
-        assertEquals(267 / 160f, resources.displayMetrics.density)
-        assertEquals(720, resources.configuration.smallestScreenWidthDp)
-        assertEquals(false, InterfaceSize.enforce(resources, override))
+    @Test fun defaultsAndRemovedChoicesUsePrefaceWhileValidChoicesRemain() {
+        val context = RuntimeEnvironment.getApplication()
+        val preferences = context.getSharedPreferences("diplay", 0)
+        preferences.edit().remove("interface_size").commit()
+        assertEquals(InterfaceSize.PREFACE_12_3, InterfaceSize.preference(context))
+        for (value in listOf(0, 200)) {
+            preferences.edit().putInt("interface_size", value).commit()
+            assertEquals(InterfaceSize.PREFACE_12_3, InterfaceSize.preference(context))
+        }
+        assertEquals(listOf(InterfaceSize.PREFACE_12_3, 75, 100, 125, 150), InterfaceSize.CHOICES)
+        for (value in listOf(75, 100, 125, 150)) {
+            InterfaceSize.save(context, value)
+            assertEquals(value, InterfaceSize.preference(context))
+        }
+        assertEquals("星瑞 12.3 英寸", InterfaceSize.displayName(context, InterfaceSize.PREFACE_12_3))
     }
 
-    @Test
-    fun enforceAlsoRewritesDimensionsWhenOnlyTheyWereReset() {
-        val resources = org.robolectric.RuntimeEnvironment.getApplication().resources
-        val override = InterfaceSize.override(screen(2666, 1333, 144), InterfaceSize.AUTO)!!
-        InterfaceSize.enforce(resources, override)
-        resources.configuration.screenWidthDp = 2666
-
-        assertEquals(true, InterfaceSize.enforce(resources, override))
-        assertEquals(1440, resources.configuration.screenWidthDp)
-    }
-
-    @Test
-    fun onlyADensityChangeNeedsANewActivity() {
-        val applied = InterfaceSize.override(screen(2666, 1333, 144), InterfaceSize.AUTO)
-        val wider = InterfaceSize.override(screen(2666, 1333, 144).apply { screenWidthDp = 2000 }, InterfaceSize.AUTO)
-        val split = InterfaceSize.override(screen(1333, 1225, 144), InterfaceSize.AUTO)
-
-        assertEquals(false, InterfaceSize.needsRecreate(applied, wider))
-        assertEquals(true, InterfaceSize.needsRecreate(applied, split))
-        assertEquals(true, InterfaceSize.needsRecreate(null, applied))
-        assertEquals(false, InterfaceSize.needsRecreate(null, null))
-    }
-
-    @Test
-    fun theContextOverrideDoesNotFreezeWindowDimensions() {
-        val scaled = InterfaceSize.override(screen(1280, 800, 160), 150)!!
-        val contextOverride = InterfaceSize.contextOverride(scaled)
-        val rotated = screen(800, 1280, 160).apply { updateFrom(contextOverride) }
-
-        assertEquals(240, rotated.densityDpi)
-        assertEquals(800, rotated.screenWidthDp)
-        assertEquals(1280, rotated.screenHeightDp)
-        assertEquals(800, rotated.smallestScreenWidthDp)
-        val next = InterfaceSize.configurationChange(rotated, 160, 150)!!
-        assertEquals(240, next.densityDpi)
-        assertEquals(533, next.screenWidthDp)
-        assertEquals(853, next.screenHeightDp)
-        assertEquals(false, InterfaceSize.needsRecreate(scaled, next))
-    }
-
-    @Test
-    fun automaticScalingReevaluatesASplitWindowFromTheSystemDensity() {
-        val scaled = InterfaceSize.override(screen(2666, 1333, 144), InterfaceSize.AUTO)!!
-        val split = screen(1333, 1225, 144).apply { updateFrom(InterfaceSize.contextOverride(scaled)) }
-        val next = InterfaceSize.configurationChange(split, 144, InterfaceSize.AUTO)!!
-
-        assertEquals(245, next.densityDpi)
-        assertEquals(783, next.screenWidthDp)
+    @Test fun appOverrideDoesNotFreezeWindowDimensions() {
+        val scaled = InterfaceSize.override(screen(1280, 480, 240), InterfaceSize.PREFACE_12_3)!!
+        val installed = InterfaceSize.contextOverride(scaled)
+        assertEquals(scaled.fontScale, installed.fontScale, 0f)
+        assertEquals(0, installed.screenWidthDp)
+        assertEquals(0, installed.screenHeightDp)
+        val split = screen(640, 480, 240).apply { updateFrom(installed) }
+        val next = InterfaceSize.configurationChange(split, 240, InterfaceSize.PREFACE_12_3)!!
+        assertEquals(160, next.densityDpi)
+        assertEquals(960, next.screenWidthDp)
         assertEquals(720, next.screenHeightDp)
-        assertEquals(true, InterfaceSize.needsRecreate(scaled, next))
-        assertNull(InterfaceSize.configurationChange(screen(480, 800, 267), 144, InterfaceSize.AUTO))
+        assertFalse(InterfaceSize.needsRecreate(scaled, next))
     }
 
-    @Test
-    fun theOverrideKeepsTheBaseLanguage() {
-        val base = screen(2666, 1333, 144).apply { setLocales(android.os.LocaleList(java.util.Locale("ar"))) }
+    @Test fun systemDensityChangesDoNotChangePrefaceControlSize() {
+        val scaled = InterfaceSize.override(screen(1280, 480, 240), InterfaceSize.PREFACE_12_3)!!
+        val reported = screen(960, 360, 320).apply { updateFrom(InterfaceSize.contextOverride(scaled)) }
+        val next = InterfaceSize.configurationChange(reported, 320, InterfaceSize.PREFACE_12_3)!!
+        assertEquals(160, next.densityDpi)
+        assertEquals(1920, next.screenWidthDp)
+        assertEquals(720, next.screenHeightDp)
+        assertFalse(InterfaceSize.needsRecreate(scaled, next))
+    }
 
-        val override = InterfaceSize.override(base, InterfaceSize.AUTO)!!
+    @Test fun enforcementRestoresBothMetricsAndAvailableWindow() {
+        val resources = RuntimeEnvironment.getApplication().resources
+        val scaled = InterfaceSize.override(screen(1280, 480, 240), InterfaceSize.PREFACE_12_3)!!
+        InterfaceSize.enforce(resources, scaled)
+        resources.configuration.screenWidthDp = 1280
+        resources.displayMetrics.densityDpi = 240
+        assertTrue(InterfaceSize.enforce(resources, scaled))
+        assertEquals(160, resources.displayMetrics.densityDpi)
+        assertEquals(1920, resources.configuration.screenWidthDp)
+        assertFalse(InterfaceSize.enforce(resources, scaled))
+    }
 
-        assertEquals("ar", override.locales[0].language)
-        assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, override.layoutDirection)
+    @Test fun enforcementKeepsTheUsersFontScale() {
+        val resources = RuntimeEnvironment.getApplication().resources
+        resources.displayMetrics.apply { densityDpi = 240; density = 1.5f; scaledDensity = 2.25f }
+        val scaled = InterfaceSize.override(screen(1280, 480, 240), InterfaceSize.PREFACE_12_3)!!
+        InterfaceSize.enforce(resources, scaled)
+        assertEquals(1.5f, resources.displayMetrics.scaledDensity / resources.displayMetrics.density, 0.001f)
+        val base = screen(1280, 480, 240).apply { fontScale = 1.5f }
+        assertEquals(1.5f, InterfaceSize.contextOverride(InterfaceSize.override(base, InterfaceSize.PREFACE_12_3)!!).fontScale, 0f)
+    }
+
+    @Test fun manualDensityChangesStillNeedRecreation() {
+        val base = screen(1280, 480, 240)
+        val automatic = InterfaceSize.override(base, InterfaceSize.PREFACE_12_3)
+        val manual = InterfaceSize.override(base, 150)
+        assertTrue(InterfaceSize.needsRecreate(automatic, manual))
+        assertTrue(InterfaceSize.needsRecreate(null, automatic))
+        assertFalse(InterfaceSize.needsRecreate(null, null))
+    }
+
+    @Test fun overrideKeepsTheBaseLanguage() {
+        val base = screen(1280, 480, 240).apply { setLocales(android.os.LocaleList(java.util.Locale("ar"))) }
+        val scaled = InterfaceSize.override(base, InterfaceSize.PREFACE_12_3)!!
+        assertEquals("ar", scaled.locales[0].language)
+        assertEquals(android.view.View.LAYOUT_DIRECTION_RTL, scaled.layoutDirection)
     }
 }

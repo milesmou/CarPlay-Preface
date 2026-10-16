@@ -17,10 +17,16 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
+import org.robolectric.util.ReflectionHelpers
+import com.shilapi.xcertplay.network.CarPlayVpnService
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.FutureTask
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], manifest = Config.NONE)
@@ -89,6 +95,31 @@ class CarPlayControllerUsbServiceTest {
         assertEquals(1, context.unregistered)
     }
 
+    @Test fun wiredBindingTargetsTheProtectedVpnServiceAndHandlesBindFailure() {
+        val context = UsbContext(true)
+        val controller = controller(context, CarPlayTransport.WIRED, MfiTarget.LOCAL)
+        assertNull(ReflectionHelpers.callInstanceMethod<CarPlayVpnService?>(controller, "awaitVpnService"))
+        assertEquals(CarPlayVpnService::class.java.name, context.boundIntent?.component?.className)
+        assertFalse(ReflectionHelpers.getField<Boolean>(controller, "vpnServiceBound"))
+    }
+
+    @Test fun cancellationWakesPendingVpnBindingAndIgnoresItsLateCallback() {
+        val context = UsbContext(true, acceptBinding = true)
+        val controller = controller(context, CarPlayTransport.WIRED, MfiTarget.LOCAL)
+        val waiting = FutureTask { ReflectionHelpers.callInstanceMethod<CarPlayVpnService?>(controller, "awaitVpnService") }
+        Thread(waiting, "test-vpn-bind").start()
+        assertTrue(context.bindCalled.await(2, TimeUnit.SECONDS))
+        controller.close()
+        assertNull(waiting.get(2, TimeUnit.SECONDS))
+        assertTrue(controller.awaitClosed(2_000))
+        assertEquals(1, context.unbound)
+        val service = Robolectric.buildService(CarPlayVpnService::class.java).create()
+        try {
+            context.boundConnection!!.onServiceConnected(context.boundIntent!!.component!!, service.get().onBind(Intent())!!)
+            assertNull(ReflectionHelpers.getField<CarPlayVpnService?>(controller, "vpnService"))
+        } finally { service.destroy() }
+    }
+
     private fun missingServiceFailsNormally(transport: CarPlayTransport, target: MfiTarget) {
         val context = UsbContext(false)
         val controller = controller(context, transport, target)
@@ -109,11 +140,21 @@ class CarPlayControllerUsbServiceTest {
             AirPlayIdentity(ByteArray(32), ByteArray(32), "test"), PairingStore(),
             object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, statuses::add).also(controllers::add)
 
-    private class UsbContext(private val hasUsb: Boolean) : ContextWrapper(RuntimeEnvironment.getApplication()) {
+    private class UsbContext(private val hasUsb: Boolean, private val acceptBinding: Boolean = false) : ContextWrapper(RuntimeEnvironment.getApplication()) {
         val receivers = mutableMapOf<BroadcastReceiver, IntentFilter>()
         var unregistered = 0
+        val bindCalled = CountDownLatch(1)
+        var boundIntent: Intent? = null
+        var boundConnection: ServiceConnection? = null
+        var unbound = 0
         override fun getApplicationContext(): Context = this
-        override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean = false
+        override fun bindService(service: Intent, conn: ServiceConnection, flags: Int): Boolean {
+            boundIntent = service
+            boundConnection = conn
+            bindCalled.countDown()
+            return acceptBinding
+        }
+        override fun unbindService(conn: ServiceConnection) { unbound++ }
         override fun getSystemService(name: String): Any? =
             if (name == USB_SERVICE && !hasUsb) null else super.getSystemService(name)
         override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter): Intent? {

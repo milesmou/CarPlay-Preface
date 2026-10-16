@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.network
 
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
@@ -37,6 +38,14 @@ import org.robolectric.util.ReflectionHelpers.ClassParameter
 @Config(sdk = [28, 33], manifest = Config.NONE, shadows = [VpnScopeBuilderShadow::class])
 class CarPlayVpnScopeTest {
     @Before fun resetVpnBoundary() { VpnScopeBoundary.reset() }
+
+    @Test fun frameworkBindingKeepsTheVpnRevocationCallbackBinder() {
+        withService { service ->
+            assertTrue(service.onBind(Intent()) is CarPlayVpnService.LocalBinder)
+            val framework = service.onBind(Intent(VpnService.SERVICE_INTERFACE))
+            assertTrue(framework != null && framework !is CarPlayVpnService.LocalBinder)
+        }
+    }
 
     @Test fun allowlistRejectionNeverEstablishesAnUnrestrictedTunnel() {
         VpnScopeBoundary.allowFailure = PackageManager.NameNotFoundException("scope rejected")
@@ -88,6 +97,23 @@ class CarPlayVpnScopeTest {
             service.detach()
             service.detach()
             assertTrue(newServer.isClosed)
+            assertReleased(service)
+        }
+    }
+
+    @Test fun revokeClosesTheListenerAndNotifiesTheOwnerOnce() {
+        withService { service ->
+            val errors = mutableListOf<String>()
+            assertEquals(CarPlayVpnService.AttachResult.Started, service.attachWireless(
+                InetAddress.getLoopbackAddress(), config, identity, PairingStore(), null,
+                object : AirPlaySessionListener {
+                    override fun onTransportError(message: String) { errors += message }
+                }, object : AirPlayMediaHandler {}))
+            val server = ReflectionHelpers.getField<ServerSocket>(service, "serverSocket")
+            service.onRevoke()
+            service.onRevoke()
+            assertTrue(server.isClosed)
+            assertEquals(listOf("VPN authorization revoked"), errors)
             assertReleased(service)
         }
     }

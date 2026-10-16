@@ -76,10 +76,16 @@ internal class CarPlayMenuVolumeControls(
     private inner class Control(val navigation: Boolean, title: Int) {
         var displayed: CarPlayMenuVolume.Level? = null
         val label = TextView(context).apply {
+            text = context.getString(title)
             textSize = 16f
             setTextColor(palette.primaryText)
             textAlignment = View.TEXT_ALIGNMENT_VIEW_START
             gravity = Gravity.START
+        }
+        val value = TextView(context).apply {
+            textSize = 14f
+            gravity = Gravity.END
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_END
         }
         val slider = SeekBar(context).apply {
             contentDescription = context.getString(title)
@@ -88,7 +94,11 @@ internal class CarPlayMenuVolumeControls(
         }
         val view = LinearLayout(context).apply {
             orientation = VERTICAL
-            addView(label, LayoutParams(-1, -2))
+            addView(LinearLayout(context).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(label, LayoutParams(0, -2, 1f))
+                addView(value, LayoutParams(-2, -2).apply { marginStart = dp(VOLUME_BLOCK_GAP_DP) })
+            }, LayoutParams(-1, -2))
             addView(slider, LayoutParams(-1, dp(VOLUME_SLIDER_HEIGHT_DP)))
         }
         private val titleText = context.getString(title)
@@ -106,9 +116,12 @@ internal class CarPlayMenuVolumeControls(
         fun update(blocked: Boolean) {
             displayed = volume.read(navigation)
             val level = displayed
-            label.text = if (level == null) context.getString(R.string.settings_volume_unavailable_label, titleText)
+            val description = if (level == null) context.getString(R.string.settings_volume_unavailable_label, titleText)
                 else context.getString(R.string.settings_volume_level, titleText, level.current, level.maximum)
-            slider.contentDescription = label.text
+            value.text = if (level == null) context.getString(R.string.settings_volume_unavailable_value)
+                else "${level.current}/${level.maximum}"
+            value.setTextColor(if (level == null || blocked) palette.secondaryText else palette.accent)
+            slider.contentDescription = description
             slider.isEnabled = level != null && !blocked
             slider.max = level?.let { it.maximum - it.minimum } ?: 0
             slider.progress = level?.let { it.current - it.minimum } ?: 0

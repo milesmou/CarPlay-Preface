@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.network
 
 import android.content.Context
+import android.content.res.Configuration
 import android.net.ConnectivityManager
 import android.net.wifi.SoftApConfiguration
 import android.net.wifi.WifiConfiguration
@@ -36,11 +37,16 @@ class LocalOnlyHotspotManager(
 ) : WirelessHotspotManager {
     private val connectivityManager =
         context.applicationContext.getSystemService(ConnectivityManager::class.java)
-    private val wifiManager = context.applicationContext.getSystemService(WifiManager::class.java)
+    // Android 9's reservation finalizer calls close() even after explicit close(). A distinct
+    // public Context service cache keeps that old WifiManager's callback slot separate.
+    private val wifiManager = context.applicationContext
+        .createConfigurationContext(Configuration(context.resources.configuration))
+        .getSystemService(WifiManager::class.java)
         ?: throw IllegalStateException("WifiManager is unavailable")
     private val stateLock = Object()
 
     private var startAttempt: StartAttempt? = null
+    private var ownedAttempt: StartAttempt? = null
     private var reservation: WifiManager.LocalOnlyHotspotReservation? = null
     private var multicastLock: WifiManager.MulticastLock? = null
     private var radioObserver: LocalOnlyHotspotRadioInfo? = null
@@ -61,8 +67,8 @@ class LocalOnlyHotspotManager(
         val attempt = StartAttempt()
         synchronized(stateLock) {
             check(!closed) { "LocalOnlyHotspotManager is closed" }
-            check(startAttempt == null && reservation == null) {
-                "A LocalOnlyHotspot is already starting or active"
+            check(startAttempt == null && reservation == null && ownedAttempt == null) {
+                "A LocalOnlyHotspot manager can own only one request; create a new manager after failure"
             }
             startAttempt = attempt
         }
@@ -72,12 +78,24 @@ class LocalOnlyHotspotManager(
         var observerAdopted = false
         val deadlineNanos = deadlineAfter(timeoutMillis)
         try {
+            val lease = requestGate.acquire(deadlineNanos) { synchronized(stateLock) { closed || attempt.stopped } }
+            synchronized(stateLock) { attempt.lease = lease; ownedAttempt = attempt }
+            ensureStartActive(attempt)
             val previousAddresses = activeInterfaces().flatMap { it.siteLocalIpv4Addresses() }.toSet()
             val previousUpstreams = upstreamInterfaceNames()
             ensureStartActive(attempt)
             onDiagnostic("LocalOnlyHotspot starting with Wi-Fi client enabled=${wifiManager.isWifiEnabled}")
             // Use only the public API. Android supplies the SSID, password and band.
-            wifiManager.startLocalOnlyHotspot(createCallback(attempt), Handler(Looper.getMainLooper()))
+            try {
+                synchronized(stateLock) {
+                    ensureStartActiveLocked(attempt)
+                    attempt.requestIssued = true
+                    wifiManager.startLocalOnlyHotspot(createCallback(attempt), Handler(Looper.getMainLooper()))
+                }
+            } catch (failure: Exception) {
+                lease.callbackFinished()
+                throw failure
+            }
 
             val activeReservation = awaitStart(attempt, deadlineNanos, timeoutMillis)
             radioInfo.start()
@@ -92,6 +110,7 @@ class LocalOnlyHotspotManager(
                 deadlineNanos = deadlineNanos,
             )
             val liveRadio = awaitRadioInfo(radioInfo, apInterface, configuration, attempt, deadlineNanos)
+            validateInterface(apInterface)
             radioInfo.watch(apInterface.bssid ?: configuration.bssid) { onDiagnostic(it) }
 
             synchronized(stateLock) {
@@ -186,11 +205,27 @@ class LocalOnlyHotspotManager(
 
     override fun validateReady() {
         val ap = synchronized(stateLock) {
-            if (closed || stopped || reservation == null) throw IOException("Temporary hotspot is no longer active")
+            if (closed) throw IOException("Temporary hotspot application reservation was released")
+            if (stopped) throw IOException("Temporary hotspot was stopped by the system")
+            if (reservation == null) throw IOException("Temporary hotspot reservation is unavailable")
             activeInterface ?: throw IOException("Temporary hotspot interface is unavailable")
         }
+        validateInterface(ap)
+        synchronized(stateLock) {
+            if (closed || stopped || reservation == null || activeInterface !== ap) {
+                throw IOException("Temporary hotspot stopped during readiness check")
+            }
+        }
+    }
+
+    private fun validateInterface(ap: ApInterface) {
         val current = activeInterfaces().singleOrNull { it.name == ap.name }
             ?: throw IOException("Temporary hotspot interface disappeared")
+        if (current.index != ap.index) throw IOException("Temporary hotspot interface was replaced")
+        val bssid = current.interfaceBssid()
+        if (ap.bssid != null && bssid != null && !ap.bssid.equals(bssid, true)) {
+            throw IOException("Temporary hotspot interface identity changed")
+        }
         if (Collections.list(current.inetAddresses).none { it.address.contentEquals(ap.hostAddress.address) }) {
             throw IOException("Temporary hotspot address changed; reconnect")
         }
@@ -200,9 +235,11 @@ class LocalOnlyHotspotManager(
         val activeReservation: WifiManager.LocalOnlyHotspotReservation?
         val activeMulticastLock: WifiManager.MulticastLock?
         val activeObserver: LocalOnlyHotspotRadioInfo?
+        val attempt: StartAttempt?
         synchronized(stateLock) {
             if (closed) return
             closed = true
+            attempt = ownedAttempt
             startAttempt?.stopped = true
             stateLock.notifyAll()
             // onStarted already owns a reservation while interface/radio discovery is still
@@ -223,6 +260,7 @@ class LocalOnlyHotspotManager(
             onDiagnostic("LocalOnlyHotspot releasing application reservation; system stop may be asynchronous")
             activeReservation.close()
         }
+        attempt?.lease?.retire()
     }
 
     private fun createCallback(attempt: StartAttempt): WifiManager.LocalOnlyHotspotCallback =
@@ -245,6 +283,7 @@ class LocalOnlyHotspotManager(
                     }
                 }
                 if (closeReservation) reservation.close()
+                attempt.lease?.callbackFinished()
             }
 
             override fun onFailed(reason: Int) {
@@ -257,6 +296,7 @@ class LocalOnlyHotspotManager(
                         stateLock.notifyAll()
                     }
                 }
+                attempt.lease?.callbackFinished()
             }
 
             override fun onStopped() {
@@ -272,6 +312,7 @@ class LocalOnlyHotspotManager(
                     stateLock.notifyAll()
                 }
                 releaseMulticastLock(lockToRelease)
+                attempt.lease?.callbackFinished()
             }
         }
 
@@ -454,21 +495,27 @@ class LocalOnlyHotspotManager(
         attempt: StartAttempt,
         deadlineNanos: Long,
     ): ApInterface {
+        var stableCandidate: ApInterface? = null
+        var stableSince = 0L
         while (true) {
             ensureStartActive(attempt)
             val networkInterface = findInterface(bssid, previousAddresses, previousUpstreams)
-            if (networkInterface != null) {
-                networkInterface.hotspotAddress()?.let { hostAddress ->
+            val candidate = networkInterface?.let {
+                it.hotspotAddress()?.let { hostAddress ->
                     val interfaceBssid = networkInterface.interfaceBssid()
                     if (bssid == null && interfaceBssid == null) {
-                        return@let
+                        null
+                    } else {
+                        ApInterface(networkInterface.name, networkInterface.index, hostAddress, interfaceBssid)
                     }
-                    return ApInterface(
-                        name = networkInterface.name,
-                        hostAddress = hostAddress,
-                        bssid = interfaceBssid,
-                    )
                 }
+            }
+            val now = System.nanoTime()
+            if (candidate == null || candidate != stableCandidate) {
+                stableCandidate = candidate
+                stableSince = now
+            } else if (now - stableSince >= TimeUnit.MILLISECONDS.toNanos(500)) {
+                return candidate
             }
 
             val remainingNanos = deadlineNanos - System.nanoTime()
@@ -555,6 +602,10 @@ class LocalOnlyHotspotManager(
         }
         releaseMulticastLock(multicastLock)
         failedReservation?.close()
+        // No request was issued if setup failed before startLocalOnlyHotspot().
+        // A pending callback keeps the lease until it closes its rejected reservation.
+        if (!attempt.requestIssued) attempt.lease?.callbackFinished()
+        attempt.lease?.retire()
     }
 
     private fun waitNanos(nanos: Long) {
@@ -710,6 +761,8 @@ class LocalOnlyHotspotManager(
     }
 
     private class StartAttempt {
+        var lease: LocalOnlyHotspotRequestGate.Lease? = null
+        var requestIssued = false
         var reservation: WifiManager.LocalOnlyHotspotReservation? = null
         var failure: IOException? = null
         var stopped = false
@@ -725,13 +778,15 @@ class LocalOnlyHotspotManager(
         val bandLabel: String,
     )
 
-    private class ApInterface(
+    private data class ApInterface(
         val name: String,
+        val index: Int,
         val hostAddress: InetAddress,
         val bssid: String?,
     )
 
     private companion object {
+        val requestGate = LocalOnlyHotspotRequestGate()
         const val MULTICAST_LOCK_TAG = "xcertplay-local-only-hotspot-mdns"
         const val NANOS_PER_MILLISECOND = 1_000_000L
         val INTERFACE_POLL_NANOS: Long = TimeUnit.MILLISECONDS.toNanos(100)

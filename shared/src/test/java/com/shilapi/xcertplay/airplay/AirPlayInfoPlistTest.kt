@@ -10,7 +10,7 @@ import org.junit.Test
 
 class AirPlayInfoPlistTest {
     @Test
-    fun bluetoothAudioDoesNotRequestMainAudioWhileRetainingTheScreen() {
+    fun bluetoothAudioMatchesGeelyPlayResourcesWithoutOfferingAudioStreams() {
         for (disabled in listOf(false, true)) {
             val config = AirPlayConfig("test", "02:00:00:00:00:02", "02:00:00:00:00:01", "1",
                 AirPlayDisplayConfig(1920, 720), disableAudioOutput = disabled, mainBufferedAudio = true)
@@ -18,7 +18,7 @@ class AirPlayInfoPlistTest {
             val info = BplistCodec.decode(BplistCodec.encode(AirPlayInfoPlist.build(config))) as Map<*, *>
             val modes = info["modes"] as Map<*, *>
             val resources = (modes["resources"] as List<*>).map { (it as Map<*, *>)["resourceID"] }
-            assertEquals(if (disabled) listOf(1L) else listOf(1L, 2L), resources)
+            assertEquals(listOf(1L, 2L), resources)
             assertEquals(!disabled, info.containsKey("audioFormats"))
             assertEquals(!disabled, info.containsKey("audioLatencies"))
             assertEquals(!disabled, info.containsKey("mainBufferedInfo"))

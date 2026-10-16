@@ -28,60 +28,81 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [25, 29], qualifiers = "en", shadows = [VpnConsentTestShadow::class])
+@Config(sdk = [28, 33], qualifiers = "en", shadows = [VpnConsentTestShadow::class])
 @LooperMode(LooperMode.Mode.PAUSED)
 class CarPlayVpnConsentTest {
     private lateinit var activity: CarPlayHostActivity
     private var launches = 0
 
-    @Test fun usbStartupDoesNotRequireVpnBeforeTryingSystemNetwork() {
-        ReflectionHelpers.setField(activity, "wirelessEnabled", false)
+    @Test fun usbStartupRequiresVpnBeforeOpeningNcm() {
         ReflectionHelpers.setField(activity, "locationReportingEnabled", false)
+        invoke("requestStartupPrerequisites")
+        assertEquals(1, launches)
+        assertTrue(field("awaitingVpnConsent"))
+        assertFalse(field("vpnReady"))
+        assertNull(ReflectionHelpers.getField<Any?>(activity, "controller"))
+    }
+
+    @Test fun wirelessStartupDoesNotPrepareOrLaunchVpn() {
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
+        ReflectionHelpers.setField(activity, "locationReportingEnabled", false)
+        VpnConsentTestShadow.failure = SecurityException("Wireless must not prepare VPN")
         invoke("requestStartupPrerequisites")
         assertEquals(0, launches)
         assertFalse(field("awaitingVpnConsent"))
+        assertFalse(log().contains("VPN consent unavailable"))
     }
 
-    @Test fun fallbackAuthorizationCompletesTheWaitingTransport() {
-        var accepted: Boolean? = null
-        ReflectionHelpers.setField(activity, "pendingVpnAuthorization", { granted: Boolean -> accepted = granted })
+    @Test fun successfulResultWithoutPreparedOwnershipStopsUsbWithoutAnotherDialog() {
         invoke("requestVpnConsent")
+        result(Activity.RESULT_OK)
+        assertFalse(field("vpnReady"))
+        assertFalse(field("awaitingVpnConsent"))
+        assertTrue(field("startupRetryStopped"))
         assertEquals(1, launches)
-        ReflectionHelpers.callInstanceMethod<Unit>(activity, "onVpnConsentResult",
-            ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, Activity.RESULT_OK))
-        assertEquals(true, accepted)
-        assertNull(ReflectionHelpers.getField<Any?>(activity, "pendingVpnAuthorization"))
     }
 
-    @Test fun fallbackDenialReleasesTheWaitingTransport() {
-        var accepted: Boolean? = null
-        ReflectionHelpers.setField(activity, "pendingVpnAuthorization", { granted: Boolean -> accepted = granted })
+    @Test fun cancelledResultDoesNotPrepareAgainAndStopsRetries() {
         invoke("requestVpnConsent")
-        ReflectionHelpers.callInstanceMethod<Unit>(activity, "onVpnConsentResult",
-            ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, Activity.RESULT_CANCELED))
-        assertEquals(false, accepted)
-        assertNull(ReflectionHelpers.getField<Any?>(activity, "pendingVpnAuthorization"))
+        VpnConsentTestShadow.failure = SecurityException("Cancellation must not call prepare")
+        result(Activity.RESULT_CANCELED)
+        assertFalse(field("vpnReady"))
+        assertTrue(field("startupRetryStopped"))
+        assertFalse(log().contains("operation=result"))
     }
 
-    @Test fun alreadyGrantedFallbackDoesNotOpenDialog() {
-        var accepted: Boolean? = null
+    @Test fun retryAfterInitialDenialWorksBeforeABackgroundOwnerExists() {
+        invoke("requestVpnConsent")
+        result(Activity.RESULT_CANCELED)
+        assertFalse(CarPlayBackgroundSession.hasSession())
+        invoke("retryConnectionFromButton")
+        assertEquals(2, launches)
+        assertTrue(field("awaitingVpnConsent"))
+        assertFalse(field("startupRetryStopped"))
+    }
+
+    @Test fun lateConsentAfterSwitchingToWirelessCannotUnlockUsb() {
+        invoke("requestVpnConsent")
+        ReflectionHelpers.setField(activity, "wirelessEnabled", true)
         VpnConsentTestShadow.consent = null
-        ReflectionHelpers.setField(activity, "pendingVpnAuthorization", { granted: Boolean -> accepted = granted })
+        result(Activity.RESULT_OK)
+        assertFalse(field("vpnReady"))
+        assertFalse(field("awaitingVpnConsent"))
+    }
+
+    @Test fun lateConsentDuringShutdownCannotStartAController() {
         invoke("requestVpnConsent")
-        assertEquals(true, accepted)
-        assertEquals(0, launches)
+        ReflectionHelpers.getField<AtomicBoolean>(activity, "shuttingDown").set(true)
+        VpnConsentTestShadow.consent = null
+        result(Activity.RESULT_OK)
+        assertFalse(field("vpnReady"))
+        assertNull(ReflectionHelpers.getField<Any?>(activity, "controller"))
     }
 
-    @Test fun obsoleteControllerCannotRequestAuthorization() {
-        val requester = ReflectionHelpers.callInstanceMethod<((Boolean) -> Unit) -> Unit>(activity,
-            "vpnAuthorizationForGeneration", ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, 99))
-        var accepted: Boolean? = null
-        requester { accepted = it }
-        assertEquals(false, accepted)
-        assertEquals(0, launches)
-    }
+    private fun result(code: Int) = ReflectionHelpers.callInstanceMethod<Unit>(activity,
+        "onVpnConsentResult", ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, code))
 
-    @Test fun rejectedFallbackStopsAutomaticReconnects() {
+    @Test fun rejectedTransportStopsAutomaticReconnects() {
         ReflectionHelpers.setField(activity, "connectionHelpView", TextView(activity))
         val reporter = ReflectionHelpers.callInstanceMethod<(com.shilapi.xcertplay.orchestration.CarPlayStatus) -> Unit>(
             activity, "createStatusReporter", ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType,
@@ -176,10 +197,12 @@ class CarPlayVpnConsentTest {
 
     @Test fun resultOfPendingConsentCompletesOrDeniesAuthorization() {
         invoke("requestVpnConsent")
+        VpnConsentTestShadow.consent = null
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onVpnConsentResult",
             ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, Activity.RESULT_OK))
         assertTrue(field("vpnReady"))
         assertFalse(field("awaitingVpnConsent"))
+        VpnConsentTestShadow.consent = Intent()
         invoke("requestVpnConsent")
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "onVpnConsentResult",
             ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, Activity.RESULT_CANCELED))

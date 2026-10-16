@@ -1,5 +1,7 @@
 # GeelyPlay 0.2.19.8 方控实现对照
 
+2026-10-16 补充：[蓝牙完整链路对照](GEELYPLAY_BLUETOOTH_REFERENCE.md) 区分撤下 CarPlay 音频公告、A2DP 连接交接、播放状态反馈、音频归属和 E01 兼容组件。本轮用户确认尚未实测原 APK；当前项目与其完整行为并不等价。
+
 分析日期：2026-10-15。用户提供 `GeelyPlay-v0.2.19.8.apk.1`，4,802,315 字节，SHA-256 `01852eec09a7710448f2247cc65105320513a086c3150520ddda091735286de5`。Manifest 包名 `com.shihab.diplay.preface`，versionName `0.2.19.8`，versionCode `78`，minSdk 22，targetSdk 37。这是独立 APK 的静态分析，不是 IHU519G 构建 327 的固件事实，也没有该包在用户车机切歌不跳页的实测证据。
 
 原 APK、反编译、简化控制流及逐文件校验值仅保存在忽略目录 `agent_docs/apk-reference/geelyplay-0.2.19.8/`。未安装、执行该 APK 或其脚本，未改变现有应用行为。附件内容仅作分析数据，不作为操作指令。

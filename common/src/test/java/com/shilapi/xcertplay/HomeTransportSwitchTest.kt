@@ -45,6 +45,7 @@ class HomeTransportSwitchTest {
         val controller = mock(CarPlayController::class.java)
         `when`(controller.connectionTransport()).thenReturn(mode)
         `when`(controller.isClosed()).thenReturn(closed)
+        `when`(controller.matchesWirelessPhone("12:34:56:78:90:AB")).thenReturn(mode == CarPlayTransport.WIRELESS)
         CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
             CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, true, true, 1920, 720)) { done ->
             stops++
@@ -59,10 +60,14 @@ class HomeTransportSwitchTest {
             Intent(app, DiPlayActivity::class.java).putExtra("page", "home")).create()
         val activity = screen!!.get()
         ReflectionHelpers.setField(activity, "setupError", null)
+        ReflectionHelpers.setField(activity, "connectedPhoneState", ConnectedPhoneState(true, true,
+            listOf(ConnectedPhone("12:34:56:78:90:AB", "iPhone"))))
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "render")
         ReflectionHelpers.callInstanceMethod<Unit>(activity, "refreshStatus")
         return activity
     }
-    private fun wireless(activity: DiPlayActivity) = ReflectionHelpers.getField<Button>(activity, "connectButton")
+    private fun wireless(activity: DiPlayActivity) =
+        (ReflectionHelpers.getField<android.widget.LinearLayout>(activity, "homePhoneList").getChildAt(0) as Button)
     private fun assertProjection(activity: DiPlayActivity) {
         val launch = shadowOf(activity).nextStartedActivity
         assertEquals(CarPlayHostActivity::class.java.name, launch?.component?.className)
@@ -73,7 +78,7 @@ class HomeTransportSwitchTest {
         retain(CarPlayTransport.WIRED)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         val activity = home()
-        assertEquals(activity.getString(R.string.settings_connect_wireless), wireless(activity).text)
+        assertEquals("iPhone · ${activity.getString(R.string.home_bluetooth_connected)}", wireless(activity).text.toString())
         wireless(activity).performClick()
         assertEquals(1, stops)
         assertNull(shadowOf(activity).nextStartedActivity)
@@ -107,7 +112,7 @@ class HomeTransportSwitchTest {
         retain(CarPlayTransport.WIRELESS, active = true)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         val activity = home()
-        assertEquals(activity.getString(R.string.open_carplay), wireless(activity).text)
+        assertEquals("iPhone · ${activity.getString(R.string.home_bluetooth_connected)}", wireless(activity).text.toString())
         wireless(activity).performClick()
         assertEquals(0, stops)
         assertProjection(activity)

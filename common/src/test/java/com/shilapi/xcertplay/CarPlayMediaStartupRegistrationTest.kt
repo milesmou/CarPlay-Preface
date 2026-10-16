@@ -56,8 +56,9 @@ class CarPlayMediaStartupRegistrationTest {
         } while (tasks.isNotEmpty())
     }
 
-    private fun attach(lines: MutableList<String> = mutableListOf()): CarPlayController {
+    private fun attach(lines: MutableList<String> = mutableListOf(), delegated: Boolean = false): CarPlayController {
         val phone = mock(CarPlayController::class.java)
+        `when`(phone.managesPlaybackAudioFocus).thenReturn(delegated)
         `when`(phone.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying(title = "Track", playing = true))
         `when`(phone.mediaPlayingSnapshot()).thenReturn(true)
         `when`(phone.sendMediaButton(anyInt())).thenReturn(true)
@@ -76,6 +77,42 @@ class CarPlayMediaStartupRegistrationTest {
         assertTrue(CarPlayMediaKeys.report().contains("mediaSessionActive=false"))
         assertTrue(CarPlayMediaKeys.report().contains("focusRequested=false"))
         assertTrue(CarPlayMediaKeys.report().contains("registered=true sourceOwned=false"))
+    }
+
+    @Test fun rendererFocusIsSharedWithKeysAndOemSourceWithoutASecondRequest() {
+        initialize(); drain()
+        val phone = attach(delegated = true)
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, phone); drain()
+        assertEquals(0, backend.requests)
+        assertTrue(CarPlayMediaKeys.report().contains("focusRequested=false focusHeld=false"))
+        assertTrue(CarPlayMediaKeys.report().contains("mediaSessionActive=false"))
+        CarPlayMediaKeys.onPlaybackFocusChanged(phone, true); drain()
+        assertEquals(1, backend.requests)
+        assertTrue(CarPlayMediaKeys.report().contains("focusRequested=false focusHeld=true"))
+        assertTrue(CarPlayMediaKeys.report().contains("mediaSessionActive=true"))
+        assertTrue(backend.command(CarPlayMediaButton.NEXT))
+        CarPlayMediaKeys.onPlaybackFocusChanged(phone, false); drain()
+        assertFalse(backend.command(CarPlayMediaButton.NEXT))
+        assertTrue(CarPlayMediaKeys.report().contains("mediaSessionActive=false"))
+        CarPlayMediaKeys.onPlaybackFocusChanged(phone, true); drain()
+        assertEquals(2, backend.requests)
+    }
+
+    @Test fun oldPlaybackFocusGrantCannotClaimReplacementSourceAndPausedGainDoesNotRequestPlay() {
+        initialize(); drain()
+        val old = attach(delegated = true)
+        CarPlayMediaKeys.onPlaybackFocusChanged(old, true)
+        val current = attach(delegated = true)
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, current); drain()
+        assertEquals(0, backend.requests)
+        assertTrue(CarPlayMediaKeys.report().contains("focusHeld=false"))
+        CarPlayMediaKeys.onMediaAudioChanged(false, current)
+        CarPlayMediaKeys.onPlaybackFocusChanged(current, true); drain()
+        assertEquals(0, backend.requests)
+        CarPlayMediaKeys.onMediaAudioChanged(true, current); drain()
+        assertEquals(1, backend.requests)
     }
 
     @Test fun bluetoothRouteDoesNotClaimMusicFocusSourceOrMediaKeysEvenOnUnexpectedAudio() {

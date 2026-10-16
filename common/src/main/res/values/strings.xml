@@ -1,4 +1,36 @@
 <resources>
+    <string name="home_connection_hint">Connect your iPhone to the head unit using Bluetooth or USB.</string>
+    <string name="settings_quick_dismiss_hint">Tap a blank area to return to CarPlay</string>
+    <string name="settings_quick_volume">Volume</string>
+    <string name="settings_volume_unavailable_value">Unavailable</string>
+    <string name="home_connected_devices">Connected Bluetooth devices</string>
+    <string name="home_bluetooth_connected">Connected</string>
+    <string name="home_bluetooth_empty">Connect your iPhone to the car’s Bluetooth. It will appear here; tap it to start CarPlay.</string>
+    <string name="home_bluetooth_permission">Allow nearby devices to show connected iPhones.</string>
+    <string name="home_usb_waiting">Waiting for iPhone</string>
+    <string name="home_usb_attached">iPhone connected by USB</string>
+    <string name="home_usb_automatic">Plug your iPhone into a USB data port to start CarPlay automatically. Allow the system prompts when needed.</string>
+    <string name="home_usb_priority">USB takes priority over wireless CarPlay.</string>
+    <string name="settings_authorization">Authorization</string>
+    <string name="settings_authorization_summary">Manage system authorization for this app.</string>
+    <string name="settings_authorization_native_title">Install native Settings first</string>
+    <string name="settings_authorization_native_description">Install it before authorizing. VPN consent also requires the corresponding system component.</string>
+    <string name="settings_authorization_system">System authorization</string>
+    <string name="settings_authorization_write">Modify system settings</string>
+    <string name="settings_authorization_write_description">Allows the app to turn on the configured car hotspot before connecting, if supported by the system. Temporary hotspots do not need this permission.</string>
+    <string name="settings_authorization_vpn">Create VPN</string>
+    <string name="settings_authorization_vpn_description">Transfers CarPlay data over a local VPN for USB connections. This action only grants permission; the connection starts when you select USB.</string>
+    <string name="usb_vpn_transport_unavailable">USB local VPN failed; automatic retries stopped</string>
+    <string name="connection_help_usb_vpn">Check VPN permission in Settings → Authorization and the system VPN components. Replug the iPhone and retry, or use wireless.</string>
+    <string name="settings_authorization_allowed">Allowed</string>
+    <string name="settings_authorization_not_allowed">Not allowed</string>
+    <string name="settings_authorization_last_allowed">Previously authorized</string>
+    <string name="settings_authorization_check">Check and authorize</string>
+    <string name="settings_authorization_waiting">Awaiting confirmation</string>
+    <string name="settings_authorization_unavailable">Cannot open system authorization. Install native Settings and make sure the required system component is enabled.</string>
+    <string name="settings_authorization_cancelled">VPN authorization was cancelled. Tap to retry.</string>
+    <string name="settings_authorization_not_completed">System VPN consent has not been granted. Tap to retry.</string>
+    <string name="settings_authorization_vpn_checked">This is the last manual check result. Tap to check again.</string>
     <string name="hotspot_hint_local">Open Connection setup to save your built-in car hotspot details.</string>
     <string name="marker_centre_default">Centre · default</string>
     <string name="report_clip_label">Diagnostic report</string>
@@ -324,7 +356,7 @@
     <string name="use_hevc_leave_off_for_the_widest_head_unit_compatibility">Use HEVC. Leave off for the widest head-unit compatibility.</string>
     <string name="use_software_hevc_decoder">Use software HEVC decoder</string>
     <string name="use_usage_content_type_routing_instead_of_stream_type">Use usage / content-type routing instead of stream type</string>
-    <string name="vpn_authorization_unavailable">This head unit cannot open VPN authorization. Return to CarPlay to check connection permissions or use wireless.</string>
+    <string name="vpn_authorization_unavailable">VPN authorization cannot open. Install native Settings and check the system VPN component, then retry in Settings → Authorization, or use wireless.</string>
     <string name="vpn_consent_was_denied">VPN consent was denied</string>
     <string name="waiting_for_iphone_over_usb">Waiting for iPhone over USB</string>
     <string name="waiting_for_mfi_coprocessor">Waiting for MFi coprocessor</string>
@@ -477,8 +509,8 @@
 
     <string name="settings_ambient_title">Ambient lighting (experimental)</string>
     <string name="settings_interface_size">Interface size</string>
-    <string name="settings_interface_size_auto">Automatic</string>
-    <string name="settings_interface_size_hint">Size of text and controls on CarPlay\'s own screens. Automatic enlarges them on large screens with a low density. CarPlay is not affected.</string>
+    <string name="settings_interface_size_preface_12_3">Preface 12.3-inch</string>
+    <string name="settings_interface_size_hint" formatted="false">Defaults to the Preface 12.3-inch, 1920×720 screen. You can also choose 75% to 150% of the system size. Only this app changes; the CarPlay picture is unaffected.</string>
     <string name="update_check">Check for updates</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You\'re up to date</string>
@@ -500,7 +532,7 @@
     <string name="settings_background_update_checks">Check for updates in the background</string>
     <string name="settings_background_update_checks_description">Once a day, CarPlay checks GitHub for a new version and shows it on the home screen. It never downloads without your tap.</string>
     <string name="settings_return_to_home">Return to home</string>
-    <string name="settings_quick_menu">Quick menu</string>
+    <string name="settings_quick_menu">Quick actions</string>
     <string name="settings_all_settings">All settings</string>
     <string name="settings_navigation_volume">Navigation volume</string>
     <string name="settings_media_volume">Media volume</string>

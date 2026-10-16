@@ -15,6 +15,13 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28, 33], qualifiers = "en", manifest = Config.NONE)
 class AudioFocusSettingsTest {
+    @Test fun linkcoFocusDefaultsOnAndSavedOptOutIsRetained() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
+        assertTrue(AirPlayPersistence.loadAudioFocusEnabled(context))
+        AirPlayPersistence.saveAudioFocusEnabled(context, false)
+        assertFalse(AirPlayPersistence.loadAudioFocusEnabled(context))
+    }
     @Test fun transientMuteIsOneDependentOptionAndRetainsPreferenceWhenFocusIsOff() {
         val activity = Robolectric.buildActivity(DiPlayActivity::class.java).get()
         activity.setTheme(android.R.style.Theme_Material_NoActionBar)

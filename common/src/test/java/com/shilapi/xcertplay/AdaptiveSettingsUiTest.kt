@@ -742,18 +742,20 @@ class AdaptiveSettingsUiTest {
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
     }
 
-    @Test fun homeOffersTheChosenPhoneAndWirelessWithoutSavedHotspotCredentials() {
+    @Test fun homeOffersConnectedPhonesWithoutSavedHotspotCredentials() {
         AirPlayPersistence.saveWirelessEnabled(context, true)
         DiPlayPreferences.savePhone(context, "AA:BB:CC:DD:EE:FF", "My iPhone")
         val screen = Robolectric.buildActivity(DiPlayActivity::class.java,
             Intent(context, DiPlayActivity::class.java).putExtra("page", "home"))
             .setup().get().also { activity = it }
         ReflectionHelpers.setField(screen, "setupError", null)
+        ReflectionHelpers.setField(screen, "connectedPhoneState", ConnectedPhoneState(true, true,
+            listOf(ConnectedPhone("AA:BB:CC:DD:EE:FF", "My iPhone"))))
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertTrue(texts(screen).any { it.text.toString() == "${screen.getString(R.string.status_ready_for_prefix)}My iPhone" })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.choose_iphone) })
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_connect_wireless) && it.isEnabled })
+        assertTrue(texts(screen).any { it.text.toString() == "My iPhone · ${screen.getString(R.string.home_bluetooth_connected)}" && it.isEnabled })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.choose_iphone) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_connect_usb) })
         assertFalse(texts(screen).any { it.text.toString().contains("选择你的 iPhone") })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.ready) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.setup_needs_attention) })
@@ -1006,7 +1008,7 @@ class AdaptiveSettingsUiTest {
         screen.onBackPressedDispatcher.onBackPressed()
 
         assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_connect_wireless) })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.home_connected_devices) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_quick_settings) })
     }
 
@@ -1077,6 +1079,14 @@ class AdaptiveSettingsUiTest {
         val vehicle = visibleIn(R.string.settings_vehicle)
         val advanced = visibleIn(R.string.settings_advanced)
         val connection = visibleIn(R.string.connection)
+        val authorization = visibleIn(R.string.settings_authorization)
+
+        for (id in listOf(R.string.settings_authorization_write, R.string.settings_authorization_vpn)) {
+            assertTrue(authorization.any { it.startsWith(text(id) + " · ") })
+            for (other in listOf(connection, display, audio, vehicle, advanced)) {
+                assertFalse(other.any { it.startsWith(text(id) + " · ") })
+            }
+        }
 
         assertFalse(advanced.any { it.toString().contains("仪表盘上的CarPlay地图") })
         assertFalse(vehicle.any { it == text(R.string.wheel_map_zoom) })
@@ -1456,7 +1466,7 @@ class AdaptiveSettingsUiTest {
 
     @Test fun utilityCategoriesHaveDirectDestinations() {
         val screen = openSettings()
-        for (category in listOf(SettingsCategory.ABOUT, SettingsCategory.DIAGNOSTICS, SettingsCategory.EXPERIMENTAL)) {
+        for (category in listOf(SettingsCategory.ABOUT, SettingsCategory.DIAGNOSTICS, SettingsCategory.EXPERIMENTAL, SettingsCategory.AUTHORIZATION)) {
             val title = ReflectionHelpers.callInstanceMethod<String>(screen, "settingsCategoryTitle",
                 ReflectionHelpers.ClassParameter(SettingsCategory::class.java, category))
             val destination = descendants(screen.window.decorView).single {
@@ -1481,8 +1491,9 @@ class AdaptiveSettingsUiTest {
     @Test fun unsupportedPageEntryUsesHomeConnectionActions() {
         val screen = openConnectionSetupFromSettings()
         assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
-        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.settings_connect_wireless) })
-        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.settings_connect_usb) })
+        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.home_connected_devices) })
+        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.home_usb_waiting) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_connect_usb) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_temporary_hotspot) })
         assertFalse(texts(screen).any { it.text.contains("车载热点") || it.text.contains("Wi-Fi Direct") || it.text.contains("同一局域网") })
         assertFalse(descendants(screen.window.decorView).any { it is EditText })

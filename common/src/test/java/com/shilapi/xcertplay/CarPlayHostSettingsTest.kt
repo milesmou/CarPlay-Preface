@@ -173,6 +173,7 @@ class CarPlayHostSettingsTest {
     fun rtlGestureMenuHomeLargeFontScreenshot() = captureGestureMenuHome("rtl")
 
     private fun captureGestureMenuHome(name: String) {
+        InterfaceSize.save(activity, if (name == "compact" || name == "rtl") 100 else InterfaceSize.PREFACE_12_3)
         val audio = mock(android.media.AudioManager::class.java)
         `when`(audio.getStreamMaxVolume(org.mockito.ArgumentMatchers.anyInt())).thenReturn(20)
         `when`(audio.getStreamVolume(3)).thenReturn(7)
@@ -208,7 +209,22 @@ class CarPlayHostSettingsTest {
         }
         (field("connectionPanel") as View).visibility = View.GONE
         views(root).forEach { it.layoutDirection = root.layoutDirection }
-        if (name == "rtl") assertEquals(View.LAYOUT_DIRECTION_RTL, root.layoutDirection)
+        // Test-only Arabic copy stresses shaping and row alignment; the product keeps its locales.
+        val arabicCopy = if (name == "rtl") mapOf(
+            R.string.settings_return_to_home to "العودة إلى الرئيسية",
+            R.string.settings_all_settings to "كل الإعدادات",
+            R.string.picture_adjustments to "ضبط الصورة",
+            R.string.exit_application to "الخروج من التطبيق",
+            R.string.settings_quick_volume to "مستوى الصوت",
+            R.string.settings_navigation_volume to "صوت الملاحة",
+            R.string.settings_media_volume to "صوت الوسائط",
+        ).mapKeys { activity.getString(it.key) } else emptyMap()
+        if (name == "rtl") {
+            assertEquals(View.LAYOUT_DIRECTION_RTL, root.layoutDirection)
+            views(menu()).filterIsInstance<TextView>().forEach { view ->
+                arabicCopy[view.text.toString()]?.let { view.text = it }
+            }
+        }
         repeat(3) {
             views(root).forEach { it.forceLayout() }
             root.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
@@ -219,7 +235,8 @@ class CarPlayHostSettingsTest {
         for (button in views(menu()).filterIsInstance<Button>()) {
             assertTrue(button.text.toString(), button.getGlobalVisibleRect(bounds))
             assertTrue(button.text.toString(), bounds.top >= 0 && bounds.bottom <= 720)
-            assertEquals(button.height, bounds.height())
+            assertEquals("${button.text}: bounds=$bounds parent=${(button.parent as View).height}", button.height, bounds.height())
+            assertTrue(button.text.toString(), button.layout.height + button.compoundPaddingTop + button.compoundPaddingBottom <= button.height)
             for (line in 0 until button.layout.lineCount) assertEquals(0, button.layout.getEllipsisCount(line))
         }
         for (slider in views(menu()).filterIsInstance<SeekBar>()) {
@@ -227,23 +244,24 @@ class CarPlayHostSettingsTest {
             assertTrue(slider.contentDescription.toString(), slider.getGlobalVisibleRect(bounds))
             assertEquals(slider.height, bounds.height())
         }
-        val heading = views(menu()).filterIsInstance<TextView>().first {
-            it.text == activity.getString(R.string.settings_quick_menu)
-        }
-        assertTrue(heading.getGlobalVisibleRect(bounds))
-        val contentTop = bounds.top
-        val contentBottom = views(menu()).filter { it is Button || it is SeekBar }.maxOf {
-            assertTrue(it.getGlobalVisibleRect(bounds))
-            bounds.bottom
-        }
-        assertTrue("Menu content should be vertically centered", kotlin.math.abs(contentTop + contentBottom - 720) <= 4)
+        val panel = (menu() as ViewGroup).getChildAt(0)
+        assertTrue(panel.getGlobalVisibleRect(bounds))
+        assertTrue("Menu panel should be vertically centered", kotlin.math.abs(bounds.top + bounds.bottom - 720) <= 4)
         val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
         root.draw(android.graphics.Canvas(bitmap))
-        val directory = java.io.File("../agent_docs/screenshots/carplay-blank-dismiss").apply { mkdirs() }
+        val directory = java.io.File("../agent_docs/screenshots/quick-menu-85-test-renders").apply { mkdirs() }
         val font = if (name == "standard") 100 else 150
         java.io.File(directory, "$name-font$font.png").outputStream().use {
             assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
+        java.io.File(directory, "$name-font$font.json").writeText(org.json.JSONObject()
+            .put("source", "Robolectric native graphics unit-test render; not an installed APK screenshot")
+            .put("widthPixels", 1920).put("heightPixels", 720)
+            .put("hostDensityDpi", activity.resources.displayMetrics.densityDpi)
+            .put("menuDensityDpi", menu().resources.displayMetrics.densityDpi)
+            .put("interfaceSize", InterfaceSize.preference(activity))
+            .put("fontScale", menu().resources.configuration.fontScale.toDouble())
+            .put("arabicTestCopy", name == "rtl").toString(2))
         bitmap.recycle()
     }
 
@@ -299,6 +317,20 @@ class CarPlayHostSettingsTest {
         assertEquals(2, views(menu()).filterIsInstance<SeekBar>().count())
         assertFalse(views(menu()).any { it is RadioButton || it is android.widget.Switch })
         assertFalse(buttons.contains(activity.getString(R.string.save_and_reconnect)))
+    }
+
+    @Test @Config(sdk = [28], qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    fun quickMenuUsesTheAppSizeWithoutChangingVideoWindowDensity() {
+        val originalDensity = activity.resources.displayMetrics.densityDpi
+        InterfaceSize.save(activity, InterfaceSize.PREFACE_12_3)
+        invoke("openSettingsMenu")
+        assertEquals(160, menu().resources.displayMetrics.densityDpi)
+        assertEquals(originalDensity, activity.resources.displayMetrics.densityDpi)
+        assertEquals(activity.resources.configuration.fontScale, menu().resources.configuration.fontScale, .001f)
+        invoke("cancelSettingsEdits")
+        InterfaceSize.save(activity, 100)
+        invoke("openSettingsMenu")
+        assertEquals(originalDensity, menu().resources.displayMetrics.densityDpi)
     }
 
     @Test fun menuVolumeUsesTheCurrentSinkAndDoesNotUndoLiveVolumeOnClose() {
@@ -470,12 +502,9 @@ class CarPlayHostSettingsTest {
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
                 overlay.layout(0, 0, width, height)
             }
-            val expected = (minOf(920, widthDp - 32) * density + 0.5f).toInt()
+            val expected = (minOf(1040, widthDp - 32) * density + 0.5f).toInt()
             assertEquals(expected, panel.width)
             assertTrue(kotlin.math.abs(panel.left - (width - panel.right)) <= 1)
-            val title = views(panel).filterIsInstance<TextView>()
-                .first { it.text == activity.getString(R.string.settings_quick_menu) }
-            assertTrue(title.width <= panel.width)
             assertTrue(kotlin.math.abs(panel.top - (height - panel.bottom)) <= 1)
             val buttons = views(panel).filterIsInstance<Button>().toList()
             assertTrue(buttons.all { it.width > 0 && it.width <= panel.width })
@@ -670,12 +699,12 @@ class CarPlayHostSettingsTest {
         assertNotSame(oldMenu, menu())
         assertEquals(false, field("appNight"))
         assertEquals(
-            DiPlayPalette.LIGHT.background,
+            androidx.core.graphics.ColorUtils.setAlphaComponent(DiPlayPalette.LIGHT.background, 224),
             (menu().background as android.graphics.drawable.ColorDrawable).color,
         )
-        val heading = views(menu()).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.settings_quick_menu) }
-        assertEquals(DiPlayPalette.LIGHT.primaryText, heading.currentTextColor)
+        val volumeLabel = views(menu()).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.settings_navigation_volume) }
+        assertEquals(DiPlayPalette.LIGHT.primaryText, volumeLabel.currentTextColor)
     }
 
     @Test fun savingPersistsSettingsAndRestartsOnce() {
@@ -807,7 +836,7 @@ class CarPlayHostSettingsTest {
         assertNull(shadowOf(activity).nextStartedActivity)
     }
 
-    @Test fun switchingToUsbNeverRequestsVpnConsent() {
+    @Test fun switchingToUsbRequestsVpnConsentOnlyOnce() {
         org.robolectric.shadows.ShadowVpnService.setPrepareResult(Intent("test.VPN_CONSENT"))
         attachController()
         AirPlayPersistence.saveWirelessEnabled(activity, true)
@@ -818,7 +847,7 @@ class CarPlayHostSettingsTest {
         val method = activity.javaClass.getDeclaredMethod("onNewIntent", Intent::class.java).apply { isAccessible = true }
         method.invoke(activity, intent)
         assertNull(field("controller"))
-        assertNull(shadowOf(activity).nextStartedActivityForResult)
+        assertEquals("test.VPN_CONSENT", shadowOf(activity).nextStartedActivityForResult?.intent?.action)
         method.invoke(activity, intent)
         assertNull(shadowOf(activity).nextStartedActivityForResult)
         assertFalse(activity.isFinishing)

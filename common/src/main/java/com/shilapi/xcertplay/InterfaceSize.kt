@@ -10,31 +10,24 @@ import android.view.ContextThemeWrapper
 import com.shilapi.xcertplay.host.R
 import kotlin.math.roundToInt
 
-/**
- * Scales DiPlay's own screens. Some head units report a low density for a large screen, so Android
- * lays them out like a very wide tablet with tiny text and controls. CarPlay's picture is not affected.
- */
+/** App-only sizing for the Preface's 12.3-inch, 1920x720 display. CarPlay video is independent. */
 object InterfaceSize {
-    const val AUTO = 0
-    val CHOICES = listOf(AUTO, 100, 125, 150, 200)
+    const val PREFACE_12_3 = -1
+    val CHOICES = listOf(PREFACE_12_3, 75, 100, 125, 150)
 
-    // Auto scales up until the shorter side is this wide; screens already narrower stay at 100%.
-    private const val AUTO_SMALLEST_WIDTH_DP = 720
+    // Logical dp baseline, not the panel's physical PPI. Keep default controls the same physical size
+    // when firmware reports 160/240/320 dpi. Manual percentages retain their system-relative meaning.
+    private const val PREFACE_UI_DENSITY_DPI = DisplayMetrics.DENSITY_DEFAULT
     private const val PREFS = "diplay"
     private const val KEY = "interface_size"
 
     fun preference(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY, AUTO).takeIf { it in CHOICES } ?: AUTO
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY, PREFACE_12_3)
+            .takeIf { it in CHOICES } ?: PREFACE_12_3
 
     fun save(context: Context, choice: Int) {
         require(choice in CHOICES)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY, choice).apply()
-    }
-
-    internal fun scale(choice: Int, smallestWidthDp: Int): Float = when {
-        choice != AUTO -> choice / 100f
-        smallestWidthDp <= AUTO_SMALLEST_WIDTH_DP -> 1f
-        else -> smallestWidthDp.toFloat() / AUTO_SMALLEST_WIDTH_DP
     }
 
     /**
@@ -43,10 +36,15 @@ object InterfaceSize {
      * without them falls back to the system language.
      */
     internal fun override(base: Configuration, choice: Int): Configuration? {
-        val scale = scale(choice, base.smallestScreenWidthDp)
+        val systemDensity = base.densityDpi.takeIf { it > 0 } ?: DisplayMetrics.DENSITY_DEFAULT
+        val scale = when (choice) {
+            PREFACE_12_3 -> PREFACE_UI_DENSITY_DPI.toFloat() / systemDensity
+            else -> choice / 100f
+        }
         if (scale == 1f) return null
         return Configuration().apply {
-            densityDpi = (base.densityDpi * scale).roundToInt()
+            fontScale = base.fontScale
+            densityDpi = (systemDensity * scale).roundToInt()
             screenWidthDp = (base.screenWidthDp / scale).roundToInt()
             screenHeightDp = (base.screenHeightDp / scale).roundToInt()
             smallestScreenWidthDp = (base.smallestScreenWidthDp / scale).roundToInt()
@@ -61,6 +59,9 @@ object InterfaceSize {
      * The scaled dimensions are written to the live resources by [enforce] instead.
      */
     internal fun contextOverride(scaled: Configuration): Configuration = Configuration().apply {
+        // Configuration() defaults to 1.0, which would silently replace the user's large-font choice.
+        // Font-scale changes recreate the activity, so the new context inherits the fresh system value.
+        fontScale = scaled.fontScale
         densityDpi = scaled.densityDpi
         setLocales(scaled.locales)
         setLayoutDirection(scaled.locales[0])
@@ -105,8 +106,10 @@ object InterfaceSize {
         return true
     }
 
-    fun displayName(context: Context, choice: Int): String =
-        if (choice == AUTO) context.getString(R.string.settings_interface_size_auto) else "$choice%"
+    fun displayName(context: Context, choice: Int): String = when (choice) {
+        PREFACE_12_3 -> context.getString(R.string.settings_interface_size_preface_12_3)
+        else -> "$choice%"
+    }
 
     fun showPicker(activity: Activity) {
         var selected = CHOICES.indexOf(preference(activity)).coerceAtLeast(0)

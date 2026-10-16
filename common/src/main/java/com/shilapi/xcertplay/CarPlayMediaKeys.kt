@@ -213,6 +213,23 @@ internal object CarPlayMediaKeys {
                 if (playing && !expected.usesCarBluetoothAudio) regainFocusLocked()
                 synchronizeMediaCenter(requestSource = playing)
             }
+            val retained = CarPlayBackgroundSession.snapshot()
+            if (retained?.controller === expected) retained.sink.onIphoneMediaPlaying(playing)
+        }
+    }
+
+    /** The PCM renderer is the focus owner; media keys observe the same grant without a second request. */
+    fun onPlaybackFocusChanged(expected: CarPlayController, held: Boolean) {
+        mainHandler.post {
+            synchronized(this) {
+                if (controller !== expected || !expected.managesPlaybackAudioFocus || expected.usesCarBluetoothAudio) return@synchronized
+                val gained = held && !focusHeld
+                focusHeld = held
+                session?.isActive = held
+                refreshTrackOwnership()
+                synchronizeMediaCenter(requestSource = gained && mediaAudioActive)
+                reportDiagnostic("Media playback focus held=$held delegated=true")
+            }
         }
     }
 
@@ -303,7 +320,12 @@ internal object CarPlayMediaKeys {
         val expectedController = controller ?: return
         if (expectedController.usesCarBluetoothAudio) return
         val focusDisabled = AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
-        val granted = if (focusDisabled) {
+        val delegated = expectedController.managesPlaybackAudioFocus
+        val granted = if (delegated) {
+            focusOwner = null
+            focusRequest = null
+            focusHeld
+        } else if (focusDisabled) {
             // Some OEMs route physical volume buttons to the focus owner. Keep an active
             // MediaSession without permanent focus so those buttons remain vehicle-owned.
             focusOwner = null
@@ -336,7 +358,7 @@ internal object CarPlayMediaKeys {
             setPlaybackToLocal(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
             setMetadata(androidMetadata(nowPlaying, shownArtworkLocked()))
-            isActive = true
+            isActive = if (delegated) granted else true
         }
         Log.i(TAG, "media keys active focusDisabled=$focusDisabled focusGranted=$granted")
         reportDiagnostic("Media keys active focusDisabled=$focusDisabled focusGranted=$granted")
@@ -362,6 +384,8 @@ internal object CarPlayMediaKeys {
                 // Only permanent loss moves media keys elsewhere; transient losses come back.
                 if (change == AudioManager.AUDIOFOCUS_LOSS) focusHeld = false
                 else if (change == AudioManager.AUDIOFOCUS_GAIN) focusHeld = true
+                if (change == AudioManager.AUDIOFOCUS_LOSS) session?.isActive = false
+                else if (change == AudioManager.AUDIOFOCUS_GAIN) session?.isActive = true
                 true
             }
         }
@@ -669,7 +693,7 @@ internal object CarPlayMediaKeys {
     private fun mediaOwnerEligible(): Boolean {
         val ownsMedia = synchronized(this) {
             controller != null && CarPlayBackgroundSession.active &&
-                (focusHeld || (focusRequest == null && foreground()))
+                (focusHeld || (focusRequest == null && controller?.managesPlaybackAudioFocus != true && foreground()))
         }
         return ownsMedia && !usesCarBluetoothAudio()
     }

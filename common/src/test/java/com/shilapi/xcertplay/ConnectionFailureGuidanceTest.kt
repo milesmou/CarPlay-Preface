@@ -7,6 +7,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ConnectionFailureGuidanceTest {
+    @Test fun wiredVpnFailureExplainsPermissionAndSystemComponents() {
+        assertEquals(R.string.connection_help_usb_vpn, ConnectionFailureGuidance.message(
+            CarPlayStatus.Failed("VPN failed", retryable = false, usbVpnUnavailable = true), false))
+    }
     @Test fun automaticFrameTestAsksForTheReportAndReplug() {
         assertEquals(R.string.connection_help_usb_ncm_test, ConnectionFailureGuidance.message(
             CarPlayStatus.Failed("test ended", retryable = false, usbNcmTested = true), false))
