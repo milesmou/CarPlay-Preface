@@ -12,12 +12,18 @@ import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 
 /** USB has priority until the driver explicitly chooses wireless after a failed wired attempt. */
 internal object UsbAutoConnect {
-    private var attemptedDevice: String? = null
-    private var failedDevice: String? = null
-    private var wirelessDevice: String? = null
+    private var priority = UsbConnectionPriority()
+    private const val EXTRA_MANUAL = "com.shihab.diplay.MANUAL_CONNECTION_REQUEST"
+    private const val EXTRA_AUTOMATIC = "com.shihab.diplay.AUTOMATIC_CONNECTION_REQUEST"
+    fun markManualRequest(intent: Intent): Intent = intent.putExtra(EXTRA_MANUAL, true)
+    fun markAutomaticRequest(intent: Intent): Intent = intent.putExtra(EXTRA_AUTOMATIC, true)
+    fun isManualRequest(intent: Intent): Boolean = intent.getBooleanExtra(EXTRA_MANUAL, false)
+    fun automaticRequestDisabled(context: Context, intent: Intent): Boolean =
+        !isManualRequest(intent) && !DiPlayPreferences.autoConnect(context) &&
+            (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED || intent.getBooleanExtra(EXTRA_AUTOMATIC, false))
+
     private const val EXTRA_GENERATION = "com.shihab.diplay.USB_REQUEST_GENERATION"
-    var generation = 0L
-        private set
+    val generation get() = priority.generation
 
     fun attached(context: Context): UsbDevice? = runCatching {
         context.getSystemService(UsbManager::class.java)?.deviceList?.values
@@ -25,63 +31,52 @@ internal object UsbAutoConnect {
     }.getOrNull()
 
     fun wirelessSelected(context: Context): Boolean =
-        attached(context)?.deviceName?.let { it == wirelessDevice } == true
+        priority.wirelessSelected(attached(context)?.deviceName)
 
     fun priorityDevice(context: Context): UsbDevice? =
-        attached(context)?.takeUnless { it.deviceName == wirelessDevice }
+        attached(context)?.takeUnless { priority.wirelessSelected(it.deviceName) }
 
     fun canChooseWireless(context: Context): Boolean {
         val device = priorityDevice(context) ?: return true
         val session = CarPlayBackgroundSession.snapshot()?.controller
         val activeWired = CarPlayBackgroundSession.active && session != null && !session.isClosed() &&
             session.connectionTransport() == CarPlayTransport.WIRED
-        return failedDevice == device.deviceName && !activeWired
+        return priority.canChooseWireless(device.deviceName, activeWired)
     }
 
     /** Only the explicit home-device action releases this cable's failed USB priority. */
     fun chooseWireless(context: Context): Boolean {
         if (!canChooseWireless(context)) return false
-        attached(context)?.let { device ->
-            if (wirelessDevice != device.deviceName) {
-                wirelessDevice = device.deviceName
-                generation++ // invalidate queued USB launches and authorization callbacks
-            }
-        }
+        priority.chooseWireless(attached(context)?.deviceName)
         return true
     }
 
-    fun beginWiredAttempt(context: Context): Long {
-        attached(context)?.let { device ->
-            attemptedDevice = device.deviceName
-            failedDevice = null
-            wirelessDevice = null
-            generation++
-        }
-        return generation
+    /** Do not let polling or duplicate attachment events restart the cable the driver cancelled. */
+    fun cancelForHome(context: Context) {
+        priority.cancelForHome(attached(context)?.deviceName)
     }
 
-    fun wiredFailed(context: Context, attempt: Long) {
-        if (attempt == generation && attached(context)?.deviceName == attemptedDevice) failedDevice = attemptedDevice
-    }
-
-    fun wiredConnected(attempt: Long) {
-        if (attempt == generation) failedDevice = null
-    }
+    fun beginWiredAttempt(context: Context): Long = priority.beginWiredAttempt(attached(context)?.deviceName)
+    fun wiredFailed(context: Context, attempt: Long) = priority.wiredFailed(attached(context)?.deviceName, attempt)
+    fun wiredConnected(attempt: Long) = priority.wiredConnected(attempt)
 
     fun isCurrentRequest(intent: Intent): Boolean =
         !intent.hasExtra(EXTRA_GENERATION) || intent.getLongExtra(EXTRA_GENERATION, -1) == generation
 
-    fun request(context: Context, force: Boolean = false): Boolean {
+    fun request(context: Context, force: Boolean = false, manual: Boolean = false): Boolean {
+        if (manual) ConnectionAutoStart.resume()
+        else if (!DiPlayPreferences.autoConnect(context) || ConnectionAutoStart.paused) return false
         val device = priorityDevice(context) ?: return false
         val session = CarPlayBackgroundSession.snapshot()?.controller
         if (!force && session != null && !session.isClosed() && session.connectionTransport() == CarPlayTransport.WIRED) return true
-        if (attemptedDevice == device.deviceName) return true
+        if (!manual && priority.alreadyAttempted(device.deviceName)) return true
         val attempt = beginWiredAttempt(context)
-        val launch = Intent(context, CarPlayHostActivity::class.java)
+        val launch = ConnectionAutoStart.stamp(Intent(context, CarPlayHostActivity::class.java))
             .setAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             .putExtra(UsbManager.EXTRA_DEVICE, device)
             .putExtra(EXTRA_GENERATION, attempt)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (manual) markManualRequest(launch) else markAutomaticRequest(launch)
         return runCatching { context.startActivity(launch); true }.getOrElse {
             android.util.Log.w("DiPlayUsbStart", "USB auto-connect launch failed: ${it.javaClass.simpleName}")
             wiredFailed(context, attempt)
@@ -96,13 +91,15 @@ internal object UsbAutoConnect {
                 val device = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE) ?: return
                 if (device.vendorId != IphoneUsbMatcher.APPLE_VENDOR_ID) return
                 if (intent.action == UsbManager.ACTION_USB_DEVICE_DETACHED) {
-                    if (device.deviceName in listOf(attemptedDevice, failedDevice, wirelessDevice)) {
-                        attemptedDevice = null
-                        failedDevice = null
-                        wirelessDevice = null
-                        generation++
+                    priority.detached(device.deviceName)
+                } else if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) {
+                    if (!DiPlayPreferences.autoConnect(context)) return
+                    if (ConnectionAutoStart.paused) {
+                        if (priority.wasCancelled(device.deviceName)) return
+                        ConnectionAutoStart.resume()
                     }
-                } else if (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED) request(context, force = true)
+                    request(context, force = true)
+                }
             }
         }, IntentFilter().apply {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
@@ -113,9 +110,7 @@ internal object UsbAutoConnect {
     }
 
     internal fun resetForTest() {
-        attemptedDevice = null
-        failedDevice = null
-        wirelessDevice = null
-        generation = 0
+        priority = UsbConnectionPriority()
+        ConnectionAutoStart.resetForTest()
     }
 }

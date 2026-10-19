@@ -1,9 +1,9 @@
 <resources>
     <string name="app_name">星瑞系统授权</string>
-    <string name="vpn_title">允许 CarPlay 创建 VPN？</string>
-    <string name="vpn_body">%1$s 请求创建 VPN。VPN 可处理该应用路由的网络流量，请仅在信任此应用时允许。CarPlay 使用本地 VPN 进行 USB 通信；本页只授权，不建立连接。</string>
+    <string name="vpn_title">允许此应用创建 VPN？</string>
+    <string name="vpn_body">应用：%1$s\n\n此应用请求创建 VPN，可处理其路由的网络流量，请仅在信任此应用时允许。本页只授权，不建立连接；具体连接方式由该应用决定。</string>
     <string name="write_title">修改系统设置</string>
-    <string name="write_body">应用：%1$s\n当前状态：%2$s\n\n允许后，该应用可以修改系统设置。CarPlay 将其用于尝试开启已保存的车机热点；临时热点不需要此权限。</string>
+    <string name="write_body">应用：%1$s\n当前状态：%2$s\n\n允许后，该应用可以修改系统设置，例如亮度和屏幕超时。本页只修改此应用的授权，不立即更改系统设置。</string>
     <string name="allowed">已允许</string>
     <string name="denied">未允许</string>
     <string name="allow">允许</string>
@@ -11,8 +11,22 @@
     <string name="cancel">取消</string>
     <string name="close">关闭</string>
     <string name="unavailable_title">暂时无法授权</string>
-    <string name="unavailable_body">请核对 Android 9 系统版本、平台签名、组件权限和 CarPlay 安装包。系统策略限制或接口不可用时，无法在此授权。</string>
-    <string name="blocked_body">系统限制了 VPN 配置，或其他应用正在使用始终开启的 VPN。请先在系统设置中处理，再返回 CarPlay 重试。</string>
-    <string name="home_body">此补充包提供 CarPlay 所需的 Android 9 VPN 确认窗口和“修改系统设置”授权页。\n\n创建 VPN：请返回 CarPlay → 设置 → 授权 → 创建 VPN，由 CarPlay 发起确认。\n\n修改系统设置：可从 CarPlay 的授权页进入，也可选择下方已安装的应用。安装或打开本页不会自动授权。</string>
+    <string name="unavailable_body">请核对 Android 9 系统版本、平台签名、组件权限和目标应用状态。系统策略限制或接口不可用时，无法在此授权。</string>
+    <string name="unavailable_reason">\n\n失败原因：%1$s</string>
+    <string name="blocked_body">系统限制了 VPN 配置，或其他应用正在使用始终开启的 VPN。请先在系统设置中处理，再返回发起请求的应用重试。</string>
+    <string name="home_body">此组件可为当前用户下符合条件的应用管理修改系统设置、悬浮窗、安装来源、使用情况访问和无障碍服务。\n\nVPN 必须由需要连接的应用发起系统授权确认，不能在这里替其他应用申请。安装或打开本页不会自动授权。</string>
     <string name="open_write">%1$s · 修改系统设置</string>
+    <string name="overlay_title">悬浮窗权限</string>
+    <string name="overlay_body">应用：%1$s\n当前状态：%2$s\n\n允许该应用在其他应用上方显示浮层。仅修改此应用的权限，不自动显示浮层。</string>
+    <string name="open_overlay">%1$s · 悬浮窗权限</string>
+    <string name="special_install_title">允许安装未知应用</string>
+    <string name="special_install_body">应用：%1$s\n当前状态：%2$s\n\n允许此应用作为 APK 安装来源。安装仍需系统确认，本页不会打开安装器或安装应用。请仅允许可信的文件管理器、浏览器或下载器。</string>
+    <string name="special_usage_title">使用情况访问</string>
+    <string name="special_usage_body">应用：%1$s\n当前状态：%2$s\n\n允许读取应用使用情况，例如前台应用和使用时长。请仅授权你信任的应用。</string>
+    <string name="special_accessibility_title">无障碍服务管理</string>
+    <string name="special_accessibility_body">服务：%1$s\n当前状态：%2$s\n\n此服务可能读取屏幕内容、观察操作并执行辅助动作，请仅启用可信服务。只变更选中的服务，保留其他服务；已允许不代表服务已经连接。</string>
+    <string name="special_loading">正在读取可管理的应用或服务…</string>
+    <string name="special_choose">请选择要管理的应用或服务，再确认允许或关闭授权。这里只列出已声明相应权限或服务的应用。</string>
+    <string name="special_empty">当前没有符合条件的应用或服务。请确认应用已安装、启用且声明相应权限或服务。</string>
+    <string name="special_policy_blocked">系统或管理员限制 · 无法变更</string>
 </resources>

@@ -100,10 +100,24 @@ class AudioClockTrimTest {
                 assertTrue("$audioType track must exist", actualTrack is AudioTrack)
                 val trim = type.getDeclaredField("clockTrim").apply { isAccessible = true }.get(candidate)
                 assertEquals("$audioType", audioType == "media", trim != null)
+                val lagGuard = type.getDeclaredField("mediaLagGuard").apply { isAccessible = true }.get(candidate)
+                assertEquals("Only music can discard stale packets: $audioType", audioType == "media", lagGuard != null)
             } finally {
                 (candidate as java.io.Closeable).close()
             }
         }
+    }
+
+    @Test fun undecodedMusicIsCountedByTheActualRendererBeforeTrimmingItsClock() {
+        // A 2-second compressed queue and only 100 ms in AudioTrack must not slow playback.
+        set("started", true)
+        val submit = type.getDeclaredMethod("submit", ByteArray::class.java, Int::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+        submit.invoke(renderer, ByteArray(12), 0)
+        submit.invoke(renderer, ByteArray(12), 96_000)
+        write(19_200)
+        assertTrue("queued compressed music must not be mistaken for a starving track", RateTrack.rates.last() >= 48_000)
+        assertEquals("decoder backpressure must not become learned clock drift", 0.0, MediaClockTrim.learnedTrim, 1e-8)
     }
 
     @Implements(AudioTrack::class)

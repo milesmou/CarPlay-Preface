@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_connect">Auto-connect</string>
+    <string name="settings_auto_connect_hint">Connect the iPhone when Bluetooth connects or USB is attached.</string>
+    <string name="settings_start_on_boot">Start on boot</string>
+    <string name="settings_start_on_boot_hint">Open the app when the head unit starts. Subject to system startup settings.</string>
+</resources>

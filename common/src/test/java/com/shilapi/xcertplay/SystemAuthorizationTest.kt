@@ -89,6 +89,20 @@ class SystemAuthorizationTest {
         assertEquals(SystemAuthorization.Result.UNAVAILABLE, authorization().finishVpnConsent(true))
         assertTrue(openedVpn.isEmpty())
     }
+    @Test fun overlayUsesAnAppScopedRequestWithoutPreparingVpn() {
+        val subject = authorization()
+        subject.canDrawOverlays()
+        assertEquals(SystemAuthorization.Result.OPENED, subject.requestOverlay())
+        assertEquals(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, openedSettings.single().action)
+        assertEquals("package:${context.packageName}", openedSettings.single().dataString)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+        assertTrue(openedVpn.isEmpty())
+    }
+    @Test fun missingOverlaySettingsNeverReportsAuthorizationSuccess() {
+        assertEquals(SystemAuthorization.Result.UNAVAILABLE,
+            authorization(settings = { throw ActivityNotFoundException() }).requestOverlay())
+    }
+
 }
 
 @Implements(VpnService::class)

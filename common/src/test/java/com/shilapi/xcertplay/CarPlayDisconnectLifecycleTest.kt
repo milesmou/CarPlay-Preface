@@ -31,6 +31,7 @@ class CarPlayDisconnectLifecycleTest {
 
     @Before fun setup() {
         CarPlayBackgroundSession.clear()
+        UsbAutoConnect.resetForTest()
         host = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         controller = mock(CarPlayController::class.java)
         `when`(controller.awaitClosed(anyLong())).thenReturn(true)
@@ -47,6 +48,7 @@ class CarPlayDisconnectLifecycleTest {
     @After fun cleanup() {
         com.shilapi.xcertplay.network.TemporaryHotspotReservationStore.release()
         ReflectionHelpers.getField<Handler>(host, "mainHandler").removeCallbacksAndMessages(null)
+        UsbAutoConnect.resetForTest()
         worker.shutdownNow()
         ReflectionHelpers.getField<ExecutorService>(host, "airPlayCommandExecutor").shutdownNow()
         CarPlayBackgroundSession.clear()
@@ -129,6 +131,111 @@ class CarPlayDisconnectLifecycleTest {
         verify(manager, times(1)).close()
         verify(controller, never()).prepareTemporaryHotspotHandoff()
         assertNull(com.shilapi.xcertplay.network.TemporaryHotspotReservationStore.take())
+    }
+
+    @Test fun returningHomeCancelsWirelessRetriesAndLateStatusCallbacks() {
+        ReflectionHelpers.setField(host, "wirelessEnabled", true)
+        `when`(controller.canRetryWirelessStartup()).thenReturn(true)
+        val reporter = ReflectionHelpers.callInstanceMethod<(com.shilapi.xcertplay.orchestration.CarPlayStatus) -> Unit>(host,
+            "createStatusReporter", ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, 0))
+        val failure = com.shilapi.xcertplay.orchestration.CarPlayStatus.Failed("connection lost")
+        // A failure status may arrive before the old session's ended callback.
+        ReflectionHelpers.setField(host, "activeAirPlaySession", mock(com.shilapi.xcertplay.airplay.AirPlaySession::class.java))
+        CarPlayBackgroundSession.active = true
+        reporter(failure)
+        assertTrue(ReflectionHelpers.getField(host, "reconnectScheduled"))
+        returnHome()
+        reporter(failure)
+        assertHomeCancellation()
+        assertEquals("session-stopping", host.onPhoneBluetoothConnected("phone"))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
+        verify(controller, never()).retryWirelessStartup()
+        worker.runAll()
+        shadowOf(Looper.getMainLooper()).idle()
+        verify(controller).close()
+        verify(controller).prepareTemporaryHotspotHandoff()
+        assertFalse(CarPlayBackgroundSession.hasSession())
+    }
+
+    @Test fun backFromUsbConnectionInvalidatesPendingVpnConsentAndRetry() {
+        ReflectionHelpers.setField(host, "wirelessEnabled", false)
+        ReflectionHelpers.setField(host, "awaitingVpnConsent", true)
+        val generation = UsbAutoConnect.generation
+        host.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_BACK))
+        ReflectionHelpers.callInstanceMethod<Unit>(host, "onVpnConsentResult",
+            ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, android.app.Activity.RESULT_OK))
+        assertHomeCancellation()
+        assertTrue(UsbAutoConnect.generation > generation)
+        assertFalse(ReflectionHelpers.getField(host, "awaitingVpnConsent"))
+        assertFalse(ReflectionHelpers.getField(host, "vpnReady"))
+        ReflectionHelpers.callInstanceMethod<Unit>(host, "requestStartupPrerequisites")
+        ReflectionHelpers.callInstanceMethod<Unit>(host, "retryConnectionFromButton")
+        assertNull(ReflectionHelpers.getField<Any?>(host, "controller"))
+        worker.runAll()
+        shadowOf(Looper.getMainLooper()).idle()
+        verify(controller).close()
+    }
+
+    @Test fun returnHomeDuringStackReplacementDoesNotStartTheReplacement() {
+        val sizeType = Class.forName("com.shilapi.xcertplay.CarPlayHostActivity\$DisplaySize")
+        ReflectionHelpers.setField(host, "activeDisplaySize",
+            sizeType.getDeclaredConstructor(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+                .apply { isAccessible = true }.newInstance(1920, 720))
+        host.javaClass.getDeclaredMethod("restartCarPlay", String::class.java).apply { isAccessible = true }
+            .invoke(host, "Test queued restart")
+        returnHome()
+        worker.runAll()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertHomeCancellation()
+        assertNull(ReflectionHelpers.getField<Any?>(host, "controller"))
+        assertFalse(CarPlayBackgroundSession.hasSession())
+        verify(controller, times(1)).close()
+    }
+
+    @Test fun aQueuedHostLaunchCannotReopenAfterCancellationAndManualResume() {
+        val launch = ConnectionAutoStart.stamp(android.content.Intent())
+        returnHome()
+        ConnectionAutoStart.resume()
+        val staleHost = Robolectric.buildActivity(CarPlayHostActivity::class.java, launch).create()
+        assertTrue(staleHost.get().isFinishing)
+        assertNull(ReflectionHelpers.getField<Any?>(staleHost.get(), "controller"))
+        staleHost.destroy()
+    }
+
+    @Test fun returningHomeAfterATransportErrorCancelsRecoveryOfAPreviouslyActiveSession() {
+        ReflectionHelpers.setField(host, "activeAirPlaySession", mock(com.shilapi.xcertplay.airplay.AirPlaySession::class.java))
+        CarPlayBackgroundSession.active = true
+        val listener = ReflectionHelpers.callInstanceMethod<com.shilapi.xcertplay.airplay.AirPlaySessionListener>(host,
+            "createSessionListener", ReflectionHelpers.ClassParameter.from(Int::class.javaPrimitiveType, 0))
+        listener.onTransportError("connection lost")
+        assertFalse(CarPlayBackgroundSession.active)
+        assertTrue(ReflectionHelpers.getField(host, "reconnectScheduled"))
+        returnHome()
+        assertHomeCancellation()
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(40))
+        worker.runAll()
+        shadowOf(Looper.getMainLooper()).idle()
+        verify(controller).close()
+        verify(controller, never()).retryWirelessStartup()
+    }
+
+    @Test fun returningHomeFromAnActiveProjectionKeepsTheSession() {
+        CarPlayBackgroundSession.active = true
+        returnHome()
+        assertFalse(ConnectionAutoStart.paused)
+        assertFalse(host.isFinishing)
+        assertSame(controller, CarPlayBackgroundSession.snapshot()?.controller)
+        verify(controller, never()).close()
+    }
+
+    private fun returnHome() = host.javaClass.getDeclaredMethod("showDiPlayHome", String::class.java)
+        .apply { isAccessible = true }.invoke(host, "home")
+
+    private fun assertHomeCancellation() {
+        assertTrue(ConnectionAutoStart.paused)
+        assertTrue(host.isFinishing)
+        assertTrue(ReflectionHelpers.getField(host, "startupRetryStopped"))
+        assertFalse(ReflectionHelpers.getField(host, "reconnectScheduled"))
     }
 
     private fun shutdown(done: () -> Unit) = shutdown(false, done)

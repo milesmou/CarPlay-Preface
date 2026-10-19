@@ -6,7 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 
-/** Starts the CarPlay host after boot when the user has enabled the startup option. */
+/** Opens the app after boot; connecting a device is controlled independently by Auto-connect. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return

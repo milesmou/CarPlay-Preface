@@ -13,12 +13,15 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 PLATFORM = 'c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8'
+SHARED_USER_ID = 'android.uid.system'
+SYSTEM_APP_ID = 1000
+PER_USER_RANGE = 100000
 SOURCE = '57adea3c0d8722ec23a487122d85c853f7a93d44'
 KEY_HASHES = {
     'platform.pk8': '1ad8ef556870edb70f69a9d3c112544c07de5162ba440d84d33f8bb0c5962875',
     'platform.x509.pem': '9837de028f460c35cc8d3fa45f14eecce30f6fbfe4b93d399aef1acb80c20d14',
 }
-PERMISSIONS = ['CONTROL_VPN', 'CONNECTIVITY_INTERNAL', 'MANAGE_APP_OPS_MODES', 'GET_APP_OPS_STATS']
+PERMISSIONS = ['CONTROL_VPN', 'CONNECTIVITY_INTERNAL', 'MANAGE_APP_OPS_MODES', 'GET_APP_OPS_STATS', 'WRITE_SECURE_SETTINGS', 'MANAGE_USERS', 'BLUETOOTH', 'BLUETOOTH_ADMIN']
 
 
 def run(*command):
@@ -41,12 +44,29 @@ def installed_supplement(manifest, badging):
                 re.search(r'"preface.authorization.component"[^\n]*\n[^\n]*"android9-v1"', manifest))
 
 
+def manifest_shared_user_id(manifest):
+    match = re.search(r'\b(?:android:|http://schemas\.android\.com/apk/res/android:)sharedUserId(?:\([^\n)]*\))?="([^"]+)"', manifest)
+    return match[1] if match else None
+
+
 def sdk_compatible(value):
     return value.strip() == '28'
 
 
 def permission_granted(dump, permission):
     return bool(re.search(r'(?m)^\s*android\.permission\.' + re.escape(permission) + r': granted=true(?:\s|$)', dump))
+
+
+def runtime_identity(adb):
+    current_user = adb('shell', 'am', 'get-current-user').strip()
+    if not current_user.isdecimal():
+        raise ValueError('Cannot verify the current Android user: ' + current_user)
+    user_id = int(current_user)
+    uid_output = adb('shell', 'pm', 'list', 'packages', '-U', '--user', str(user_id), 'com.android.vpndialogs')
+    uid_matches = re.findall(r'(?m)^package:com\.android\.vpndialogs\s+uid:(\d+)\s*$', uid_output)
+    uid = int(uid_matches[0]) if len(uid_matches) == 1 else None
+    return {'currentUserId': user_id, 'uid': uid, 'appId': uid % PER_USER_RANGE if uid is not None else None,
+            'sharedUserId': SHARED_USER_ID, 'identityReady': uid == user_id * PER_USER_RANGE + SYSTEM_APP_ID}
 
 
 def tools():
@@ -75,8 +95,14 @@ def check_apk(paths, apk):
     manifest = run(paths['aapt2'], 'dump', 'xmltree', apk, '--file', 'AndroidManifest.xml')
     if not installed_supplement(manifest, badging) or not re.search(r"(?m)^(?:minSdkVersion|sdkVersion):'28'\r?$", badging) or "targetSdkVersion:'28'" not in badging:
         raise ValueError('Unexpected supplement package, version, marker or API level')
+    if manifest_shared_user_id(manifest) != SHARED_USER_ID:
+        raise ValueError('Supplement must declare sharedUserId=' + SHARED_USER_ID)
     if re.search(r'android:debuggable[^\n]*=(?:true|0xffffffff|0x00000001)(?:\s|$)', manifest):
         raise ValueError('Installable privileged supplement must not be debuggable')
+    declared = set(re.findall(r"(?m)^uses-permission: name='([^']+)'", badging))
+    missing = {'android.permission.' + name for name in PERMISSIONS} - declared
+    if missing:
+        raise ValueError('Supplement permissions missing: ' + ', '.join(sorted(missing)))
 
 
 def prepare_key(fetch_key):
@@ -113,7 +139,7 @@ def sign(paths, fetch_key):
     check_apk(paths, apk)
     record = {'apk': str(apk), 'sha256': hashlib.sha256(apk.read_bytes()).hexdigest(),
               'versionName': element['versionName'], 'versionCode': element['versionCode'],
-              'platformCertificateSha256': PLATFORM, 'publicAospBuildCommit': SOURCE,
+              'platformCertificateSha256': PLATFORM, 'sharedUserId': SHARED_USER_ID, 'publicAospBuildCommit': SOURCE,
               'keyInputSha256': KEY_HASHES, 'vehicleVerified': False}
     (output / 'authorization-provenance.json').write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     return apk
@@ -122,7 +148,7 @@ def sign(paths, fetch_key):
 def install(paths, serial, apk):
     def adb(*args):
         return run(paths['adb'], '-s', serial, *args)
-    result = {'serial': serial, 'installed': False}
+    result = {'serial': serial, 'installed': False, 'identityReady': False}
     sdk = adb('shell', 'getprop', 'ro.build.version.sdk')
     if not sdk_compatible(sdk):
         return {**result, 'reason': f'Android API {sdk}; this component requires API 28'}
@@ -147,12 +173,33 @@ def install(paths, serial, apk):
             return {**result, 'reason': 'Stock or unknown VpnDialogs already exists; no overwrite or uninstall'}
         if signer_digest(run(paths['java'], '-jar', paths['signer'], 'verify', '--print-certs', installed)) != PLATFORM:
             return {**result, 'reason': 'Existing supplement signature mismatch'}
+        if manifest_shared_user_id(manifest) != SHARED_USER_ID:
+            return {**result, 'reason': 'The verified repository authorization supplement has an old or different shared UID; '
+                    'Android cannot migrate it with install -r. Manually remove only this old authorization supplement '
+                    'and then install the new supplement; this script never uninstalls a package'}
+        try:
+            existing_identity = runtime_identity(adb)
+        except Exception as failure:
+            return {**result, 'reason': 'Cannot verify runtime identity of the existing repository authorization supplement; '
+                    'no update attempted: ' + str(failure)}
+        result['existingIdentity'] = existing_identity
+        if not existing_identity['identityReady']:
+            return {**result, 'reason': 'The verified repository authorization supplement runtime UID does not match '
+                    'the current user android.uid.system/appId 1000; no update attempted. '
+                    'Manually remove only this old authorization supplement and then install the new supplement; '
+                    'this script never uninstalls a package'}
     message = adb('install', '-r', apk)
     result.update(installed='Success' in message, installResult=message)
     if result['installed']:
-        dump = adb('shell', 'dumpsys', 'package', 'com.android.vpndialogs')
-        result['permissions'] = {name: permission_granted(dump, name) for name in PERMISSIONS}
-        result['permissionsReady'] = all(result['permissions'].values())
+        try:
+            result.update(runtime_identity(adb))
+            if not result['identityReady']:
+                result['reason'] = 'APK installed, but the current user runtime UID does not match android.uid.system/appId 1000'
+            dump = adb('shell', 'dumpsys', 'package', 'com.android.vpndialogs')
+            result['permissions'] = {name: permission_granted(dump, name) for name in PERMISSIONS}
+            result['permissionsReady'] = all(result['permissions'].values())
+        except Exception as failure:
+            result['reason'] = 'APK installed; runtime identity or permission verification failed: ' + str(failure)
     return result
 
 
@@ -186,7 +233,7 @@ def main():
         shutil.copyfile(apk, target / 'authorization.apk')
         record = {'packageName': 'com.android.vpndialogs', 'versionCode': int(version[1]),
                   'versionName': version[2], 'sha256': hashlib.sha256(apk.read_bytes()).hexdigest(),
-                  'certificateSha256': PLATFORM}
+                  'certificateSha256': PLATFORM, 'sharedUserId': SHARED_USER_ID}
         (target / 'manifest.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
     outcomes = []
     if args.install_connected or args.serial:

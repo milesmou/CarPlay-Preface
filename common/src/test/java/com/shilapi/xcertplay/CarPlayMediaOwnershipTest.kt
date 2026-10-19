@@ -144,38 +144,27 @@ class CarPlayMediaOwnershipTest {
         assertFalse(lines.any { it.contains("1234") || it.contains("5678") })
     }
 
-    @Test fun disablingVolumeSelectionKeepsTrackKeysAndDefaultMediaCenterAttached() {
-        NavigationWheelSettings.setEnabled(app, false)
+    @Test fun legacyVolumePreferenceCannotRestoreAThirdModeOrChangeCurrentMediaOwnership() {
+        val legacy = app.getSharedPreferences("diplay_navigation_wheel", 0)
         try {
-            val controller = attach()
-            CarPlayBackgroundSession.active = true
-            assertFalse(CarPlayMediaKeys.volumeKeysEligible(app))
-            assertTrue(CarPlayMediaKeys.onWindowMediaKey(key(KeyEvent.KEYCODE_MEDIA_NEXT)) == true)
-            verify(controller).sendMediaButton(CarPlayMediaButton.NEXT)
-            assertNotNull(ReflectionHelpers.getField<PrefaceMediaCenter>(CarPlayMediaKeys, "mediaCenter"))
-        } finally { NavigationWheelSettings.setEnabled(app, true) }
-    }
-
-    @Test fun mergedMusicModeRetainsSavedChoicesAndChangesVolumeOnlyOnTheNextController() {
-        MusicWheelMode.save(app, MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME)
-        try {
-            val current = attach()
-            CarPlayBackgroundSession.active = true
-            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
-            MusicWheelMode.save(app, MusicWheelMode.CARPLAY_SYSTEM_VOLUME)
-            assertEquals(MusicWheelMode.CARPLAY_SYSTEM_VOLUME, MusicWheelMode.load(app))
-            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
-            CarPlayMediaKeys.attach(app, current) { true }
-            assertTrue(CarPlayMediaKeys.volumeKeysEligible(app))
-            attach()
-            assertFalse(CarPlayMediaKeys.volumeKeysEligible(app))
-            MusicWheelMode.save(app, MusicWheelMode.CAR_BLUETOOTH)
-            assertEquals(MusicWheelMode.CAR_BLUETOOTH, MusicWheelMode.load(app))
-            assertFalse(NavigationWheelSettings.enabled(app))
-            // Existing independently saved values are interpreted without rewriting preferences.
-            AirPlayPersistence.saveCarBluetoothAudio(app, false)
-            assertEquals(MusicWheelMode.CARPLAY_SYSTEM_VOLUME, MusicWheelMode.load(app))
-        } finally { MusicWheelMode.save(app, MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME) }
+            for (enabled in listOf(true, false)) {
+                legacy.edit().putBoolean("enabled", enabled).putBoolean("authorized", true).commit()
+                MusicWheelMode.save(app, MusicWheelMode.CARPLAY)
+                assertEquals(MusicWheelMode.CARPLAY, MusicWheelMode.load(app))
+                attach()
+                CarPlayBackgroundSession.active = true
+                assertTrue(CarPlayMediaKeys.onWindowMediaKey(key(KeyEvent.KEYCODE_MEDIA_NEXT)) == true)
+                assertNotNull(ReflectionHelpers.getField<PrefaceMediaCenter>(CarPlayMediaKeys, "mediaCenter"))
+                MusicWheelMode.save(app, MusicWheelMode.CAR_BLUETOOTH)
+                assertEquals(MusicWheelMode.CAR_BLUETOOTH, MusicWheelMode.load(app))
+                // Saving a transport must not take keys away from the existing CarPlay controller.
+                assertTrue(CarPlayMediaKeys.onWindowMediaKey(key(KeyEvent.KEYCODE_MEDIA_PREVIOUS)) == true)
+                assertEquals(enabled, legacy.getBoolean("enabled", !enabled))
+            }
+        } finally {
+            MusicWheelMode.save(app, MusicWheelMode.CARPLAY)
+            legacy.edit().clear().commit()
+        }
     }
 
     @Test fun learnedKeyDispatchesOnceAcrossSourcesAndDisabledDefaultCannotStillSend() {

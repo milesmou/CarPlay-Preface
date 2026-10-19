@@ -9,6 +9,7 @@ import android.graphics.Canvas
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.ActivityResultLauncher
@@ -42,6 +43,7 @@ class AuthorizationSettingsUiTest {
         AuthorizationVpnShadow.resetState()
         AuthorizationWriteShadow.allowed = false
         previousFlags = context.applicationInfo.flags
+        shadowOf(context).grantPermissions(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
     }
 
     @After fun cleanup() {
@@ -64,25 +66,30 @@ class AuthorizationSettingsUiTest {
         assertEquals(0, AuthorizationVpnShadow.calls)
     }
 
-    @Test fun bundledComponentOnlyOpensInstallerAfterExplicitTapAndDoesNotGrantVpn() {
+    @Test fun bundledComponentSavesThenOpensDownloadsAfterExplicitTapWithoutInstallingOrGrantingVpn() {
         val screen = openAuthorization()
         screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
-        screen.authorizationInstallWorker = { it.run() }
+        screen.authorizationExportWorker = { it.run() }
         var preparations = 0
-        screen.authorizationPrepareInstall = {
+        screen.authorizationPrepareExport = {
             preparations++
-            Intent(Intent.ACTION_VIEW).setDataAndType(android.net.Uri.parse("content://test/component"), "application/vnd.android.package-archive")
+            AuthorizationComponentExport.Saved("Download/test.apk", context.cacheDir)
         }
+        screen.authorizationOpenFolder = { screen.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)); true }
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
         assertEquals(0, preparations)
         assertNull(shadowOf(screen).nextStartedActivity)
-        descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.performClick()
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick()
         assertEquals(1, preparations)
-        assertEquals(Intent.ACTION_VIEW, shadowOf(screen).nextStartedActivity.action)
+        val opened = shadowOf(screen).nextStartedActivity
+        assertEquals(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS, opened.action)
+        assertNull(opened.type)
+        assertTrue(texts(screen).any { it.text.contains("Download/test.apk") })
         assertEquals(0, AuthorizationVpnShadow.calls)
         screen.authorizationComponentState = { AuthorizationComponentInstaller.State.READY }
         controller!!.pause().resume()
-        assertFalse(descendants(screen.window.decorView).any { it.tag == "authorization-component-install" })
+        assertTrue(descendants(screen.window.decorView).any { it.tag == "authorization-component-export" })
+        assertTrue(descendants(screen.window.decorView).any { it.tag == "authorization-open-downloads" })
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_ready) })
         assertEquals(0, AuthorizationVpnShadow.calls)
     }
@@ -90,14 +97,110 @@ class AuthorizationSettingsUiTest {
     @Test fun failedComponentPreparationShowsRetryWithoutOpeningVpnOrInstaller() {
         val screen = openAuthorization()
         screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
-        screen.authorizationInstallWorker = { it.run() }
-        screen.authorizationPrepareInstall = { throw IllegalStateException("invalid archive") }
+        screen.authorizationExportWorker = { it.run() }
+        screen.authorizationPrepareExport = { throw IllegalStateException("invalid archive") }
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
-        descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.performClick()
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick()
         assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_install_failed) })
-        assertTrue(descendants(screen.window.decorView).single { it.tag == "authorization-component-install" }.isEnabled)
+        assertTrue(descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.isEnabled)
         assertNull(shadowOf(screen).nextStartedActivity)
         assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun bothActionsRemainAvailableInEveryComponentStateAndOpeningTheFolderDoesNotExport() {
+        val screen = openAuthorization()
+        var folderOpens = 0
+        var exports = 0
+        screen.authorizationOpenDownloads = { folderOpens++; true }
+        screen.authorizationPrepareExport = { exports++; error("opening the folder must not export") }
+        for (state in AuthorizationComponentInstaller.State.values()) {
+            screen.authorizationComponentState = { state }
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            assertTrue(descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.isEnabled)
+            descendants(screen.window.decorView).single { it.tag == "authorization-open-downloads" }.performClick()
+        }
+        assertEquals(AuthorizationComponentInstaller.State.values().size, folderOpens)
+        assertEquals(0, exports)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun savingAnAlreadySavedApkShowsTheNoticeWithoutReopeningTheFolder() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.READY }
+        screen.authorizationExportWorker = { it.run() }
+        var saves = 0
+        var folderOpens = 0
+        val path = "Download/Preface-Android9-Authorization-7.apk"
+        screen.authorizationPrepareExport = {
+            AuthorizationComponentExport.Saved(path, context.cacheDir, alreadySaved = saves++ > 0)
+        }
+        screen.authorizationOpenFolder = { folderOpens++; true }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        repeat(2) { descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick() }
+        assertEquals(2, saves)
+        assertEquals(1, folderOpens)
+        val notice = screen.getString(R.string.settings_authorization_component_already_saved, path)
+        assertEquals(notice, org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        assertTrue(texts(screen).any { it.text.toString() == notice })
+        assertNull(shadowOf(screen).nextStartedActivity)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun incompatibleComponentSaveShowsItsReasonWithoutRequestingStorageOrExporting() {
+        val screen = openAuthorization()
+        shadowOf(context).denyPermissions(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        var exports = 0
+        screen.authorizationPrepareExport = { exports++; error("incompatible component must not export") }
+        for (state in listOf(AuthorizationComponentInstaller.State.EXISTING,
+                AuthorizationComponentInstaller.State.UNAVAILABLE, AuthorizationComponentInstaller.State.PERMISSION_MISSING)) {
+            screen.authorizationComponentState = { state }
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick()
+            val reason = when (state) {
+                AuthorizationComponentInstaller.State.EXISTING -> R.string.settings_authorization_component_existing
+                AuthorizationComponentInstaller.State.UNAVAILABLE -> R.string.settings_authorization_component_unsupported
+                else -> R.string.settings_authorization_component_permission_missing
+            }
+            assertEquals(screen.getString(reason), org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+            assertNull(shadowOf(screen).nextStartedActivityForResult)
+        }
+        assertEquals(0, exports)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun systemIdentityMigrationShowsManualReinstallNoticeAndOnlyExportsAfterTap() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.REINSTALL_REQUIRED }
+        screen.authorizationExportWorker = { it.run() }
+        var exports = 0
+        screen.authorizationPrepareExport = {
+            exports++
+            AuthorizationComponentExport.Saved("Download/Preface-Android9-Authorization-7.apk", context.cacheDir)
+        }
+        screen.authorizationOpenFolder = { screen.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)); true }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_reinstall_required) })
+        assertEquals(0, exports)
+        assertNull(shadowOf(screen).nextStartedActivity)
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick()
+        assertEquals(1, exports)
+        assertEquals(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS, shadowOf(screen).nextStartedActivity.action)
+        assertNull(shadowOf(screen).nextStartedActivity)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun folderOpenFailureKeepsTheSavedPathAndDoesNotClaimSavingFailed() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.UPDATE_AVAILABLE }
+        screen.authorizationExportWorker = { it.run() }
+        screen.authorizationPrepareExport = { AuthorizationComponentExport.Saved("Download/v2.apk", context.cacheDir) }
+        screen.authorizationOpenFolder = { false }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        descendants(screen.window.decorView).single { it.tag == "authorization-component-export" }.performClick()
+        assertTrue(texts(screen).any { it.text.contains("Download/v2.apk") })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_folder_unavailable) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_authorization_component_install_failed) })
+        assertNull(shadowOf(screen).nextStartedActivity)
     }
 
     @Test fun writeStatusRefreshesWhenReturningFromSystemSettings() {
@@ -110,6 +213,27 @@ class AuthorizationSettingsUiTest {
         AuthorizationWriteShadow.allowed = true
         controller!!.resume()
         assertTrue(row(screen, R.string.settings_authorization_write).text.endsWith(screen.getString(R.string.settings_authorization_allowed)))
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+    @Test fun downloadsButtonWorksWhenNoComponentExportIsAvailable() {
+        val screen = openAuthorization()
+        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.EXISTING }
+        var exports = 0
+        screen.authorizationPrepareExport = { exports++; error("must not export") }
+        screen.authorizationOpenDownloads = { screen.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)); true }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        descendants(screen.window.decorView).single { it.tag == "authorization-open-downloads" }.performClick()
+        assertEquals(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS, shadowOf(screen).nextStartedActivity.action)
+        assertEquals(0, exports)
+        assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    @Test fun additionalPermissionsOnlyOpenTheirOwnConfirmationAfterTap() {
+        val screen = openAuthorization()
+        assertNull(shadowOf(screen).nextStartedActivity)
+        row(screen, R.string.settings_authorization_overlay).performClick()
+        assertEquals(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, shadowOf(screen).nextStartedActivity.action)
+        assertFalse(texts(screen).any { it.text.contains("忽略电池优化") })
         assertEquals(0, AuthorizationVpnShadow.calls)
     }
 
@@ -162,32 +286,68 @@ class AuthorizationSettingsUiTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun rtlLargeFontScreenshot() = capture("rtl", rtl = true)
 
-    private fun capture(size: String, rtl: Boolean = false, fontScale: Float = 1.5f) {
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun migrationNoticeFullLargeFontScreenshot() = capture("full", reinstall = true)
+
+    @Test @Config(qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun migrationNoticeCompactLargeFontScreenshot() = capture("compact", reinstall = true)
+
+    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun migrationNoticeRtlLargeFontScreenshot() = capture("rtl", rtl = true, reinstall = true)
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun installedComponentFullLargeFontScreenshot() = capture("full", installed = true)
+
+    @Test @Config(qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun installedComponentCompactLargeFontScreenshot() = capture("compact", installed = true)
+
+    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun installedComponentRtlLargeFontScreenshot() = capture("rtl", rtl = true, installed = true)
+
+    private fun capture(size: String, rtl: Boolean = false, fontScale: Float = 1.5f, reinstall: Boolean = false, installed: Boolean = false) {
         context.resources.updateConfiguration(Configuration(context.resources.configuration).apply { this.fontScale = fontScale }, context.resources.displayMetrics)
         // Explicit system-size choice exercises the short available dp window while keeping 1920x720.
         InterfaceSize.save(context, if (size == "compact") 100 else InterfaceSize.PREFACE_12_3)
         if (rtl) context.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
         val screen = openAuthorization()
-        screen.authorizationComponentState = { AuthorizationComponentInstaller.State.INSTALLABLE }
+        screen.authorizationComponentState = {
+            if (reinstall) AuthorizationComponentInstaller.State.REINSTALL_REQUIRED
+            else if (installed) AuthorizationComponentInstaller.State.READY else AuthorizationComponentInstaller.State.INSTALLABLE
+        }
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
         val frame = screen.findViewById<ViewGroup>(android.R.id.content)
         val write = row(screen, R.string.settings_authorization_write)
         val vpn = row(screen, R.string.settings_authorization_vpn)
+        val overlay = row(screen, R.string.settings_authorization_overlay)
+        val save = descendants(frame).single { it.tag == "authorization-component-export" } as TextView
+        val downloads = descendants(frame).single { it.tag == "authorization-open-downloads" } as TextView
+        val migrationNotice = if (reinstall) texts(screen).single {
+            it.text.toString() == screen.getString(R.string.settings_authorization_component_reinstall_required)
+        } else null
         if (rtl) {
             // Production pins Chinese; Arabic fixtures verify actual RTL row and text geometry.
             descendants(frame).forEach { it.layoutDirection = View.LAYOUT_DIRECTION_RTL }
             val fixtures = mapOf(
                 R.string.settings_authorization to "الأذونات",
                 R.string.settings_authorization_summary to "إدارة أذونات النظام لهذا التطبيق.",
-                R.string.settings_authorization_native_title to "يرجى تثبيت إعدادات النظام أولاً",
-                R.string.settings_authorization_native_description to "ثبّت الإعدادات قبل منح الأذونات. يتطلب إذن VPN مكوّن النظام المناسب أيضاً.",
+                R.string.settings_authorization_native_title to "مكوّن أذونات النظام",
+                R.string.settings_authorization_native_description to "تتضمن هذه الحزمة مكوّن أذونات Android 9. احفظه في التنزيلات وثبّته يدوياً عبر مدير الملفات، ثم امنح كل إذن على حدة.",
                 R.string.settings_authorization_system to "أذونات النظام",
+                R.string.settings_authorization_component_reinstall_required to "يستخدم المكوّن الجديد هوية النظام ولا يمكنه استبدال المكوّن القديم مباشرة. احفظ ملف APK أولاً، ثم أزل مكوّن الأذونات القديم يدوياً وثبّت الملف المحفوظ عبر مدير الملفات. احتفظ بتطبيق CarPlay الرئيسي.",
+                R.string.settings_authorization_component_install to "حفظ مكوّن الأذونات بصيغة APK",
+                R.string.settings_authorization_component_ready to "مكوّن الأذونات مثبّت. استخدم خيارات الأذونات أدناه.",
+                R.string.settings_authorization_open_downloads to "فتح مجلد الحفظ",
                 R.string.settings_authorization_write_description to "افتح صفحة أذونات التطبيق للسماح بتعديل إعدادات النظام.",
                 R.string.settings_authorization_vpn_description to "تحقق من إذن VPN واطلبه. يمنح الإذن فقط دون إنشاء اتصال.",
             ).mapKeys { screen.getString(it.key) }
             texts(screen).forEach { view -> fixtures[view.text.toString()]?.let { view.text = it } }
             write.text = "تعديل إعدادات النظام · غير مسموح"
             vpn.text = "إنشاء VPN · تحقق وامنح الإذن"
+            overlay.text = "العرض فوق التطبيقات · غير مسموح"
         }
         repeat(3) {
             descendants(frame).forEach { it.forceLayout() }
@@ -204,6 +364,13 @@ class AuthorizationSettingsUiTest {
         assertEquals(if (size == "compact") 100 else InterfaceSize.PREFACE_12_3, InterfaceSize.preference(screen))
         assertEquals(write.height, vpn.height)
         assertEquals(Math.round(60 * screen.resources.displayMetrics.density), write.height)
+        assertSame("Save and open Downloads share a row", save.parent, downloads.parent)
+        assertEquals(LinearLayout.HORIZONTAL, (save.parent as LinearLayout).orientation)
+        assertEquals("Both actions have the same height", save.height, downloads.height)
+        assertEquals("Both actions align at the top", save.top, downloads.top)
+        assertTrue("Both actions share the available width", kotlin.math.abs(save.width - downloads.width) <= 1)
+        assertTrue("Action height accommodates the complete label", save.height >= save.layout.height + save.compoundPaddingTop + save.compoundPaddingBottom)
+        assertTrue("Action height accommodates the complete label", downloads.height >= downloads.layout.height + downloads.compoundPaddingTop + downloads.compoundPaddingBottom)
         if (size == "preface-default") {
             assertEquals(60, write.height)
             assertEquals(240, ReflectionHelpers.getField<ScrollView>(screen, "settingsRailScroll").width)
@@ -211,6 +378,9 @@ class AuthorizationSettingsUiTest {
         if (rtl) {
             assertEquals(View.LAYOUT_DIRECTION_RTL, write.layoutDirection)
             assertNotNull("RTL row has its chevron on the left", write.compoundDrawables[0])
+            assertTrue("RTL actions follow reading order", save.left >= downloads.right)
+        } else {
+            assertTrue("Actions follow reading order", downloads.left >= save.right)
         }
         for (view in texts(screen)) {
             val layout = view.layout ?: continue
@@ -219,17 +389,35 @@ class AuthorizationSettingsUiTest {
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
         // These are unit-test renders, not installed-APK screenshots for user previews.
         val directory = File("../agent_docs/screenshots/authorization-test-renders").apply { mkdirs() }
-        for (part in listOf("top", "actions")) {
-            scroll.scrollTo(0, if (part == "top") 0 else scroll.getChildAt(0).height)
+        for (part in listOf("top") + (if (reinstall) listOf("migration-notice") else emptyList()) + listOf("component-actions", "vpn", "actions")) {
+            // Descendant rects are already in the scroll view's content coordinates.
+            val vpnOffset = android.graphics.Rect().also { vpn.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(vpn, it) }.top
+            val componentOffset = android.graphics.Rect().also { save.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(save, it) }.top
+            val migrationOffset = migrationNotice?.let { note ->
+                android.graphics.Rect().also { note.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(note, it) }.top
+            } ?: 0
+            scroll.scrollTo(0, when (part) { "top" -> 0; "migration-notice" -> migrationOffset; "component-actions" -> componentOffset; "vpn" -> vpnOffset; else -> scroll.getChildAt(0).height })
             shadowOf(Looper.getMainLooper()).idle()
+            if (part == "migration-notice") {
+                val rect = android.graphics.Rect()
+                assertTrue("Manual reinstall notice is reachable", migrationNotice!!.getGlobalVisibleRect(rect))
+                assertEquals("Manual reinstall notice is fully visible", migrationNotice.height, rect.height())
+            }
+            if (part == "component-actions") {
+                for (action in listOf(save, downloads)) {
+                    val rect = android.graphics.Rect()
+                    assertTrue("Authorization APK action is reachable", action.getGlobalVisibleRect(rect))
+                    assertEquals("Authorization APK action is fully visible", action.height, rect.height())
+                }
+            }
             if (part == "actions") {
                 val rect = android.graphics.Rect()
-                assertTrue("VPN action is reachable", vpn.getGlobalVisibleRect(rect))
-                assertEquals("VPN action is fully visible", vpn.height, rect.height())
+                assertTrue("Overlay action is reachable", overlay.getGlobalVisibleRect(rect))
+                assertEquals("Overlay action is fully visible", overlay.height, rect.height())
             }
             val bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
             frame.draw(Canvas(bitmap))
-            val filename = "$size-$part-dpi${screen.resources.displayMetrics.densityDpi}-font${Math.round(fontScale * 100)}"
+            val filename = "${if (reinstall) "migration-" else if (installed) "installed-" else ""}$size-$part-dpi${screen.resources.displayMetrics.densityDpi}-font${Math.round(fontScale * 100)}"
             File(directory, "$filename.png").outputStream().use {
                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
@@ -241,6 +429,7 @@ class AuthorizationSettingsUiTest {
                 put("densityDpi", screen.resources.displayMetrics.densityDpi)
                 put("fontScale", fontScale)
                 put("interfaceSize", InterfaceSize.preference(screen))
+                put("componentState", screen.authorizationComponentState().name)
                 put("configuration", screen.resources.configuration.toString())
             }.toString(2))
             bitmap.recycle()

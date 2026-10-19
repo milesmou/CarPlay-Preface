@@ -33,7 +33,7 @@ android {
 dependencies {
     compileOnly(project(":ecarx-mediacenter-api-stubs"))
     testImplementation(project(":ecarx-mediacenter-api-stubs"))
-    api(project(":shared"))
+    implementation(project(":shared"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

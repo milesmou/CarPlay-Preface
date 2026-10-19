@@ -43,6 +43,28 @@ class StartupDiagnosticSnapshotTest {
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
     }
 
+    @Test fun bootStartOpensHomeEvenWhenAutomaticConnectionIsDisabled() {
+        AirPlayPersistence.saveAutoStartOnBoot(app, true)
+        DiPlayPreferences.saveAutoConnect(app, false)
+        var launch: Intent? = null
+        val context = object : ContextWrapper(app) {
+            override fun startActivity(intent: Intent) { launch = intent }
+        }
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        assertEquals(DiPlayActivity::class.java.name, launch?.component?.className)
+        assertFalse(DiPlayPreferences.autoConnect(app))
+    }
+
+    @Test fun automaticConnectionAloneDoesNotEnableBootStart() {
+        DiPlayPreferences.saveAutoConnect(app, true)
+        var launched = false
+        val context = object : ContextWrapper(app) {
+            override fun startActivity(intent: Intent) { launched = true }
+        }
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        assertFalse(launched)
+    }
+
     @Test fun launchFailureRecordsOnlyItsClassAndASecondBootReplacesOldEvidence() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
         val context = object : ContextWrapper(app) {

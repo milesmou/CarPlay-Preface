@@ -3,15 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// The reviewed upstream experimental pair is bundled by default. An explicit local input can replace it.
-val authenticationAssets = providers.environmentVariable("DIPLAY_AUTH_ASSETS_DIR")
-    .orNull?.let { file(it).canonicalFile } ?: rootProject.file("runtime-assets").canonicalFile
-
-val repositorySigning = groovy.json.JsonSlurper().parseText(
-    providers.fileContents(rootProject.layout.projectDirectory.file("signing/signing.json")).asText.get(),
-) as Map<*, *>
-val repositoryKeystore = rootProject.file("signing/${repositorySigning["keystoreFile"]}").canonicalFile
-
 android {
     namespace = "com.shilapi.xcertplay"
     compileSdk {
@@ -22,46 +13,21 @@ android {
         applicationId = "com.shihab.diplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 86
+        versionCode = 97
         versionName = "0.1.1"
 
     }
 
 
-    sourceSets.getByName("main").assets.srcDir(authenticationAssets)
-
-    signingConfigs {
-        create("release") {
-            storeFile = file(
-                providers.environmentVariable("ANDROID_KEYSTORE_PATH")
-                    .filter { it.isNotBlank() }
-                    .getOrElse(repositoryKeystore.absolutePath),
-            )
-            storeType = providers.environmentVariable("ANDROID_KEYSTORE_TYPE")
-                .filter { it.isNotBlank() }
-                .getOrElse(repositorySigning["keystoreType"] as String)
-            storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
-                .filter { it.isNotBlank() }
-                .getOrElse(repositorySigning["storePassword"] as String)
-            keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
-                .filter { it.isNotBlank() }
-                .getOrElse(repositorySigning["keyAlias"] as String)
-            keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
-                .filter { it.isNotBlank() }
-                .getOrElse(repositorySigning["keyPassword"] as String)
-        }
-    }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".hudtest"
-            signingConfig = signingConfigs.getByName("release")
         }
         release {
             optimization {
                 enable = false
             }
-            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -88,66 +54,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-// Only the selected accessory pair is allowed; APK signing keys and other credentials remain excluded.
-val credentialAssets = files(android.sourceSets.flatMap { source ->
-    source.assets.directories.map { directory ->
-        fileTree(directory) {
-            include("**/offline-mfi/**", "**/*.pk8", "**/*.p7b", "**/*.key",
-                "**/*.pem", "**/*.p12", "**/*.pfx", "**/*.jks", "**/*.keystore")
-        }
-    }
-})
-val rejectBundledCredentials by tasks.registering {
-    group = "verification"
-    description = "Reject unexpected credential files in APK assets."
-    val filesToCheck = credentialAssets
-    val allowed = listOf("identity.pk8", "certificate.p7b")
-        .map { authenticationAssets.resolve("offline-mfi/$it").canonicalFile }.toSet()
-    inputs.files(filesToCheck)
-    doLast {
-        check(allowed.all { it.isFile && it.length() > 0 }) { "Runtime authentication assets are incomplete" }
-        val unexpected = filesToCheck.files.filter { it.canonicalFile !in allowed }
-        check(unexpected.isEmpty()) { "Unexpected credential files in APK assets" }
-    }
-}
-tasks.named("preBuild") { dependsOn(rejectBundledCredentials) }
-
-// Bundle the separate, platform-signed consent APK. Signing inputs remain local and are never assets.
-abstract class PrepareAuthorizationAssets : Exec() {
-    @get:OutputDirectory abstract val assetOutput: DirectoryProperty
-}
-val authorizationAssets = layout.buildDirectory.dir("generated/authorizationAssets")
-val prepareAuthorizationAssets by tasks.registering(PrepareAuthorizationAssets::class) {
-    group = "build"
-    dependsOn(":authorization-components:assembleRelease")
-    val unsigned = rootProject.layout.projectDirectory.file("authorization-components/build/outputs/apk/release/authorization-components-release-unsigned.apk")
-    val metadata = rootProject.layout.projectDirectory.file("authorization-components/build/outputs/apk/release/output-metadata.json")
-    val script = rootProject.layout.projectDirectory.file("scripts/android9_authorization.py")
-    inputs.files(unsigned, metadata, script,
-        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.pk8"),
-        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.x509.pem"))
-    assetOutput.set(authorizationAssets)
-    workingDir(rootProject.projectDir)
-    commandLine("python", script.asFile.absolutePath, "--sign", "--asset-output", authorizationAssets.get().asFile.absolutePath)
-}
-androidComponents.onVariants { variant ->
-    variant.sources.assets?.addGeneratedSourceDirectory(prepareAuthorizationAssets, PrepareAuthorizationAssets::assetOutput)
-}
-
-// Both ordinary and standalone main-app builds include the selected pair.
-val verifyStandaloneAuthentication by tasks.registering {
-    group = "verification"
-    description = "Verify runtime authentication input for a standalone car-test APK."
-    val directory = authenticationAssets
-    doLast {
-        check(listOf("identity.pk8", "certificate.p7b").all {
-            directory.resolve("offline-mfi/$it").let { file -> file.isFile && file.length() > 0 }
-        }) { "Standalone CarPlay authentication files are missing or empty" }
-    }
-}
-tasks.named("preBuild") { mustRunAfter(verifyStandaloneAuthentication) }
-tasks.register("assembleStandaloneDebug") {
-    group = "build"
-    description = "Build a standalone car-test APK with explicitly provisioned authentication."
-    dependsOn(verifyStandaloneAuthentication, "assembleDebug")
-}
+apply(from = rootProject.file("gradle/carplay-distribution.gradle"))

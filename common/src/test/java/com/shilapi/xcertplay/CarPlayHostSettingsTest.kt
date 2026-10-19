@@ -46,6 +46,7 @@ class CarPlayHostSettingsTest {
     private lateinit var controllers: MockedConstruction<CarPlayController>
 
     @Before fun setUp() {
+        ConnectionAutoStart.resetForTest()
         activityLifecycle = Robolectric.buildActivity(CarPlayHostActivity::class.java)
         activity = activityLifecycle.get()
         controllers = mockConstruction(CarPlayController::class.java) { controller, _ ->
@@ -72,6 +73,7 @@ class CarPlayHostSettingsTest {
         (field("airPlayCommandExecutor") as ExecutorService).shutdownNow()
         CarPlayBackgroundSession.clear()
         controllers.close()
+        ConnectionAutoStart.resetForTest()
     }
 
     @Test fun hotspotStatusShowsNetworkDetailsWithoutExportingThePassword() {
@@ -116,6 +118,23 @@ class CarPlayHostSettingsTest {
         activityLifecycle.pause().stop().destroy()
     }
 
+    @Test fun systemBackFromTheConnectionMenuCancelsAfterDiscardingPendingEdits() {
+        attachController()
+        invoke("openSettingsMenu")
+        val original = AirPlayPersistence.loadFps(activity)
+        setField("fps", if (original == 30) 60 else 30)
+        activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK))
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertFalse(activity.isFinishing)
+        discardPendingEdits()
+        assertEquals("home", shadowOf(activity).nextStartedActivity.getStringExtra("page"))
+        assertTrue(activity.isFinishing)
+        assertTrue(ConnectionAutoStart.paused)
+        assertNull(field("controller"))
+        assertEquals(original, AirPlayPersistence.loadFps(activity))
+        assertFalse(field("reconnectScheduled") as Boolean)
+    }
+
     @Test fun menuHomeButtonReturnsToHomeAndKeepsTheConnection() {
         val controller = attachController()
         CarPlayBackgroundSession.active = true
@@ -134,6 +153,8 @@ class CarPlayHostSettingsTest {
 
     @Test fun menuHomeButtonConfirmsUnsavedChangesBeforeNavigating() {
         val controller = attachController()
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        CarPlayBackgroundSession.active = true
         invoke("openSettingsMenu")
         val original = AirPlayPersistence.loadFps(activity)
         setField("fps", if (original == 30) 60 else 30)
@@ -446,6 +467,19 @@ class CarPlayHostSettingsTest {
         assertTrue(field("menuOpen") as Boolean)
     }
 
+    @Test fun pictureAdjustmentsRequireTheSameConnectedSessionWhenThePanelOpens() {
+        setField("activeAirPlaySession", null)
+        invoke("openPicturePanel")
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(field("picturePanel"))
+
+        setField("activeAirPlaySession", mock(AirPlaySession::class.java))
+        invoke("openPicturePanel")
+        setField("activeAirPlaySession", null)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(field("picturePanel"))
+    }
+
     @Test fun pictureShortcutOpensLiveAdjustmentsAndKeepsTheConnection() {
         activityLifecycle.create().start().resume().visible()
         while (shadowOf(activity).nextStartedActivity != null) { }
@@ -482,7 +516,7 @@ class CarPlayHostSettingsTest {
         for (fingers in 2..4) {
             gesture(fingers)
             assertFalse(field("menuOpen") as Boolean)
-            assertFalse(field("gestureSequenceActive") as Boolean)
+            assertFalse(activity.touchController.trackingSettingsGesture)
         }
         invoke("openSettingsMenu")
         invoke("cancelSettingsEdits")

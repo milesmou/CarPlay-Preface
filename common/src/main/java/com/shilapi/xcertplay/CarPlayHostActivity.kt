@@ -2,7 +2,6 @@ package com.shilapi.xcertplay
 
 import android.app.AlertDialog
 import android.Manifest
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,7 +17,6 @@ import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,7 +26,6 @@ import android.os.Process
 import android.os.SystemClock
 import android.text.Editable
 import android.text.InputType
-import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.Log
 import android.view.Gravity
@@ -61,7 +58,6 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayDisplaySettings
@@ -78,7 +74,6 @@ import com.shilapi.xcertplay.airplay.SafeAreaRect
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.location.AndroidCarPlayLocationProvider
 import com.shilapi.xcertplay.media.AndroidMediaSink
-import com.shilapi.xcertplay.media.CarPlayTouchMapper
 import com.shilapi.xcertplay.media.CarPlayVideoLayout
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
@@ -92,7 +87,6 @@ import com.shilapi.xcertplay.orchestration.MfiTarget
 import com.shilapi.xcertplay.orchestration.WirelessHotspotMode
 import com.shilapi.xcertplay.orchestration.isManualHotspotChannelCompatible
 import com.shilapi.xcertplay.settings.ConnectionSettingsSection
-import com.shilapi.xcertplay.settings.DisplaySettingsSection
 import com.shilapi.xcertplay.settings.SettingsTheme
 import com.shilapi.xcertplay.settings.SettingsWidgets
 import com.shilapi.xcertplay.transport.Iap2IdentificationConfig
@@ -101,7 +95,6 @@ import com.shilapi.xcertplay.transport.BluetoothLinkCheck
 import com.shilapi.xcertplay.transport.BluetoothRadioCheck
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.UsbDeviceId
-import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -190,6 +183,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private val wirelessPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (shuttingDown.get()) return@registerForActivityResult
             awaitingWirelessPermissions = false
             wirelessPermissionsReady = hasRequiredWirelessPermissions()
             appendLog(
@@ -204,6 +198,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     private val microphonePermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (shuttingDown.get()) return@registerForActivityResult
             microphoneAvailable = granted
             microphonePermissionResolved = true
             appendLog(if (granted) "Microphone permission granted" else "Microphone permission denied")
@@ -211,6 +206,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            if (shuttingDown.get()) return@registerForActivityResult
             awaitingLocationPermission = false
             locationPermissionAvailable = hasFineLocationPermission()
             if (locationPermissionAvailable) {
@@ -360,7 +356,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var activeDisplaySize: DisplaySize? = null
     private var pendingDisplaySize: DisplaySize? = null
     private var sessionDisplay: CarPlaySessionDisplay? = null
-    private var touchOutsideContent = false
     private var displayDiagnosticAttempt: String? = null
     private var hevcEnabled = true
     private val hevcDecoders by lazy { HevcSupport.decoders() }
@@ -454,12 +449,15 @@ class CarPlayHostActivity : ComponentActivity() {
     private var reconnectScheduled = false
     private var reconnectTicket = 0L
     private var sessionLog: SessionLogFile? = null
+    internal val touchController = CarPlayTouchController(
+        menuOpen = { menuOpen }, gestureFingerCount = { gestureFingerCount },
+        swipeDistancePixels = { dp(SETTINGS_SWIPE_DISTANCE_DP) },
+        swipeDirectionRatio = SETTINGS_SWIPE_DIRECTION_RATIO,
+        contentRect = ::contentRect, sendTouch = { controller?.sendTouch(it) ?: false },
+        openSettingsMenu = ::openSettingsMenu, appendLog = ::appendLog,
+    )
     private var gestureFingerCount = 3
     private var settingsGestureHint: TextView? = null
-    private var gestureSequenceActive = false
-    private var gestureTracking = false
-    private var gestureStartX = 0f
-    private var gestureStartY = 0f
     private var recoveryPendingAfterMenu = false
     private var failurePendingAfterMenu: CarPlayStatus.Failed? = null
     private val shuttingDown = AtomicBoolean(false)
@@ -559,6 +557,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!ConnectionAutoStart.accepts(intent)) { finish(); return }
+        if (UsbAutoConnect.automaticRequestDisabled(this, intent)) {
+            startActivity(Intent(this, DiPlayActivity::class.java).putExtra("page", "home"))
+            finish(); return
+        }
         awaitingVpnConsent = savedInstanceState?.getBoolean("usb_vpn_pending") ?: false
         usbAttemptGeneration = savedInstanceState?.getLong("usb_attempt_generation", UsbAutoConnect.generation)
             ?: UsbAutoConnect.generation
@@ -608,7 +611,7 @@ class CarPlayHostActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    // The gesture menu provides explicit navigation; system Back keeps this page.
+                    returnHomeFromConnection()
                 }
             },
         )
@@ -680,7 +683,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestStartupPrerequisites() {
-        if (shuttingDown.get() || (!wirelessEnabled && UsbAutoConnect.wirelessSelected(this))) return
+        if (shuttingDown.get() || UsbAutoConnect.automaticRequestDisabled(this, intent) ||
+            (!wirelessEnabled && UsbAutoConnect.wirelessSelected(this))) return
         if (locationReportingEnabled && !locationPermissionAvailable) {
             requestLocationPermission()
             return
@@ -693,7 +697,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestVpnConsent() {
-        if (awaitingVpnConsent || shuttingDown.get() || wirelessEnabled || UsbAutoConnect.wirelessSelected(this)) return
+        if (awaitingVpnConsent || shuttingDown.get() || wirelessEnabled || UsbAutoConnect.wirelessSelected(this) ||
+            UsbAutoConnect.automaticRequestDisabled(this, intent)) return
         usbAttemptGeneration = UsbAutoConnect.beginWiredAttempt(this)
         val consent = try {
             com.shilapi.xcertplay.network.CarPlayVpnService.prepare(this)
@@ -718,7 +723,7 @@ class CarPlayHostActivity : ComponentActivity() {
         if (!awaitingVpnConsent) return
         awaitingVpnConsent = false
         vpnReady = false
-        if (shuttingDown.get() || wirelessEnabled || UsbAutoConnect.wirelessSelected(this) ||
+        if (shuttingDown.get() || UsbAutoConnect.automaticRequestDisabled(this, intent) || wirelessEnabled || UsbAutoConnect.wirelessSelected(this) ||
             usbAttemptGeneration != UsbAutoConnect.generation) return
         if (resultCode == RESULT_OK) {
             // A result alone does not prove that this package is still the prepared VPN owner.
@@ -755,6 +760,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun requestLocationPermission() {
+        if (shuttingDown.get()) return
         if (locationPermissionAvailable || awaitingLocationPermission) return
         awaitingLocationPermission = true
         locationPermission.launch(
@@ -770,6 +776,7 @@ class CarPlayHostActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     private fun requestWirelessPermissions() {
+        if (shuttingDown.get()) return
         val permissions = requiredWirelessPermissions()
         if (permissions.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) {
             wirelessPermissionsReady = true
@@ -793,6 +800,8 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (shuttingDown.get() || !ConnectionAutoStart.accepts(intent) ||
+            UsbAutoConnect.automaticRequestDisabled(this, intent)) return
         setIntent(intent)
         if (isIphoneUsbAttachment(intent)) {
             if (wirelessEnabled) {
@@ -833,6 +842,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (shuttingDown.get() || isFinishing) return
         AppLocale.enforce(this)
         WheelKeyService.restoreIfNeeded(this)
         hostAppearanceResumed = true
@@ -895,11 +905,13 @@ class CarPlayHostActivity : ComponentActivity() {
 
 
     // Hardware navigation belongs to the iPhone-rendered CarPlay UI, not Android View focus.
-    private val navigationVolumeKeys = NavigationWheelKeyPolicy()
     private val windowMediaPresses = mutableSetOf<Triple<Int, Int, Int>>()
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_BACK) return true
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) returnHomeFromConnection()
+            return true
+        }
         if (WheelMediaLearning.offer(event)) return true
         val physicalKey = Triple(event.deviceId, event.keyCode, event.scanCode)
         val downOrUp = event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP
@@ -926,10 +938,6 @@ class CarPlayHostActivity : ComponentActivity() {
             return true
         }
 
-
-        if (navigationVolumeKeys.onKey(event.action, event.keyCode, event.deviceId, event.downTime, event.repeatCount,
-            eligible = !menuOpen && activeAirPlaySession != null && CarPlayMediaKeys.volumeKeysEligible(this),
-        ) { delta -> CarPlayWheelVolume.adjust(this, delta) }) return true
 
         // Standard wheel media keys can reach this window without an accessibility service.
         val mediaPress = CarPlayMediaButton.forCarPlayWindow(
@@ -1224,6 +1232,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // VPN denial happens before a controller owns the background session. That initial
         // attempt still needs a working Retry button, without disturbing another owner's session.
         if (!CarPlayBackgroundSession.isOwner(this) && (controller != null || CarPlayBackgroundSession.hasSession())) return
+        UsbAutoConnect.markManualRequest(intent)
         if (!wirelessEnabled) usbAttemptGeneration = UsbAutoConnect.beginWiredAttempt(this)
         startupRetryBudget.manualRetry()
         startupRetryStopped = false
@@ -2965,6 +2974,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration || startupRetryStopped) return@runOnUiThread
                     startupRetryBudget.disconnected()
+                    activeAirPlaySession = null
+                    CarPlayBackgroundSession.active = false
                     if (menuOpen) {
                         recoveryPendingAfterMenu = true
                         return@runOnUiThread
@@ -3408,7 +3419,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun maybeStartCarPlay() {
-        if (shuttingDown.get()) return
+        if (shuttingDown.get() || UsbAutoConnect.automaticRequestDisabled(this, intent)) return
         if (!wirelessEnabled && UsbAutoConnect.wirelessSelected(this)) return
         if (wirelessEnabled && UsbAutoConnect.priorityDevice(this) != null) {
             wirelessEnabled = false
@@ -3547,6 +3558,8 @@ class CarPlayHostActivity : ComponentActivity() {
         startupRetryBudget.disconnected()
         startupRetryButton?.visibility = View.GONE
         appendLog(reason)
+        activeAirPlaySession = null
+        CarPlayBackgroundSession.active = false
         activeScreenStreamTypes.clear()
         setConnectionStage(reason)
         Log.i(TAG, "$reason; rebuilding stack at ${size.width}x${size.height}")
@@ -3590,8 +3603,32 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
+    private fun connectionAttemptPending(): Boolean =
+        (activeAirPlaySession == null && !CarPlayBackgroundSession.active) ||
+            reconnectScheduled || handshakeResetInProgress || startupRetryStopped
+
+    private fun returnHomeFromConnection() {
+        if (!connectionAttemptPending() || shuttingDown.get()) return
+        if (menuOpen) leaveSettingsMenu { showDiPlayHome() } else showDiPlayHome()
+    }
+
     private fun showDiPlayHome(page: String = "home") {
         controller?.sendTouch(emptyList())
+        // Leaving the connection screen is an explicit cancellation, including late permissions
+        // and a stack replacement already waiting for the previous controller to close.
+        if (page != "settings" && connectionAttemptPending() && !shuttingDown.get()) {
+            ConnectionAutoStart.cancel()
+            UsbAutoConnect.cancelForHome(this)
+            startupRetryStopped = true
+            bluetoothRecoveryAllowed = false
+            reconnectScheduled = false
+            ++reconnectTicket
+            recoveryPendingAfterMenu = false
+            failurePendingAfterMenu = null
+            startAfterHandshakeReset = false
+            shutdown(false, "connection return home")
+            finish()
+        }
         startActivity(Intent(this, DiPlayActivity::class.java)
             .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
@@ -3631,11 +3668,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun openPicturePanel() {
         closePicturePanel()
+        val session = activeAirPlaySession ?: return
         val generation = picturePanelGeneration
         val root = videoView?.parent as? FrameLayout ?: return
         controller?.sendTouch(emptyList())
         root.post {
-            if (generation != picturePanelGeneration || isFinishing || isDestroyed) return@post
+            if (generation != picturePanelGeneration || activeAirPlaySession !== session || isFinishing || isDestroyed) return@post
             val panel = CarPlayPicturePanel(
                 this,
                 adjustmentsAvailable = fallbackVideoView == null,
@@ -3772,7 +3810,7 @@ class CarPlayHostActivity : ComponentActivity() {
         AsyncDiagnosticLog.append(diagnosticLog, "Disconnect requested reason=$reason terminateProcess=$terminateProcess")
         teardownExecutor.execute {
             val started = System.nanoTime()
-            if (!terminateProcess && reason == "DiPlay disconnect") oldController?.prepareTemporaryHotspotHandoff()
+            if (!terminateProcess && reason in setOf("DiPlay disconnect", "connection return home")) oldController?.prepareTemporaryHotspotHandoff()
             oldController?.close()
             var clean: Boolean
             do {
@@ -3933,92 +3971,7 @@ class CarPlayHostActivity : ComponentActivity() {
         sink?.setSurface(SCREEN_TYPE_MAIN, surface)
     }
 
-    private fun onHostTouch(view: View, event: MotionEvent): Boolean {
-        if (menuOpen) return true
-
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                gestureSequenceActive = false
-                gestureTracking = false
-            }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                if (gestureFingerCount > 0 && event.pointerCount == gestureFingerCount && !gestureSequenceActive) {
-                    gestureSequenceActive = true
-                    gestureTracking = true
-                    gestureStartX = pointerCentroid(event, horizontal = true)
-                    gestureStartY = pointerCentroid(event, horizontal = false)
-                    controller?.sendTouch(emptyList())
-                    appendLog("Settings swipe tracking started; fingers=$gestureFingerCount")
-                    return true
-                }
-            }
-        }
-
-        if (gestureSequenceActive) {
-            if (event.actionMasked == MotionEvent.ACTION_POINTER_UP || event.pointerCount != gestureFingerCount) {
-                gestureTracking = false
-            }
-            if (!gestureTracking || event.pointerCount != gestureFingerCount) {
-                if (event.actionMasked == MotionEvent.ACTION_UP ||
-                    event.actionMasked == MotionEvent.ACTION_CANCEL
-                ) {
-                    gestureSequenceActive = false
-                    gestureTracking = false
-                } else if (event.actionMasked == MotionEvent.ACTION_POINTER_UP) {
-                    gestureTracking = false
-                }
-                return true
-            }
-            if (event.actionMasked == MotionEvent.ACTION_MOVE) {
-                val deltaX = Math.abs(pointerCentroid(event, horizontal = true) - gestureStartX)
-                val deltaY = pointerCentroid(event, horizontal = false) - gestureStartY
-                if (
-                    deltaY >= dp(SETTINGS_SWIPE_DISTANCE_DP) &&
-                    deltaY >= deltaX * SETTINGS_SWIPE_DIRECTION_RATIO
-                ) {
-                    gestureSequenceActive = false
-                    gestureTracking = false
-                    openSettingsMenu()
-                    return true
-                }
-            }
-            return true
-        }
-
-        val content = contentRect(view.width, view.height)
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            touchOutsideContent = !content.contains(event.x, event.y)
-        }
-        if (touchOutsideContent) {
-            // Ignore the entire touch sequence when it starts in a letterbox bar.
-            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
-                touchOutsideContent = false
-            }
-            return true
-        }
-        val contacts = CarPlayTouchMapper.contacts(event, content)
-        val queued = controller?.sendTouch(contacts) ?: false
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN,
-            MotionEvent.ACTION_POINTER_DOWN,
-            MotionEvent.ACTION_UP,
-            MotionEvent.ACTION_POINTER_UP,
-            MotionEvent.ACTION_CANCEL -> Log.i(
-                TAG,
-                "touch action=${MotionEvent.actionToString(event.actionMasked)} " +
-                    "pointers=${event.pointerCount} queued=$queued",
-            )
-        }
-        return true
-    }
-
-    private fun pointerCentroid(event: MotionEvent, horizontal: Boolean): Float {
-        var total = 0f
-        for (index in 0 until event.pointerCount) {
-            total += if (horizontal) event.getX(index) else event.getY(index)
-        }
-        return total / event.pointerCount
-    }
+    private fun onHostTouch(view: View, event: MotionEvent): Boolean = touchController.onTouch(view, event)
 
     private fun onScreenStreamStateChanged(generation: Int, type: Int, active: Boolean) {
         runOnUiThread {
@@ -4240,111 +4193,4 @@ class CarPlayHostActivity : ComponentActivity() {
         val channel: Int? = null,
         val backend: String? = null,
     )
-}
-
-internal data class CarPlaySessionDisplay(
-    val width: Int,
-    val height: Int,
-    val rotation: Int,
-    val hideTopBar: Boolean,
-    val hideBottomBar: Boolean,
-    // Measured startup window; it may differ from the fixed negotiated video canvas.
-    val windowWidth: Int,
-    val windowHeight: Int,
-    /** The view areas this session declared, or null for the whole screen as one area. */
-    val viewAreas: CarPlayViewAreas? = null,
-    /** Whether the status bar was on screen when the session started, or null when unknown. */
-    val statusBarShown: Boolean? = null,
-)
-
-/**
- * The driver keeps the status bar, and another window (the head unit's reversing camera) hid it: the window
- * grew by the bar only for a while. A new session at that size stayed scaled down below the returning bar (#643).
- */
-internal fun statusBarHiddenByAnotherWindow(display: CarPlaySessionDisplay, width: Int, height: Int,
-    statusBarShown: Boolean?): Boolean =
-    !display.hideTopBar && display.statusBarShown == true && statusBarShown == false &&
-        width == display.windowWidth && height > display.windowHeight
-
-/** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */
-internal object CarPlayBackgroundSession {
-    @Volatile var active = false
-    private var stopAction: (((() -> Unit)) -> Unit)? = null
-    private var stopping = false
-    private var owner: Any? = null
-    @Synchronized fun isOwner(candidate: Any): Boolean = owner === candidate
-    @Synchronized fun hasSession(): Boolean = stopAction != null || stopping
-    /** Receiver and activity callbacks run on the main thread; never replace the current owner. */
-    fun phoneBluetoothConnected(address: String): String? {
-        val current = synchronized(this) {
-            if (stopping) return "session-stopping"
-            if (stopAction == null) return null
-            owner as? CarPlayHostActivity
-        }
-        return current?.onPhoneBluetoothConnected(address) ?: "session-present"
-    }
-    private val stopWaiters = mutableListOf<() -> Unit>()
-
-    fun stop(completion: () -> Unit = {}) {
-        val action: (((() -> Unit)) -> Unit)?
-        synchronized(this) {
-            if (stopping) { stopWaiters.add(completion); return }
-            action = stopAction
-            if (action != null) { stopping = true; stopWaiters.add(completion) }
-        }
-        if (action == null) { completion(); return }
-        action.invoke {
-            val callbacks = synchronized(this) {
-                stopping = false
-                stopWaiters.toList().also { stopWaiters.clear() }
-            }
-            callbacks.forEach { it() }
-        }
-    }
-
-    data class Snapshot(
-        val controller: CarPlayController,
-        val sink: AndroidMediaSink,
-        val width: Int,
-        val height: Int,
-        val display: CarPlaySessionDisplay,
-    )
-
-    private var controller: CarPlayController? = null
-    private var sink: AndroidMediaSink? = null
-    private var width = 0
-    private var height = 0
-    private var display: CarPlaySessionDisplay? = null
-
-    @Synchronized
-    fun snapshot(): Snapshot? {
-        val currentController = controller ?: return null
-        val currentSink = sink ?: return null
-        val currentDisplay = display ?: return null
-        return Snapshot(currentController, currentSink, width, height, currentDisplay)
-    }
-
-    @Synchronized
-    fun store(controller: CarPlayController, sink: AndroidMediaSink, width: Int, height: Int,
-        owner: Any, display: CarPlaySessionDisplay, stop: (() -> Unit) -> Unit) {
-        this.stopAction = stop
-        this.owner = owner
-        this.controller = controller
-        this.sink = sink
-        this.width = width
-        this.height = height
-        this.display = display
-    }
-
-    @Synchronized
-    fun clear(expected: CarPlayController? = null, keepOwner: Boolean = false) {
-        if (expected != null && controller !== expected) return
-        controller = null
-        sink = null
-        if (!keepOwner) { stopAction = null; owner = null }
-        active = false
-        width = 0
-        height = 0
-        display = null
-    }
 }

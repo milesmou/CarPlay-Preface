@@ -8,16 +8,13 @@ import android.bluetooth.BluetoothHeadset
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.bluetooth.BluetoothSocket
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
@@ -105,46 +102,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-
-sealed class CarPlayStatus {
-    data object DiscoveringMfi : CarPlayStatus()
-    data object WaitingForMfi : CarPlayStatus()
-    data object RequestingMfiPermission : CarPlayStatus()
-    data object MfiReady : CarPlayStatus()
-    data object StartingHotspot : CarPlayStatus()
-    data class HotspotReady(
-        val ssid: String,
-        val band: String,
-        val channel: Int,
-        val bssid: String,
-        val address: String,
-        val backend: String,
-        val passphrase: String = "",
-    ) : CarPlayStatus() {
-        override fun toString(): String = "HotspotReady(band=$band, channel=$channel, backend=$backend)"
-    }
-    data object WaitingForPairedIphone : CarPlayStatus()
-    data object ConnectingBluetooth : CarPlayStatus()
-    data object RunningWireless : CarPlayStatus()
-    data object WirelessActive : CarPlayStatus()
-    data object WirelessActiveFallback : CarPlayStatus()
-    data object DiscoveringIphone : CarPlayStatus()
-    data object WaitingForIphone : CarPlayStatus()
-    data object RequestingIphonePermission : CarPlayStatus()
-    data object WaitingForReenumeration : CarPlayStatus()
-    data object SelectingConfiguration : CarPlayStatus()
-    data object OpeningDataPaths : CarPlayStatus()
-    data object Pairing : CarPlayStatus()
-    data object ConnectingControl : CarPlayStatus()
-    data object AttachingNetwork : CarPlayStatus()
-    data object RunningControl : CarPlayStatus()
-    data object TestingUsbNcm : CarPlayStatus()
-    data object ControlEnded : CarPlayStatus()
-    data class Failed(val message: String, val wifiResetRequired: Boolean = false,
-        val startupFailure: WirelessStartupFailure? = null, val retryable: Boolean = true,
-        val usbDirectUnavailable: Boolean = false, val usbNcmTested: Boolean = false,
-        val usbVpnUnavailable: Boolean = false) : CarPlayStatus()
-}
 
 internal fun isWirelessHandoffInProgress(
     handoffRequested: Boolean,
@@ -307,26 +264,13 @@ class CarPlayController(
     @Volatile private var wirelessTunnelChannel: Iap2Session? = null
     @Volatile private var wirelessRuntimeIdentification: Iap2IdentificationConfig? = null
     @Volatile private var wirelessAirPlayEndpoint: Iap2WirelessCarPlayEndpoint? = null
-    @Volatile private var socketService: CarPlaySocketService? = null
-    @Volatile private var socketServiceBound = false
-    @Volatile private var vpnService: CarPlayVpnService? = null
-    private var vpnServiceBound = false
-    private val vpnServiceLatch = CountDownLatch(1)
-    private val vpnServiceLock = Any()
-    private val vpnServiceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            synchronized(vpnServiceLock) {
-                if (closed || !vpnServiceBound) return
-                vpnService = (binder as CarPlayVpnService.LocalBinder).service
-                vpnServiceLatch.countDown()
-            }
-        }
-
-        override fun onServiceDisconnected(name: ComponentName) {
-            synchronized(vpnServiceLock) { vpnService = null }
-            fail(WiredVpnUnavailable("CarPlay VPN service disconnected"))
-        }
-    }
+    private val serviceBindings = CarPlayServiceBindings(
+        appContext, { closed }, ::connectionDiagnostic,
+        onVpnDisconnected = { fail(WiredVpnUnavailable("CarPlay VPN service disconnected")) },
+        onSocketDisconnected = { fail(IphoneUsbException.DeviceUnavailable("CarPlay socket service disconnected")) },
+    )
+    private val socketService get() = serviceBindings.socketService
+    private val vpnService get() = serviceBindings.vpnService
     private val wirelessHandoffRequested = AtomicBoolean(false)
     private val wirelessTunnelReady = AtomicBoolean(false)
     private val wirelessActiveReported = AtomicBoolean(false)
@@ -338,20 +282,7 @@ class CarPlayController(
     private var permissionCloseable: Closeable? = null
     private var attachCloseable: Closeable? = null
     private var ch341PermissionCloseable: Closeable? = null
-    private var socketServiceLatch = CountDownLatch(1)
     private val teardownComplete = CountDownLatch(1)
-
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-            socketService = (binder as CarPlaySocketService.LocalBinder).service
-            socketServiceLatch.countDown()
-        }
-
-        override fun onServiceDisconnected(name: ComponentName) {
-            socketService = null
-            fail(IphoneUsbException.DeviceUnavailable("CarPlay socket service disconnected"))
-        }
-    }
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
@@ -2093,25 +2024,49 @@ class CarPlayController(
     private fun beginReenumeration(device: UsbDevice, fallbackAfterRejection: Boolean = false) {
         phase = Phase.REENUMERATION
         reenumerationAttempts += 1
+        val attempt = reenumerationAttempts
+        val generation = availabilityPollGeneration.get()
+        fun isCurrentAttempt() = !closed && phase == Phase.REENUMERATION &&
+            attempt == reenumerationAttempts && generation == availabilityPollGeneration.get()
         connectionDiagnostic("USB transition requested count=$reenumerationAttempts")
         onStatus(CarPlayStatus.SelectingConfiguration)
         iphoneHost.requestCarPlayReenumerationAsync(device, executor) { transition ->
+            if (!isCurrentAttempt()) return@requestCarPlayReenumerationAsync
             when (transition) {
-                IphoneUsbHost.TransitionResult.ReenumerationRequested ->
+                IphoneUsbHost.TransitionResult.ReenumerationRequested -> mainHandler.post {
+                    if (!isCurrentAttempt()) return@post
                     onStatus(CarPlayStatus.WaitingForReenumeration)
+                    watchReenumeration(device)
+                }
                 is IphoneUsbHost.TransitionResult.Failed -> if (fallbackAfterRejection) {
                     connectionDiagnostic(
                         "USB transition rejected; using the configuration the iPhone offers " +
                             "error=${transition.error.message}",
                     )
                     mainHandler.post {
-                        if (!closed && phase == Phase.REENUMERATION) openDataPaths(device)
+                        if (isCurrentAttempt()) openDataPaths(device)
                     }
                 } else {
                     fail(transition.error)
                 }
             }
         }
+    }
+
+    /** Recheck an unanswered mode request once; a real detach still waits for the next attach. */
+    private fun watchReenumeration(device: UsbDevice) {
+        if (closed || phase != Phase.REENUMERATION) return
+        val attempt = reenumerationAttempts
+        val generation = availabilityPollGeneration.get()
+        mainHandler.postDelayed({
+            if (closed || phase != Phase.REENUMERATION || attempt != reenumerationAttempts ||
+                generation != availabilityPollGeneration.get()) return@postDelayed
+            val listed = iphoneHost.discover().firstOrNull { it.deviceName == device.deviceName } ?: return@postDelayed
+            connectionDiagnostic(
+                "USB transition unanswered after ${REENUMERATION_WAIT_MILLIS}ms count=$attempt; checking the iPhone again",
+            )
+            requestIphonePermission(listed)
+        }, REENUMERATION_WAIT_MILLIS)
     }
 
     private fun onIphoneAttached(device: UsbDevice) {
@@ -2392,8 +2347,7 @@ class CarPlayController(
     private fun attachVpn(ncm: NcmUsbBridge, hostMac: ByteArray, startup: WiredStartupDeadline): CarPlayVpnService {
         onStatus(CarPlayStatus.AttachingNetwork)
         val service = awaitVpnService() ?: throw WiredVpnUnavailable("Could not bind the CarPlay VPN service")
-        return synchronized(vpnServiceLock) {
-            if (closed || vpnService !== service) throw IOException("CarPlay connection closed")
+        return serviceBindings.withVpnService(service) {
             val listener = object : AirPlaySessionListener by sessionListener {
                 override fun onSessionActive(session: AirPlaySession) {
                     if (closed || !startup.sessionEstablished()) { session.close(); return }
@@ -2950,81 +2904,10 @@ class CarPlayController(
     private fun ByteArray.macString(): String =
         joinToString(":") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
-    private fun awaitVpnService(): CarPlayVpnService? {
-        synchronized(vpnServiceLock) {
-            if (closed) return null
-            vpnService?.let { return it }
-            if (!vpnServiceBound) {
-                vpnServiceBound = true
-                try {
-                    if (!appContext.bindService(Intent(appContext, CarPlayVpnService::class.java),
-                            vpnServiceConnection, Context.BIND_AUTO_CREATE)) {
-                        vpnServiceBound = false
-                        vpnServiceLatch.countDown()
-                    }
-                } catch (error: RuntimeException) {
-                    vpnServiceBound = false
-                    vpnServiceLatch.countDown()
-                    connectionDiagnostic("VPN service bind failed failureClass=${error.javaClass.simpleName}")
-                }
-            }
-        }
-        return try {
-            if (vpnServiceLatch.await(SOCKET_SERVICE_CONNECT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) && !closed)
-                vpnService else null
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            null
-        }
-    }
-
-    private fun unbindVpnService(): CarPlayVpnService? = synchronized(vpnServiceLock) {
-        val service = vpnService
-        vpnService = null
-        if (vpnServiceBound) {
-            vpnServiceBound = false
-            runCatching { appContext.unbindService(vpnServiceConnection) }
-        }
-        vpnServiceLatch.countDown() // cancellation also wakes a worker waiting for onServiceConnected
-        service
-    }
-
-    private fun awaitSocketService(): CarPlaySocketService? {
-        socketService?.let { return it }
-        bindSocketService()
-        return try {
-            if (socketServiceLatch.await(SOCKET_SERVICE_CONNECT_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) socketService else null
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            null
-        }
-    }
-
-    private fun bindSocketService() {
-        if (socketServiceBound) return
-        socketServiceBound = true
-        try {
-            val intent = Intent(appContext, CarPlaySocketService::class.java)
-            if (!appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)) {
-                socketServiceBound = false
-                socketServiceLatch.countDown()
-            }
-        } catch (_: Throwable) {
-            socketServiceBound = false
-            socketServiceLatch.countDown()
-        }
-    }
-
-    private fun unbindSocketService() {
-        if (!socketServiceBound) return
-        socketServiceBound = false
-        try {
-            appContext.unbindService(serviceConnection)
-        } catch (_: Exception) {
-            // The service may have already been unbound.
-        }
-        socketService = null
-    }
+    private fun awaitVpnService() = serviceBindings.awaitVpnService()
+    private fun unbindVpnService() = serviceBindings.unbindVpnService()
+    private fun awaitSocketService() = serviceBindings.awaitSocketService()
+    private fun unbindSocketService() = serviceBindings.unbindSocketService()
 
     private fun closeReceivers() {
         listOfNotNull(permissionCloseable, attachCloseable, ch341PermissionCloseable).forEach {
@@ -3215,7 +3098,6 @@ class CarPlayController(
         private const val PROFILE_HEADSET_CLIENT = 16
         private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L
         private const val PAIR_TIMEOUT_MILLIS = 5 * 60_000L
-        private const val SOCKET_SERVICE_CONNECT_TIMEOUT_MILLIS = 10_000L
         private const val WIRELESS_PREFS = "diplay_wireless"
         private const val HOTSPOT_FAMILY_PREFERENCE_KEY = "hotspot_address_family"
         private const val CONTROL_LOOP_TIMEOUT_MILLIS = 5 * 60_000L
@@ -3226,6 +3108,7 @@ class CarPlayController(
         private const val WIRELESS_HANDOFF_TIMEOUT_MILLIS = 45_000L
         private const val RFCOMM_CONNECT_TIMEOUT_MILLIS = 15_000L
         private const val MAXIMUM_REENUMERATION_ATTEMPTS = 2
+        const val REENUMERATION_WAIT_MILLIS = 10_000L
         private const val START_SESSION_PROGRESS = "iap2 tx=0x4301"
         private const val EXECUTOR_CLOSE_TIMEOUT_MILLIS = 2_000L
         private const val ADAPTER_ADDRESS_PLACEHOLDER = "02:00:00:00:00:00"

@@ -22,7 +22,9 @@ jobs:
         with:
           packages: platform-tools platforms;android-37.0 build-tools;36.0.0 ndk;28.2.13676358
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test, lint and build without authentication assets
+      - name: Prepare verified public Android 9 component signing inputs
+        run: python3 scripts/android9_authorization.py --prepare-signing-inputs --fetch-public-aosp-key
+      - name: Test, lint and build with bundled authentication and authorization
         run: ./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintDebug :mobile:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:

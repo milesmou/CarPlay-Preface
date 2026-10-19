@@ -128,15 +128,190 @@ class PrefaceMediaCenterTest {
         assertFalse(api.command(4))
     }
 
-    @Test fun apiLossReleasesTheOldTokenAndDoesNotAutomaticallyStealFocusWhenReadyAgain() {
+    @Test fun initialNotReadyRetainsTheRealPlaybackRequestUntilReady() {
+        center.start(); drain(); play()
+        api.ready(false); drain()
+        api.ready(false); drain()
+        api.ready(true); drain()
+        assertEquals(1, api.registrations)
+        assertEquals(1, api.requests)
+        assertTrue(api.command(4))
+        api.ready(true); drain()
+        center.update(song.copy(elapsedMillis = 1000L), true); drain()
+        assertEquals(1, api.requests)
+    }
+
+    @Test fun apiLossRecoversUninterruptedPlaybackOnceWithANewToken() {
         ready(); play()
+        val oldToken = api.token
         api.ready(false); drain()
         assertFalse(api.command(4))
         assertEquals(1, api.unregistrations)
+        api.ready(false); drain()
+        center.update(song.copy(elapsedMillis = 1000L), true); drain()
+        api.token = Any()
         api.ready(true); drain()
         assertEquals(2, api.registrations)
+        assertEquals(2, api.requests)
+        assertTrue(api.command(4))
+        assertSame(oldToken, api.requestTokens.first())
+        assertSame(api.token, api.requestTokens.last())
+        assertNotSame(api.requestTokens.first(), api.requestTokens.last())
+        api.ready(true); drain()
+        assertEquals(2, api.requests)
+    }
+
+    @Test fun pausingWhileTheApiIsUnavailableCancelsRecoveryEvenIfMetadataLaterSaysPlaying() {
+        ready(); play()
+        api.ready(false); drain()
+        center.update(song.copy(playing = false), true); drain()
+        center.update(song, true); drain()
+        api.ready(true); drain()
         assertEquals(1, api.requests)
         assertFalse(api.command(4))
+    }
+
+    @Test fun losingFocusWhileTheApiIsUnavailableCancelsRecoveryAfterEligibilityReturns() {
+        ready(); play()
+        api.ready(false); drain()
+        center.update(song, false); drain()
+        center.update(song, true); drain()
+        api.ready(true); drain()
+        assertEquals(1, api.requests)
+        assertFalse(api.command(4))
+        play()
+        assertEquals(2, api.requests)
+        assertTrue(api.command(4))
+    }
+
+    @Test fun commandSuppressionWhileTheApiIsUnavailableCancelsTheOldRecovery() {
+        ready(); play()
+        api.ready(false); drain()
+        center.update(song, true, commandsAllowed = false); drain()
+        center.update(song, true, commandsAllowed = true); drain()
+        api.ready(true); drain()
+        assertEquals(1, api.requests)
+        assertFalse(api.command(4))
+    }
+
+    @Test fun disconnectWhileTheApiIsUnavailableDoesNotRecoverForTheReplacementSession() {
+        ready(); play()
+        api.ready(false); drain()
+        center.disconnect(); drain()
+        center.update(song, true); drain()
+        api.ready(true); drain()
+        assertEquals(1, api.requests)
+        assertFalse(api.command(4))
+    }
+
+    @Test fun rejectedPlaybackIsNotRetriedMerelyBecauseTheApiReconnected() {
+        api.acceptPlay = false
+        ready(); play()
+        api.ready(false); drain()
+        api.acceptPlay = true
+        api.ready(true); drain()
+        assertEquals(1, api.requests)
+        assertFalse(api.command(4))
+    }
+
+    @Test fun eligibilityChangesDuringRecoveryIpcRejectTheStaleClaim() {
+        ready(); play()
+        api.ready(false); drain()
+        api.onRequest = {
+            center.update(song, false)
+            center.update(song, true)
+        }
+        api.ready(true); drain()
+        assertEquals(2, api.requests)
+        assertFalse(api.command(4))
+    }
+
+    @Test fun pauseDuringRecoveryIpcRejectsTheStaleClaimEvenIfPlayingMetadataReturns() {
+        ready(); play()
+        api.ready(false); drain()
+        api.onRequest = {
+            center.update(song.copy(playing = false), true)
+            center.update(song, true)
+        }
+        api.ready(true); drain()
+        assertEquals(2, api.requests)
+        assertFalse(api.command(4))
+    }
+
+    @Test fun explicitRetryReplacesTheFailedBackendAndInvalidatesItsReadyAndCommandCallbacks() {
+        val next = FakeBackend()
+        val backends = listOf(api, next)
+        var creations = 0
+        val owner = Any()
+        val owned = PrefaceMediaCenter(Executor { tasks.add(it) }, { backends[creations++] },
+            { sent.add(it) }, log::add)
+        owned.start(); drain()
+        val oldReady = api.ready
+        val oldCommand = api.command
+        api.ready(false); drain()
+        owned.retryInitialization(owner); drain()
+        assertEquals(2, creations)
+        oldReady(true); oldReady(false); drain()
+        assertEquals(0, api.registrations)
+        assertEquals(0, next.registrations)
+        next.ready(true); drain()
+        owned.update(song, true, requestSource = true); drain()
+        assertTrue(next.command(4))
+        assertFalse(oldCommand(4))
+        assertEquals(1, next.requests)
+        next.ready(false); drain()
+        assertEquals(1, next.unregistrations)
+        owned.retryInitialization(owner); drain()
+        assertEquals(2, creations)
+    }
+
+    @Test fun onlyFailedInitializationCanBeRetriedAndClosedCentersCannotRetry() {
+        val owner = Any()
+        center.start(); drain()
+        center.retryInitialization(owner); drain()
+        assertEquals(1, api.initializations)
+        api.ready(true); drain()
+        center.retryInitialization(owner); drain()
+        assertEquals(1, api.initializations)
+        center.close(); drain()
+        center.retryInitialization(Any()); drain()
+        assertEquals(1, api.initializations)
+        assertEquals(1, api.unregistrations)
+    }
+
+    @Test fun aQueuedRetryCannotInitializeAfterItsControllerWasReplaced() {
+        center.start(); drain()
+        api.ready(false); drain()
+        var current = true
+        val owner = Any()
+        center.retryInitialization(owner) { current }
+        current = false
+        drain()
+        assertEquals(1, api.initializations)
+        // A skipped stale callback does not use this owner's one permitted attempt.
+        current = true
+        center.retryInitialization(owner) { current }; drain()
+        assertEquals(2, api.initializations)
+    }
+
+    @Test fun initializationExceptionsAndMissingSdkCanBeRetriedOncePerOwner() {
+        api.initializationFailure = IllegalStateException("private details")
+        center.start(); drain()
+        val first = Any()
+        center.retryInitialization(first); drain()
+        center.retryInitialization(first); drain()
+        assertEquals(2, api.initializations)
+        api.initializationFailure = NoClassDefFoundError("missing SDK")
+        val second = Any()
+        center.retryInitialization(second); drain()
+        assertEquals(3, api.initializations)
+        assertTrue(center.report().contains("init-unavailable:NoClassDefFoundError"))
+        api.initializationFailure = null
+        center.retryInitialization(Any()); drain()
+        assertEquals(4, api.initializations)
+        api.ready(true); drain()
+        assertEquals(1, api.registrations)
+        assertEquals(0, api.requests)
     }
 
     @Test fun permissionFailureIsReportedWithoutExceptionMessageOrToken() {
@@ -189,6 +364,7 @@ class PrefaceMediaCenterTest {
         lateinit var command: (Int) -> Boolean
         var token: Any? = Any()
         var failure: Exception? = null
+        var initializationFailure: Throwable? = null
         var onRegister: () -> Unit = {}
         var onRequest: () -> Unit = {}
         var acceptPlay = true
@@ -196,11 +372,17 @@ class PrefaceMediaCenterTest {
         var requests = 0
         var unregistrations = 0
         var disconnections = 0
+        var initializations = 0
         val publications = mutableListOf<CarPlayNowPlaying>()
+        val requestTokens = mutableListOf<Any>()
         override fun init(snapshot: () -> PrefaceMediaCenter.Snapshot, command: (Int) -> Boolean,
-            ready: (Boolean) -> Unit) { this.command = command; this.ready = ready }
+            ready: (Boolean) -> Unit) {
+            initializations++
+            initializationFailure?.let { throw it }
+            this.command = command; this.ready = ready
+        }
         override fun register(): Any? { registrations++; failure?.let { throw it }; onRegister(); return token }
-        override fun requestPlay(token: Any): Boolean { requests++; onRequest(); return acceptPlay }
+        override fun requestPlay(token: Any): Boolean { requests++; requestTokens.add(token); onRequest(); return acceptPlay }
         override fun publish(token: Any, info: CarPlayNowPlaying): Boolean { publications.add(info); return true }
         override fun disconnect() { disconnections++ }
         override fun unregister(token: Any): Boolean { unregistrations++; return true }

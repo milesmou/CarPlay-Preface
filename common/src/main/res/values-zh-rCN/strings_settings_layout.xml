@@ -6,9 +6,9 @@
     <string name="settings_navigation">导航</string>
     <string name="settings_vehicle">车辆</string>
     <string name="settings_advanced">实验性</string>
-    <string name="settings_advanced_subtitle">集中管理实验性功能，启用前请确认适用条件。</string>
+    <string name="settings_advanced_subtitle">按需开启，异常时关闭。</string>
     <string name="settings_advanced_caution_title">请谨慎更改</string>
-    <string name="settings_advanced_caution_description">这些功能可能取决于车辆固件、ADB 权限或 CarPlay 的实验性行为。日常设置位于上方各类别中。</string>
+    <string name="settings_advanced_caution_description">部分功能依赖车机固件或授权，可能影响声音、画面或连接。</string>
     <string name="settings_search">搜索</string>
     <string name="settings_open_category">打开%1$s设置</string>
     <string name="settings_ready_connected">CarPlay 正在运行。需要重新连接的更改会特别说明。</string>

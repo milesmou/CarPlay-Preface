@@ -10,8 +10,6 @@ On Android 9 and earlier, **Save diagnostic report** asks for storage access and
 
 Microphone access supports Siri and calls. Bluetooth/Nearby devices and Wi-Fi/Location permissions support discovery and transport. The optional local VPN permission supports the USB link; it does not provide a remote internet VPN.
 
-The verified DiLink 5.1 cluster profile optionally uses Android Usage Access to follow theme and mini-map-card visibility. This permission exposes app-activity history. DiPlay filters the results to four stock BYD cluster activities, processes them locally, and logs only inferred cluster theme/visibility changes. Unrelated activity events are not retained or uploaded. Automatic mode is opt-in; disabling it stops these queries. Usage Access can also be revoked as described in [BYD navigation](BYD_NAVIGATION.md#dilink-51-theme-profile).
-
 DiPlay checks GitHub's public release list for updates once a day and shortly after it opens. The request carries DiPlay's version in its user agent and no other data, and GitHub sees the head unit's IP address. Nothing is downloaded or installed without your tap, and **About** turns the background check off. A downloaded update is verified against its published checksum; on Android 10 and later it is also copied to `Download/DiPlay`.
 
 The static website has no analytics script or account. GitHub Pages, GitHub and Telegram apply their own policies when you use those services.

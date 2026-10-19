@@ -259,34 +259,19 @@ class WheelKeyServiceTest {
 
     @Test
     @Config(sdk = [25, 29])
-    fun volumeKeysDelegateWhileEligibleAndKeepConsumedPressPairedAfterOwnershipEnds() {
+    fun volumeKeysStayWithTheCarDespiteTheOldSavedVolumeOption() {
         WheelZoomSettings.setEnabled(service, false)
         service.session = { "phone" }
-        var eligible = false
-        val steps = mutableListOf<Int>()
-        service.volumeEligible = { eligible }
-        service.adjustVolume = { steps += it; true }
-        fun event(action: Int, time: Long, repeat: Int = 0) = KeyEvent(time, time, action,
-            KeyEvent.KEYCODE_VOLUME_UP, repeat)
-        fun dispatch(event: KeyEvent): Boolean = service.javaClass
-            .getDeclaredMethod("onKeyEvent", KeyEvent::class.java).apply { isAccessible = true }
-            .invoke(service, event) as Boolean
-        assertFalse(dispatch(event(KeyEvent.ACTION_DOWN, 1)))
-        eligible = true // The current session supplies the captured volume policy.
-        assertTrue(dispatch(event(KeyEvent.ACTION_DOWN, 2)))
-        assertEquals(listOf(1), steps)
-        eligible = false
-        assertTrue(dispatch(event(KeyEvent.ACTION_DOWN, 2, 1)))
-        assertTrue(dispatch(event(KeyEvent.ACTION_UP, 2)))
-        assertEquals(listOf(1), steps)
-        assertFalse(dispatch(event(KeyEvent.ACTION_DOWN, 3)))
-        service.adjustVolume = { false }
-        eligible = true
-        assertFalse(dispatch(event(KeyEvent.ACTION_DOWN, 4)))
-        assertFalse(dispatch(event(KeyEvent.ACTION_DOWN, 5)))
-        eligible = false
-        assertFalse(dispatch(event(KeyEvent.ACTION_DOWN, 6)))
-        assertEquals(listOf(1), steps)
+        service.getSharedPreferences("diplay_navigation_wheel", Context.MODE_PRIVATE)
+            .edit().putBoolean("enabled", true).commit()
+        for (code in listOf(24, 25, 291, 292, 307, 308)) {
+            for ((action, repeat) in listOf(KeyEvent.ACTION_DOWN to 0, KeyEvent.ACTION_DOWN to 1, KeyEvent.ACTION_UP to 0)) {
+                val event = KeyEvent(1, 1, action, code, repeat)
+                assertFalse("code=$code action=$action repeat=$repeat", service.javaClass
+                    .getDeclaredMethod("onKeyEvent", KeyEvent::class.java).apply { isAccessible = true }
+                    .invoke(service, event) as Boolean)
+            }
+        }
     }
 
 }

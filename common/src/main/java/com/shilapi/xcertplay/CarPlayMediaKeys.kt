@@ -63,7 +63,6 @@ internal object CarPlayMediaKeys {
     private var focusHeld = false
     private var appContext: Context? = null
     private var mediaAudioActive = false
-    private var adaptiveVolumeForSession = true
     private val learnedHeld = mutableSetOf<Pair<String, Int>>()
     // A long-click broadcast can precede physical UP by seconds. Retain its acceptance
     // until each observed press is released, independently of the short echo window.
@@ -134,12 +133,12 @@ internal object CarPlayMediaKeys {
     @Synchronized
     fun attach(context: Context, next: CarPlayController, diagnostic: (String) -> Unit = {},
         mediaOwner: Any = next, foreground: () -> Boolean = { false }) {
+        val changingController = controller !== next
         val adoptingStartupRegistration = controller == null && mediaCenter != null
         if (controller !== next) {
             releaseLocked(keepStartupRegistration = true)
             learnedHeld.clear()
             siriHandledPresses.clear()
-            adaptiveVolumeForSession = NavigationWheelSettings.enabled(context)
             artworkOwner = artworkQueue.newSession()
             mediaAudioOwner = mediaOwner
             lateinit var ownedCallback: CarPlayMediaCallback
@@ -164,6 +163,9 @@ internal object CarPlayMediaKeys {
             reportDiagnostic("OEM media center startup registration adopted")
         }
         initialize(context)
+        if (changingController && !next.usesCarBluetoothAudio) mediaCenter?.retryInitialization(next) {
+            synchronized(this) { controller === next && !next.usesCarBluetoothAudio }
+        }
         next.playbackListener = { playing ->
             onIphonePlaying(next, playing)
         }
@@ -444,7 +446,6 @@ internal object CarPlayMediaKeys {
 
     private fun reportDiagnostic(message: String) { WheelKeyLog.note(message); runCatching { diagnostic(message) } }
 
-    internal fun reportWheelVolume(message: String) = reportDiagnostic(message)
 
     @Synchronized
     fun report(): String = "Media keys controllerAttached=${controller != null} mediaSessionActive=${session?.isActive == true} " +
@@ -702,14 +703,6 @@ internal object CarPlayMediaKeys {
         appContext?.let { mediaOwnerEligible() && !inCall(it) } == true
 
     internal fun usesCarBluetoothAudio(): Boolean = synchronized(this) { controller?.usesCarBluetoothAudio == true }
-
-    internal fun iphoneMediaPlaying(): Boolean? = synchronized(this) { controller }?.mediaPlayingSnapshot()
-
-    internal fun volumeKeysEligible(context: Context): Boolean =
-        synchronized(this) { adaptiveVolumeForSession } && trackKeysEligible() &&
-            !WheelKeyService.volumeKeysReserved() &&
-            !com.shilapi.xcertplay.media.NavigationPlayback.snapshot().priorityVoiceActive &&
-            (lastPrefaceSiriRequest?.let { SystemClock.uptimeMillis() - it < 1500L } != true)
 
     private fun requestSiriForPress(code: Int): Boolean {
         if (!siriKeyEligible()) return false

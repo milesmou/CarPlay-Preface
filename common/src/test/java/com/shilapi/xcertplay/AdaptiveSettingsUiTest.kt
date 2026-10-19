@@ -127,13 +127,19 @@ class AdaptiveSettingsUiTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun compactBluetoothMusicLargeFontScreenshot() = captureBluetoothMusic("compact")
 
+    @Test
+    @Config(sdk = [28], qualifiers = "ar-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun rtlBluetoothMusicLargeFontScreenshot() = captureBluetoothMusic("rtl")
+
     private fun captureBluetoothMusic(size: String) {
+        if (size == "compact") InterfaceSize.save(context, 100)
         context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
             fontScale = 1.5f
         }, context.resources.displayMetrics)
         val screen = openSettings()
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
-            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.AUDIO))
         val frame = screen.findViewById<ViewGroup>(android.R.id.content)
         repeat(3) {
             descendants(frame).forEach { it.forceLayout() }
@@ -143,21 +149,46 @@ class AdaptiveSettingsUiTest {
             shadowOf(Looper.getMainLooper()).idle()
         }
         val title = screen.getString(R.string.settings_music_wheel_mode)
-        assertEquals(MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME, MusicWheelMode.load(context))
+        assertEquals("音频方案", title)
+        assertEquals(MusicWheelMode.CARPLAY, MusicWheelMode.load(context))
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
-        val target = texts(screen).first { it.text.startsWith("$title · ") }
-        val rect = android.graphics.Rect(0, 0, target.width, target.height)
-        scroll.offsetDescendantRectToMyCoords(target, rect)
-        scroll.scrollTo(0, rect.top)
-        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(texts(screen).any { it.text.startsWith("$title · ") })
+        if (size == "rtl") {
+            val copy = mapOf(
+                screen.getString(R.string.settings_music_wheel_mode) to "مخطط الصوت",
+                screen.getString(R.string.settings_music_wheel_system_description) to "استخدم صوت CarPlay وأزرار الوسائط، وتتحكم السيارة في مستوى الصوت.",
+                screen.getString(R.string.settings_music_wheel_next_connection) to "يسري عند الاتصال التالي، ويستمر الاتصال الحالي.",
+            )
+            descendants(frame).forEach { view ->
+                view.layoutDirection = View.LAYOUT_DIRECTION_RTL
+                if (view is TextView) {
+                    copy[view.text.toString()]?.let { view.text = it }
+                    if (view.text.startsWith(screen.getString(R.string.settings_music_wheel_mode) + " · "))
+                        view.text = "مخطط الصوت · صوت CarPlay"
+                }
+            }
+        }
+        descendants(frame).forEach { it.forceLayout() }
+        frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+        frame.layout(0, 0, 1920, 720)
+        // Capture the page from its start so the first card and its heading remain visible.
+        scroll.scrollTo(0, 0)
         assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+        assertEquals(if (size == "compact") 320 else 160, screen.resources.displayMetrics.densityDpi)
+        assertEquals(1.5f, screen.resources.configuration.fontScale, 0.001f)
         val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
         frame.draw(android.graphics.Canvas(bitmap))
-        val directory = java.io.File("../agent_docs/screenshots/bluetooth-music-wheel").apply { mkdirs() }
+        val directory = java.io.File("../agent_docs/screenshots/audio-scheme").apply { mkdirs() }
         java.io.File(directory, "$size-font150.png").outputStream().use {
             assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
         }
         bitmap.recycle()
+        java.io.File(directory, "$size-font150.json").writeText(org.json.JSONObject()
+            .put("source", "Robolectric/API28 native test render; not installed APK or vehicle screenshot")
+            .put("width", 1920).put("height", 720).put("fontScale", 1.5)
+            .put("densityDpi", screen.resources.displayMetrics.densityDpi)
+            .put("interfaceSize", if (size == "compact") "100%" else "星瑞 12.3 英寸").put("rtlArabicFixture", size == "rtl").toString(2))
     }
 
     @Test fun bluetoothMusicSwitchSavesForNextConnectionWithoutStoppingTheCurrentSession() {
@@ -168,17 +199,19 @@ class AdaptiveSettingsUiTest {
             CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, false, false, 1920, 720)) { stops++ }
         try {
             CarPlayBackgroundSession.active = true
-            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.EXPERIMENTAL)
+            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.AUDIO)
             ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
             val setting = texts(screen).single { it.text.startsWith(screen.getString(R.string.settings_music_wheel_mode) + " · ") }
             assertFalse(descendants(screen.window.decorView).filterIsInstance<Switch>().any {
-                it.contentDescription == screen.getString(R.string.settings_car_bluetooth_audio) ||
-                    it.contentDescription == screen.getString(R.string.settings_navigation_wheel_volume)
+                it.contentDescription == screen.getString(R.string.settings_car_bluetooth_audio)
             })
             setting.performClick()
             val dialog = ShadowAlertDialog.getLatestAlertDialog()
-            assertEquals(3, dialog.listView.adapter.count)
-            assertEquals(MusicWheelMode.CARPLAY_ADAPTIVE_VOLUME.ordinal, dialog.listView.checkedItemPosition)
+            assertEquals(2, dialog.listView.adapter.count)
+            assertEquals(listOf("CarPlay 音频", "蓝牙音频"), (0 until dialog.listView.adapter.count).map {
+                dialog.listView.adapter.getItem(it).toString()
+            })
+            assertEquals(MusicWheelMode.CARPLAY.ordinal, dialog.listView.checkedItemPosition)
             shadowOf(dialog).clickOnItem(MusicWheelMode.CAR_BLUETOOTH.ordinal)
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             shadowOf(Looper.getMainLooper()).idle()
@@ -346,7 +379,11 @@ class AdaptiveSettingsUiTest {
         if (withoutPhone) ReflectionHelpers.setField(screen, "setupError", null)
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
             ReflectionHelpers.ClassParameter(SettingsCategory::class.java,
-                if (withoutPhone) SettingsCategory.CONNECTION else SettingsCategory.EXPERIMENTAL))
+                when {
+                    withoutPhone -> SettingsCategory.CONNECTION
+                    volume -> SettingsCategory.AUDIO
+                    else -> SettingsCategory.EXPERIMENTAL
+                }))
         layoutRoot(screen)
         assertFalse(texts(screen).any { it.text.toString().contains("外接控制器") })
         if (withoutMap) {
@@ -753,7 +790,7 @@ class AdaptiveSettingsUiTest {
             listOf(ConnectedPhone("AA:BB:CC:DD:EE:FF", "My iPhone"))))
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
 
-        assertTrue(texts(screen).any { it.text.toString() == "My iPhone · ${screen.getString(R.string.home_bluetooth_connected)}" && it.isEnabled })
+        assertTrue(texts(screen).any { it.text.toString() == "My iPhone · ${screen.getString(R.string.wireless_carplay)}" && it.isEnabled })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.choose_iphone) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_connect_usb) })
         assertFalse(texts(screen).any { it.text.toString().contains("选择你的 iPhone") })
@@ -924,7 +961,7 @@ class AdaptiveSettingsUiTest {
             val lp = button.layoutParams as LinearLayout.LayoutParams
             assertEquals(button.text.toString(), dp(60), lp.height)
             assertEquals(button.text.toString(), 0, lp.topMargin)
-            assertTrue(button.text.toString(), lp.bottomMargin in setOf(0, dp(6), dp(12)))
+            assertTrue(button.text.toString(), lp.bottomMargin in setOf(0, dp(6), dp(20)))
         }
         val page = scroll.getChildAt(0)
         assertFalse(descendants(scroll).any { it.tag == "spacer" && it.parent !== page })
@@ -948,7 +985,7 @@ class AdaptiveSettingsUiTest {
         val card = chooseImage.parent as LinearLayout
         val preview = card.getChildAt(card.indexOfChild(chooseImage) - 1)
 
-        assertEquals(Math.round(12 * screen.resources.displayMetrics.density),
+        assertEquals(Math.round(20 * screen.resources.displayMetrics.density),
             (preview.layoutParams as LinearLayout.LayoutParams).bottomMargin)
     }
 
@@ -1008,7 +1045,7 @@ class AdaptiveSettingsUiTest {
         screen.onBackPressedDispatcher.onBackPressed()
 
         assertEquals("home", ReflectionHelpers.getField<String>(screen, "page"))
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.home_connected_devices) })
+        assertTrue(texts(screen).any { it.text == screen.getString(R.string.home_connection_hint) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_quick_settings) })
     }
 
@@ -1053,14 +1090,13 @@ class AdaptiveSettingsUiTest {
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.save_diagnostic_report) })
     }
 
-    @Test fun displayOpensPictureAdjustments() {
+    @Test fun settingsDoNotOfferPictureAdjustments() {
         val screen = openSettings()
-        descendants(screen.window.decorView)
-            .single { it.contentDescription == screen.getString(R.string.settings_open_category,
-                screen.getString(R.string.settings_display)) }
-            .performClick()
-
-        assertTrue(texts(screen).any { it.text == screen.getString(R.string.picture_adjustments) })
+        for (category in SettingsCategory.entries) {
+            ReflectionHelpers.setField(screen, "settingsCategory", category)
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            assertFalse(category.name, texts(screen).any { it.text == screen.getString(R.string.picture_adjustments) })
+        }
     }
 
     @Test fun settingsLiveWhereDriversLookForThem() {
@@ -1108,8 +1144,10 @@ class AdaptiveSettingsUiTest {
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)
         assertTrue(vehicle.any { it.startsWith(text(R.string.settings_wheel_siri) + " · ") })
         assertTrue(text(R.string.settings_wheel_keys) in vehicle)
-        assertTrue(text(R.string.settings_music_wheel_mode) in advanced)
-        assertFalse(text(R.string.settings_music_wheel_mode) in audio)
+        assertFalse(text(R.string.settings_music_wheel_mode) in advanced)
+        assertTrue(text(R.string.settings_music_wheel_mode) in audio)
+        assertEquals("音频方案", text(R.string.settings_music_wheel_mode))
+        assertTrue(audio.indexOf(text(R.string.settings_music_wheel_mode)) < audio.indexOf(text(R.string.audio_routing)))
         assertFalse(text(R.string.settings_music_wheel_mode) in vehicle)
         assertFalse(text(R.string.settings_ambient_title) in advanced)
         assertFalse(text(R.string.settings_ambient_title) in audio)
@@ -1491,8 +1529,9 @@ class AdaptiveSettingsUiTest {
     @Test fun unsupportedPageEntryUsesHomeConnectionActions() {
         val screen = openConnectionSetupFromSettings()
         assertEquals(WirelessHotspotMode.LOCAL_ONLY_HOTSPOT, WirelessHotspotMode.LOCAL_ONLY_HOTSPOT)
-        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.home_connected_devices) })
-        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.home_usb_waiting) })
+        assertEquals(1, texts(screen).count { it.text == screen.getString(R.string.home_connection_hint) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.home_connected_devices) })
+        assertFalse(texts(screen).any { it.text == screen.getString(R.string.home_usb_waiting) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_connect_usb) })
         assertFalse(texts(screen).any { it.text == screen.getString(R.string.settings_temporary_hotspot) })
         assertFalse(texts(screen).any { it.text.contains("车载热点") || it.text.contains("Wi-Fi Direct") || it.text.contains("同一局域网") })

@@ -10,7 +10,7 @@
 - 本次上游参考：v0.2.20，`3c95c936859e8a9153f0040caf2337adddb9e3e4`。
 - 上游仓库：[shihabal3amri/DiPlay](https://github.com/shihabal3amri/DiPlay)，[发布记录](https://github.com/shihabal3amri/DiPlay/releases/tag/v0.2.20)。
 - 基于本地 `3b4f24548ec6ad011b4d50ffc988a1c2ac75bf07` 及已有未提交修改，逐功能移植，未整分支 merge 或整文件覆盖本地连接实现。
-- 用户要求合并[评估](UPSTREAM_REVIEW_0.2.20.md)第一批及第二批全部适用点。第二批中的热点误报和听筒回退也按本地边界引入；“明确不引入”部分继续排除。
+- 用户授权分两批移植下表适用点；热点误报和听筒回退也按本地边界引入，“明确不引入”部分继续排除。
 
 ## 已移植
 

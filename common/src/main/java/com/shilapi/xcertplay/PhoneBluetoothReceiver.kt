@@ -13,11 +13,11 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 
-/** Optional wake-up path for the selected iPhone; receiver-side profiles supplement ACL. */
+/** Automatic connection uses the phone from the connected event; receiver profiles supplement ACL. */
 class PhoneBluetoothReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val source = ACTIONS[intent.action] ?: return
-        if (!DiPlayPreferences.connectOnPhoneBluetooth(context)) return
+        if (!DiPlayPreferences.autoConnect(context)) return
         fun skip(reason: String) { PhoneWakeDiagnostics.observe(context, source, reason) }
         val disconnected = intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED
         if (!disconnected && intent.action != BluetoothDevice.ACTION_ACL_CONNECTED &&
@@ -25,7 +25,6 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
             skip("not-connected"); return
         }
         val selected = DiPlayPreferences.phoneAddress(context)
-        if (selected == null) { skip("no-selected-phone"); return }
         if (Build.VERSION.SDK_INT >= 31 &&
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             skip("permission-missing"); return
@@ -39,7 +38,14 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         if (device == null) { skip("device-missing"); return }
         val address = runCatching { device.address }.getOrNull()
         if (address == null) { skip("address-unavailable"); return }
-        if (!address.equals(selected, ignoreCase = true)) { skip("other-phone"); return }
+        if (!disconnected) {
+            val major = runCatching { device.bluetoothClass?.majorDeviceClass }.getOrNull()
+            if (major != null && major !in setOf(android.bluetooth.BluetoothClass.Device.Major.PHONE,
+                    android.bluetooth.BluetoothClass.Device.Major.UNCATEGORIZED, android.bluetooth.BluetoothClass.Device.Major.MISC)) {
+                skip("not-phone"); return
+            }
+        }
+        if (!disconnected && ConnectionAutoStart.paused) { skip("cancelled-on-home"); return }
         if (!disconnected && UsbAutoConnect.priorityDevice(context) != null) {
             skip("usb-priority")
             UsbAutoConnect.request(context)
@@ -48,7 +54,7 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE)
         if (disconnected) {
-            prefs.edit().remove("last_launch_elapsed").apply()
+            if (address.equals(selected, true)) prefs.edit().remove("last_launch_elapsed").apply()
             skip("disconnected"); return
         }
 
@@ -70,10 +76,11 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
             now >= previous && now - previous < 15_000) {
             skip("debounced"); return
         }
+        DiPlayPreferences.savePhone(context, address, runCatching { device.name }.getOrNull() ?: "iPhone")
         prefs.edit().putLong("last_launch_elapsed", now).putString("phone", address).putInt("boot", boot).commit()
         PhoneWakeDiagnostics.observe(context, source, "matched")
         PhoneWakeDiagnostics.record(context, "matched")
-        val launch = Intent(context, DiPlayActivity::class.java).apply {
+        val launch = ConnectionAutoStart.stamp(Intent(context, DiPlayActivity::class.java)).apply {
             putExtra(EXTRA_AUTO_CONNECT, true)
             putExtra(EXTRA_PHONE_ADDRESS, address)
             putExtra(EXTRA_WAKE_ELAPSED, now)
@@ -100,11 +107,12 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
             "android.bluetooth.avrcp-controller.profile.action.CONNECTION_STATE_CHANGED" to "avrcp-controller",
             "android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED" to "headset-client")
 
-        /** Application lifetime: receives profile broadcasts while the launcher is in the background. */
+        /** ACL uses the manifest receiver; receiver-side profiles supplement it while this process lives. */
         fun register(context: Context) {
             runCatching {
                 ContextCompat.registerReceiver(context, PhoneBluetoothReceiver(),
-                    IntentFilter().apply { ACTIONS.keys.forEach(::addAction) }, ContextCompat.RECEIVER_EXPORTED)
+                    IntentFilter().apply { ACTIONS.keys.filter { it != BluetoothDevice.ACTION_ACL_CONNECTED &&
+                        it != BluetoothDevice.ACTION_ACL_DISCONNECTED }.forEach(::addAction) }, ContextCompat.RECEIVER_EXPORTED)
             }.onFailure { PhoneWakeDiagnostics.record(context, "receiver-registration-failed", it) }
         }
     }
@@ -131,7 +139,7 @@ internal object PhoneWakeDiagnostics {
     fun report(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val at = prefs.getLong("at", 0)
-        val state = "enabled=${DiPlayPreferences.connectOnPhoneBluetooth(context)} " +
+        val state = "enabled=${DiPlayPreferences.autoConnect(context)} " +
             "selectedPhone=${DiPlayPreferences.phoneAddress(context) != null} " +
             "lastEventSource=${prefs.getString("eventSource", "none")} " +
             "lastEventDecision=${prefs.getString("eventDecision", "none")} " +

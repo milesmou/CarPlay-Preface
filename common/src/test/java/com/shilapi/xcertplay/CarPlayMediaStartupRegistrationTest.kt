@@ -174,6 +174,38 @@ class CarPlayMediaStartupRegistrationTest {
         assertEquals(1, backend.requests)
     }
 
+    @Test fun newCarPlayControllerRetriesFailedStartupOnceWithoutRetryingMetadataOrSameController() {
+        backend.autoReady = false
+        initialize(); drain()
+        backend.ready(false); drain()
+        val phone = attach(); drain()
+        assertEquals(2, factories)
+        backend.ready(false); drain()
+        CarPlayMediaKeys.attach(app, phone) { true }
+        CarPlayBackgroundSession.active = true
+        CarPlayMediaKeys.onMediaAudioChanged(true, phone); drain()
+        assertEquals(2, factories)
+        CarPlayMediaKeys.detach(phone); drain()
+        CarPlayMediaKeys.attach(app, phone) { true }; drain()
+        assertEquals(2, factories)
+        attach(); drain()
+        assertEquals(3, factories)
+        assertEquals(0, backend.requests)
+    }
+
+    @Test fun bluetoothControllerDoesNotRetryTheFailedOemMediaInitialization() {
+        backend.autoReady = false
+        initialize(); drain()
+        backend.ready(false); drain()
+        val phone = mock(CarPlayController::class.java)
+        controller = phone
+        `when`(phone.usesCarBluetoothAudio).thenReturn(true)
+        `when`(phone.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        CarPlayMediaKeys.attach(app, phone) { true }; drain()
+        assertEquals(1, factories)
+        assertEquals(0, backend.requests)
+    }
+
     @Test fun disconnectRetainsTheProcessTokenAndTheNextSessionMustClaimPlaybackAgain() {
         initialize(); drain()
         val first = attach()

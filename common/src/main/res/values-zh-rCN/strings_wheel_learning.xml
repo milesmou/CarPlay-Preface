@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_wheel_learning_hint">可学习、恢复默认或停用上一曲、下一曲和 Siri 按键。点“学习按键”后，请在 10 秒内按键；仅能学习应用收到的按键。电话、音量、系统及文字输入键不可分配。停用仅停止应用转发，原车动作仍保留；蓝牙方案的媒体键归原车。修改无需重连 CarPlay。</string>
+    <string name="settings_wheel_learning_hint">点按功能可学习、恢复或停用，修改立即生效。仅支持应用收到的按键；电话、音量及系统／输入键不可分配。停用不影响原车动作，蓝牙媒体键仍归原车。</string>
     <string name="settings_wheel_previous">上一曲按键</string>
     <string name="settings_wheel_next">下一曲按键</string>
     <string name="settings_wheel_siri">Siri 按键</string>

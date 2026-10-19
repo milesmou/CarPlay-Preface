@@ -21,10 +21,10 @@ import org.robolectric.annotation.Implementation
  * Settings saved while it was in the background must reach the next handshake.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [29], manifest = Config.NONE, shadows = [HostConnectionSettingsRefreshTest.Bootstrap::class, HostConnectionSettingsRefreshTest.ForbiddenVpn::class])
+@Config(sdk = [29], manifest = Config.NONE, shadows = [HostConnectionSettingsRefreshTest.Bootstrap::class, HostConnectionSettingsRefreshTest.PreparedVpn::class])
 class HostConnectionSettingsRefreshTest {
-    @Test fun usbStartupDoesNotRequestVpnConsent() {
-        ForbiddenVpn.prepareCalls = 0
+    @Test fun usbStartupPreparesItsLocalVpnAuthorization() {
+        PreparedVpn.prepareCalls = 0
         val activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).create()
         try {
             val host = activity.get()
@@ -32,23 +32,25 @@ class HostConnectionSettingsRefreshTest {
             org.robolectric.util.ReflectionHelpers.setField(host, "locationReportingEnabled", false)
             org.robolectric.util.ReflectionHelpers.setField(host, "activeDisplaySize", null)
             org.robolectric.util.ReflectionHelpers.callInstanceMethod<Unit>(host, "requestStartupPrerequisites")
-            assertEquals(0, ForbiddenVpn.prepareCalls)
+            assertEquals(1, PreparedVpn.prepareCalls)
         } finally { activity.destroy() }
     }
 
     @Implements(android.net.VpnService::class)
-    class ForbiddenVpn {
+    class PreparedVpn {
         companion object {
             var prepareCalls = 0
             @JvmStatic @Implementation fun prepare(context: Context): android.content.Intent? {
                 prepareCalls++
-                throw AssertionError("USB must not request VPN authorization")
+                return null
             }
         }
     }
     private val app get() = RuntimeEnvironment.getApplication()
 
     @Before fun setUp() {
+        UsbAutoConnect.resetForTest()
+        CarPlayBackgroundSession.clear()
         app.getSharedPreferences("xcertplay_airplay", Context.MODE_PRIVATE).edit().clear().commit()
     }
 
@@ -79,7 +81,7 @@ class HostConnectionSettingsRefreshTest {
     /** The projection screen must start without the private MFi identity used by real cars. */
     @Implements(DiPlayBootstrap::class, isInAndroidSdk = false)
     internal class Bootstrap {
-        @Implementation fun ensure(context: Context) = Unit
+        @Implementation fun ensure(context: Context, mfiTarget: com.shilapi.xcertplay.orchestration.MfiTarget) = Unit
 
         @Implementation fun deviceId(identity: AirPlayIdentity): String = "02:00:00:00:00:01"
     }

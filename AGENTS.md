@@ -11,7 +11,7 @@ Instructions for coding agents that work on CarPlay-Preface.
 5. 无线连接提供“临时热点”和“手动车机热点”二选一，默认使用 Android `LocalOnlyHotspot` 临时热点。手动模式选择后，应用尝试使用系统保存配置开启车机热点；用户保存匹配的 SSID 和密码。保留权限和接口检查，无法开启时提示原因及系统设置入口；不修改热点配置或自动关闭热点，存在 CarPlay 会话时不操作热点开关。临时热点使用公共 API 与系统分配的名称、密码、频段；手动断开 CarPlay 后保留本应用仍有效的预约，手动重连或重建连接前复核接口和地址，有效则复用原名称与密码，失效才重建。完全退出、重置临时热点或改用 USB／手动热点时仅释放本应用的预约，不关闭其他应用或系统持有的热点。预约仅在本进程内保留，进程结束后重新检查并申请。两种模式均保留权限、接口归属和运行状态检查，不猜测信道；不引入 Wi-Fi Direct 或现有 Wi-Fi／同一局域网模式，正式发布前不保留旧配置迁移代码。设置变更在下一次连接生效，不擅自中断正在运行的 CarPlay。
 6. 用户已确认实际车机为 **2023 款星瑞、12.3 英寸中控屏、1920×720 像素、横屏**。应用“界面大小 → 星瑞 12.3 英寸”使用该屏幕的 160 dpi 应用逻辑密度基准（不是硬件物理 PPI，也不修改系统密度），并作为默认选项；界面大小仅保留星瑞 12.3 英寸、75%、100%、125%、150%，移除自动及 200% 模式，缺失或无效保存值使用星瑞选项，保留有效百分比选择与系统字体大小，详见 `docs/PREFACE_SCREEN_LAYOUT.md`。后续车机界面测试和截图固定使用 **1920×720 横屏**，不使用竖屏截图验证车机界面；高密度、大字体和窄可用窗口场景也必须保持横屏，在同一分辨率下通过密度、字体比例或可用窗口约束验证。1920×720 是像素分辨率，不是 dp 尺寸；控件仍使用 dp，并根据运行时密度、系统栏及分屏后的实际可用窗口适配。用户预览优先交付已安装 APK 的原始截图，记录设备、版本、密度、字体及界面大小；单元测试渲染图必须标明来源，不作为实际运行截图交付。可使用 `scripts/capture_ui_preview.py` 检查页面和参数后截图。
 
-7. 按用户 2026-10-16 的最新要求，USB 恢复官方 DiPlay v0.2.20 的 **NCM＋本地 VPN/TUN** 方案（来源提交 `3c95c936859e8a9153f0040caf2337adddb9e3e4`），不依赖 root 或系统预先创建的 NCM 网卡。USB 启动时按需请求系统 VPN 授权，应用仅接管当前 iPhone 的 NCM 接口，TUN 只允许本应用且仅路由 `fe80::/64`，不连接远程 VPN 服务器、不回退为全设备 VPN。保留 USB 授权、活动配置、配对、认证和会话检查；授权拒绝／组件缺失、TUN 建立失败或桥接错误明确失败并停止自动重试，不伪造授权、不自动通过 ADB 修改 VPN app-op。无线继续使用普通 socket 服务，不申请 VPN 或创建 TUN。退出、取消、拔线及授权撤销释放本应用持有的 NCM/TUN/监听资源。旧系统网卡路径与失败后的独立原始帧测试不再接入 USB 主流程，避免与实时桥接争抢接口。设置中的“授权”保留手动系统设置／VPN 入口，顶部说明主 APK 已内置授权组件，兼容且缺失时由用户点击安装并确认系统提示；页面渲染、搜索及恢复时不调用 `VpnService.prepare()`，手动 VPN 按钮只授权，不启动连接。USB 启动及该次授权返回可以调用准备接口。详见 `docs/USB_VPN_RESTORE_0.2.20.md`、`docs/SYSTEM_AUTHORIZATION.md`。应用实现与实车验证分别记录，不将恢复上游方案描述为星瑞实车连接已修复。
+7. 按用户 2026-10-16 的最新要求，USB 恢复官方 DiPlay v0.2.20 的 **NCM＋本地 VPN/TUN** 方案（来源提交 `3c95c936859e8a9153f0040caf2337adddb9e3e4`），不依赖 root 或系统预先创建的 NCM 网卡。USB 启动时按需请求系统 VPN 授权，应用仅接管当前 iPhone 的 NCM 接口，TUN 只允许本应用且仅路由 `fe80::/64`，不连接远程 VPN 服务器、不回退为全设备 VPN。保留 USB 授权、活动配置、配对、认证和会话检查；授权拒绝／组件缺失、TUN 建立失败或桥接错误明确失败并停止自动重试，不伪造授权、不自动通过 ADB 修改 VPN app-op。无线继续使用普通 socket 服务，不申请 VPN 或创建 TUN。退出、取消、拔线及授权撤销释放本应用持有的 NCM/TUN/监听资源。旧系统网卡路径与失败后的独立原始帧测试不再接入 USB 主流程，避免与实时桥接争抢接口。设置中的“授权”保留手动系统设置／VPN 入口，顶部说明主 APK 已内置授权组件，兼容时由用户点击保存到下载目录（本仓库组件已安装就绪时也允许再次保存），再经文件管理器手动安装；页面渲染、搜索及恢复时不调用 `VpnService.prepare()`，手动 VPN 按钮只授权，不启动连接。USB 启动及该次授权返回可以调用准备接口。详见 `docs/USB_VPN_RESTORE_0.2.20.md`、`docs/SYSTEM_AUTHORIZATION.md`。应用实现与实车验证分别记录，不将恢复上游方案描述为星瑞实车连接已修复。
 
 8. CarPlay 协商像素严格由“隐藏导航栏”选项决定：勾选为 **1920×720**，不勾选为 **1760×720**。停用分辨率百分比及旧画布缩放，已有保存值不得改变这两档。图标文字物理尺寸调节保留；窗口测量只用于本地显示与触摸映射，不因临时窗口增长／缩小重建连接。导航栏选择引起的分辨率变更在下次连接生效，不擅自中断会话。
 
@@ -24,12 +24,14 @@ Instructions for coding agents that work on CarPlay-Preface.
 
 ## Checks
 
+用户 2026-10-19 要求：日常修改后暂不自动构建、签名或安装测试 APK；仅在用户明确要求打包时执行后续构建与安装流程。
+
 只有用户明确要求“完整测试”时，才运行以下 CI 全量检查。普通修改或“构建测试 APK”默认不运行全量单元测试、Lint 或所有模块检查；构建测试包时仅执行用户指定模块的构建任务（默认 `:mobile:assembleDebug`），并继续核对签名及按下文规则自动安装。不要把仅构建成功描述为完整检查通过。
 
 When the user explicitly requests full testing, run the CI command from `.github/workflows/android.yml`:
 
 ```sh
-./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest \
+./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :authorization-components:testDebugUnitTest :home:testDebugUnitTest \
   :mobile:lintDebug :home:lintDebug :maphost:lintDebug \
   :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug
 ```
@@ -45,14 +47,14 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 版本与上游同步
 
-1. 当前上游参考基线为 **DiPlay v0.2.20（选择性同步）**，具体提交与排除范围见 `docs/UPSTREAM_SYNC_0.2.20.md`；另选择性移植 **huangwits/DiPlay-Preface v0.2.20.1** 的蓝牙音频流程，来源与差异见 `docs/GEELYPLAY_BLUETOOTH_0.2.20.1.md`，USB/VPN 按用户后续要求从官方 v0.2.20 恢复，见 `docs/USB_VPN_RESTORE_0.2.20.md`；不引入 E01 专属功能。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
+1. 当前上游参考基线为 **DiPlay v0.2.21（选择性同步，仅音乐积压、软件 Opus 和 USB 重新枚举超时复查三项）**，本次固定来源与排除范围见 `docs/UPSTREAM_SYNC_0.2.21.md`，此前 v0.2.20 选择性移植继续保留，见 `docs/UPSTREAM_SYNC_0.2.20.md`；另选择性移植 **huangwits/DiPlay-Preface v0.2.20.1** 的蓝牙音频流程，来源与差异见 `docs/GEELYPLAY_BLUETOOTH_0.2.20.1.md`，USB/VPN 按用户后续要求从官方 v0.2.20 恢复，见 `docs/USB_VPN_RESTORE_0.2.20.md`；不引入 E01 专属功能。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
 2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的 `versionCode`。应用 `versionName` 遵循下一条的发布规则，不得直接覆盖为上游的应用版本号。
 3. 用户指定应用版本时采用指定版本。当前开发版本为 **0.1.1**，在 GitHub 正式发布此版本前，所有开发修改与上游同步均保持 `versionName = "0.1.1"`，不自动递增补丁号。正式发布后，未指定下一版本时默认递增本仓库应用版本的补丁号。`versionCode` 不得回退，新升级构建必须大于上一升级构建，以支持覆盖安装；修改应用版本时同时更新中文 `README.md`。
 4. 如果同步的是尚未发布或零散的上游提交，记录实际同步的提交 SHA 和同步范围，不虚构上游发布版本，也不将部分提交描述为完整同步某个新版本。
 
 ## 构建环境与设备安装
 
-独立模块 `authorization-components` 是用户要求补齐的 Android 9 系统授权组件，包名 `com.android.vpndialogs`，不属于 CarPlay 主应用。该模块仅使用匹配参考固件的公开 AOSP 平台测试签名，由 `scripts/android9_authorization.py` 在 Release 构建后本地签名并核对实际设备；原始签名输入只留忽略目录，不扩大凭据白名单、不更换主应用签名。主应用从构建 86 起内置该独立签名 APK 和最小校验元数据，在“设置 → 授权”点击安装按钮后调起系统安装器；不能静默安装、自动授权或创建 VPN/TUN，已有原厂／未知同名组件时保留。新环境先显式使用脚本的 `--prepare-signing-inputs --fetch-public-aosp-key` 准备固定来源及校验值的公开输入，正常主应用构建自动依赖组件构建、签名及生成 assets，签名输入不得打包。只在 API 28、平台签名匹配且无原厂／未知同名组件时安装，不覆盖现有系统 VpnDialogs；实际安装及权限状态分别记录，详见 `docs/ANDROID9_AUTHORIZATION_COMPONENTS.md`。
+独立模块 `authorization-components` 是用户要求补齐的 Android 9 系统授权组件，包名 `com.android.vpndialogs`，不属于 CarPlay 主应用。该模块仅使用匹配参考固件的公开 AOSP 平台测试签名，由 `scripts/android9_authorization.py` 在 Release 构建后本地签名并核对实际设备；原始签名输入只留忽略目录，不扩大凭据白名单、不更换主应用签名。主应用从构建 86 起内置该独立签名 APK 和最小校验元数据，在“设置 → 授权”点击保存按钮后导出到公共 Download 根目录并打开目录，由用户通过文件管理器手动安装，CarPlay 不直接发起组件安装；不能静默安装、自动授权或创建 VPN/TUN，已有原厂／未知同名组件时保留。组件 4 起移除忽略电池优化入口、白名单调用及 DEVICE_POWER 权限。组件 5 起按用户要求提供“允许安装未知应用”“使用情况访问”“无障碍服务管理”三项；按用户后续要求，组件 7 移除补丁桌面图标，保留标准 Settings Intent 授权入口，CarPlay 主应用不增加这三项，可由用户选择当前用户下已安装且声明对应权限／服务的其他应用；逐项确认、校验 UID／签名／版本和系统策略，支持撤销，不提供任意 app-op 或批量授权入口。用户已取消通知使用权，不引入通知授权或独立系统管理包。按用户后续明确选择，组件 7 改用与原生设置一致的 android.uid.system 共享 UID 和 getOpsForPackage 状态查询；继续校验平台证书、实际安装身份、目标和系统策略。按用户 2026-10-19 最新要求，组件 8 起现有六项授权均支持当前用户下符合条件的其他已安装应用；修改系统设置与悬浮窗的标准 Settings Intent 无 package: 时提供应用选择，有 package: 时仅确认该应用；VPN 只接受系统 getCallingPackage() 身份，由目标应用自己发起，不提供代选包名或 Intent extra 授权。保留 UID、签名、版本、声明、启用状态和系统策略检查，签名用于确认目标身份未变化，不要求其他应用采用 CarPlay 签名。组件自身平台权限不转授，蓝牙音乐代理继续仅接受两个已核对签名的 CarPlay 包；不新增授权类别或桌面图标，CarPlay 主授权页继续只管理自身权限。补丁保留 WRITE_SECURE_SETTINGS、读取无障碍管理员允许列表所需的 MANAGE_USERS 及既有授权权限，使用 GET_APP_OPS_STATS 读取状态，不再声明仅用于旧 checkOpNoThrow 查询的 UPDATE_APP_OPS_STATS；签名保持原值。旧独立 UID 补丁不能直接覆盖升级为系统共享 UID，必须明确提示用户仅手动卸载本仓库旧授权补丁后重装，不卸载 CarPlay、不自动卸载或清数据，已有原厂／未知同名组件仍保留。RECEIVE_BOOT_COMPLETED 是已声明的普通权限；悬浮窗不是接收开机广播的授权，不把后台拉起辅助或未确认的厂商自启动白名单描述为标准开机权限。“保存授权 APK”和“打开保存目录”按钮在所有组件状态下常驻，放在同一行、均分可用宽度并保持等高，文字可换行，使用统一 dp 间距。点击保存时保留兼容性与签名检查；已安装就绪的本仓库组件也可保存，下载目录已有相同内容 APK 时提示已保存，不重复写入、不再次自动打开目录，不覆盖同名不同内容文件。“打开保存目录”按钮行为独立于导出按钮，任何组件状态下均可手动打开下载目录，无需重新导出；优先系统下载入口，再尝试文件管理器目录入口，不优先发送通用目录 ACTION_VIEW。系统接受打开请求不代表目录已实际显示，不能据此声明实车闪回已修复。新环境先显式使用脚本的 `--prepare-signing-inputs --fetch-public-aosp-key` 准备固定来源及校验值的公开输入，正常主应用构建自动依赖组件构建、签名及生成 assets，签名输入不得打包。只在 API 28、平台签名匹配且无原厂／未知同名组件时安装，不覆盖现有系统 VpnDialogs；实际安装及权限状态分别记录，详见 `docs/ANDROID9_AUTHORIZATION_COMPONENTS.md`。
 
 主应用默认打包 `runtime-assets/offline-mfi/identity.pk8` 和 `certificate.p7b`。这是用户明确要求导入的上游 v0.2.18 公共预览 APK 的实验性配件认证资料；来源和 SHA-256 见 `docs/runtime-authentication-provenance.json`。设置 `DIPLAY_AUTH_ASSETS_DIR` 可为本地构建替换认证目录，替换资料不得入库。
 
@@ -62,10 +64,12 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ### 后续 APK 必须合并交付授权组件
 
-1. 用户已确认：后续交付的 CarPlay 主应用 APK 必须内置独立签名的 Android 9 授权组件，以一个主 APK 分发，由“设置 → 授权 → 安装授权组件”引导用户确认系统安装。不得退回要求用户另外下载、传输两个 APK 的默认交付方式。
+组件 6 起另提供仅供两个已核对签名的 CarPlay 包调用的蓝牙音乐连接代理；只能连接同用户、仍已配对的所选 iPhone A2DP sink。保留 API 28、双方证书、实际权限、会话取消、其他手机和通话检查；不提供断开、配对、HFP/SCO、切音源或全局蓝牙设置。主应用直接连接接口不可用时才在蓝牙输出模式使用，系统受理不等于已连接，真实查询仍须确认。不得将平台签名接口存在描述为 IHU353G 自动暂停已修复，详见 `docs/BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md`。
+
+1. 用户已确认：后续交付的 CarPlay 主应用 APK 必须内置独立签名的 Android 9 授权组件，以一个主 APK 分发，由“设置 → 授权 → 保存授权组件”保存到公共 Download 根目录并打开目录，让用户通过文件管理器手动安装；CarPlay 不直接调起组件 APK 安装器，不申请安装来源权限，Android 9 缺少存储权限时仅请求导出所需的存储权限。不得退回要求用户另外下载、传输两个 APK 的默认交付方式。
 2. `mobile` 的 Debug、Release 和 `assembleStandaloneDebug` 均必须通过现有生成 assets 任务构建、签名并内置组件；用户指定其他 CarPlay 打包模块或新增变体时，也应先接入同等打包流程，再交付，不能遗漏组件。
 3. 构建后必须检查主 APK 内含 `assets/authorization/authorization.apk` 和 `manifest.json`，核对内置 APK 的 SHA-256、包名、版本及平台证书，并核对主 APK 仍使用仓库原有签名。组件构建、签名、校验或打包失败时，修复或明确报告阻塞，不得交付缺少组件的 APK 或用旧组件替代本次应构建的产物。
-4. 主应用和组件保持独立包名及签名；系统安装仍需用户确认，安装后分别授权。已有原厂／未知组件、API 或平台证书不匹配时跳过补装，不静默安装、不自动授权、不覆盖原厂组件。平台签名输入只留本机忽略目录，不入库、不放入任何 APK 资产。
+4. 主应用和组件保持独立包名及签名；系统安装仍需用户确认，安装后分别授权。已有原厂／未知组件、API 或平台证书不匹配时跳过导出；本仓库旧版组件有更新时允许导出新版供用户手动覆盖安装，不静默安装、不自动授权、不覆盖原厂组件。平台签名输入只留本机忽略目录，不入库、不放入任何 APK 资产。
 
 ### 测试 APK 命名
 
@@ -89,8 +93,8 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 ## Adding or moving a setting
 
 The Settings screen is grouped by driver goal, not by implementation.
-`SettingsCategory`, `SettingsSection` and `SettingsInformationArchitecture` at the top of
-`common/src/main/java/com/shilapi/xcertplay/DiPlayActivity.kt` define the groups.
+`SettingsCategory`, `SettingsSection` and `SettingsInformationArchitecture` in
+`common/src/main/java/com/shilapi/xcertplay/SettingsInformationArchitecture.kt` define the groups.
 `SettingsLayoutPolicyTest` fails when a section has no category or has more than one.
 
 ### Choose the category
@@ -136,7 +140,14 @@ Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(э
 
 ### Settings entry
 
-This branch has no Overview menu or standalone connection setup page. Home lists currently connected Bluetooth phones; tapping a device starts wireless CarPlay. The Settings action is first in the upper-right action group. USB has no connect button: attaching an iPhone starts wired CarPlay and takes priority over wireless, including queued permission callbacks, Bluetooth wake and a running wireless session. After a failed wired attempt, an explicit home-device selection may start wireless while the cable remains attached, after old USB resources finish closing; polling, duplicate attachment notifications and late authorization callbacks must not reclaim that cable's priority. An active wired session keeps priority. A cable replug or manual wired retry restores USB priority; do not repeatedly launch from home polling after denial. Pairing and permissions appear when needed. Settings opens on Connection, which holds connection readiness and connection preferences. There is no first-launch setup guide or guide entry in Settings.
+Picture adjustments are available only from the connected CarPlay projection quick menu. Do not add a picture-adjustment button to Settings or start a connection for that action. Keep saved picture values and live adjustment behavior.
+
+The Audio page starts with the non-experimental “音频方案” (Audio mode) card, with exactly two choices: CarPlay audio and Bluetooth audio. Do not duplicate it in Experimental. The removed playback-dependent media/navigation volume selection must not be restored by old preferences or service recovery. Leave volume keys with the head unit; preserve media keys, explicitly configured Siri/joystick support, audio stream settings and speech mixing. Mode changes apply at the next connection through markReconnectNeeded(), without stopping the current session. See `docs/BLUETOOTH_MUSIC_WHEEL.md`.
+
+The Automatic connection card is first on the Connection page, before wireless hotspot and readiness. It has exactly two switches: Auto-connect (default on when unset) and Start on boot (independent, default off). Auto-connect uses a phone with live Bluetooth connection evidence or the attached USB device, preserving USB priority and existing sessions. Do not restore a default transport picker, separate Bluetooth switch or preselected-phone control. Automatic USB and queued Bluetooth/permission launches obey the unified switch. When disabled or cancelled, the USB device row may start a manual connection; do not add another transport card or USB Connect button. Boot start opens the app through BOOT_COMPLETED without granting permissions or running ADB. See `docs/AUTOMATIC_CONNECTION.md`.
+
+This branch has no Overview menu or standalone connection setup page. Home shows a brief Bluetooth/USB connection hint and at most one current device without separate transport cards. Prefer the current CarPlay session; otherwise show the USB-priority device or one live Bluetooth phone (prefer the saved phone). Tapping the live Bluetooth phone starts wireless CarPlay; tapping a session returns to projection. Keep the explicit wireless selection available after a failed USB attempt. The Settings action is first in the upper-right action group. USB has no connect button: attaching an iPhone starts wired CarPlay and takes priority over wireless, including queued permission callbacks, Bluetooth wake and a running wireless session. After a failed wired attempt, an explicit home-device selection may start wireless while the cable remains attached, after old USB resources finish closing; polling, duplicate attachment notifications and late authorization callbacks must not reclaim that cable's priority. An active wired session keeps priority. A cable replug or manual wired retry restores USB priority; do not repeatedly launch from home polling after denial. Pairing and permissions appear when needed. Settings opens on Connection, which holds connection readiness and connection preferences. There is no first-launch setup guide or guide entry in Settings.
+Returning from the connection waiting screen to Home cancels the current USB and wireless attempt, queued retries, authorization callbacks and pending launch intents, and closes its controller through the existing teardown barrier. While on Home, polling, duplicate notifications for the same cable and Bluetooth wake must not restart that cancelled attempt. Explicit phone selection or a physical USB replug may start a new request; old request generations stay invalid. Keep an already active projection running when returning Home, and preserve a valid temporary hotspot reservation under the manual-disconnect rules.
 Every category is directly accessible through the wide-screen rail or compact horizontal category strip.
 About has its own category. Do not reintroduce Overview, quick-setting duplicates, or a language picker.
 

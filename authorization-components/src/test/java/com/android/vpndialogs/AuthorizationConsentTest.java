@@ -37,11 +37,12 @@ public class AuthorizationConsentTest {
             if (unavailable) throw new SecurityException("no platform permission");
         }
         @Override public Target target(String name, boolean vpn) {
-            if (!Android9Backend.supportedPackage(name)) throw new SecurityException("untrusted target");
+            if (!Android9Backend.supportedPackage(name) && !"com.example.other".equals(name))
+                throw new SecurityException("unavailable target");
             return new Target(name, 10123, "CarPlay");
         }
         @Override public boolean vpnBlocked(Target target) { return blocked; }
-        @Override public boolean vpnPrepared(Target target) { preparedReads++; return prepared; }
+        @Override public boolean vpnAuthorized(Target target) { preparedReads++; return prepared; }
         @Override public boolean allowVpn(Target target) { vpnWrites++; changedPackage = target.packageName; return !failWrite; }
         @Override public boolean writeAllowed(Target target) { return allowed; }
         @Override public boolean setWriteAllowed(Target target, boolean value) {
@@ -97,16 +98,57 @@ public class AuthorizationConsentTest {
         assertNull(button(activity.getWindow().getDecorView(), "允许"));
         assertEquals(0, fake.preparedReads); assertEquals(0, fake.vpnWrites);
     }
-    @Test public void missingCallerAndUnrelatedCallerCannotGrant() {
+    @Test public void missingCallerAndUnavailableCallerCannotGrant() {
         for (String name : new String[]{null, "com.other.vpn"}) {
             caller = name; TestConfirm activity = vpn();
             assertNull(button(activity.getWindow().getDecorView(), "允许"));
             assertEquals(0, fake.vpnWrites); activity.finish();
         }
     }
+    @Test public void anotherVpnAppCanRequestConsentOnlyForItsActualCallerIdentity() {
+        caller = "com.example.other";
+        TestConfirm activity = Robolectric.buildActivity(TestConfirm.class,
+            new Intent().putExtra("package", "com.shihab.diplay").setData(Uri.parse("package:com.shihab.diplay"))).setup().get();
+        assertEquals(0, fake.vpnWrites);
+        click(activity, "允许");
+        assertEquals("com.example.other", fake.changedPackage);
+        assertEquals(Activity.RESULT_OK, Shadows.shadowOf(activity).getResultCode());
+    }
+    @Test public void anotherAppCanExplicitlyGrantAndRevokeWriteSettings() {
+        Intent request = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.example.other"));
+        TestWrite activity = settings(request);
+        assertEquals(0, fake.settingsWrites);
+        click(activity, "允许");
+        assertEquals("com.example.other", fake.changedPackage); assertTrue(fake.allowed);
+        activity = settings(request); click(activity, "关闭授权");
+        assertFalse(fake.allowed);
+    }
+    @Test public void settingsWithoutAPackageOpensTheAppSelectorWithoutGranting() {
+        TestWrite activity = settings(new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS));
+        Intent next = Shadows.shadowOf(activity).getNextStartedActivity();
+        assertNotNull(next); assertEquals(SpecialAccessActivity.class.getName(), next.getComponent().getClassName());
+        assertEquals(Settings.ACTION_MANAGE_WRITE_SETTINGS, next.getAction());
+        assertEquals(0, fake.settingsWrites);
+    }
     @Test public void missingPlatformPermissionNeverShowsAnAllowControl() {
         fake.unavailable = true; TestConfirm activity = vpn();
         assertNull(button(activity.getWindow().getDecorView(), "允许")); assertEquals(0, fake.vpnWrites);
+    }
+    @Test public void reflectiveFailureShowsUnderlyingPermissionReasonWithoutGranting() {
+        TestWrite activity = settings(settingsIntent());
+        activity.unavailable(new java.lang.reflect.InvocationTargetException(
+            new SecurityException("android.permission.UPDATE_APP_OPS_STATS")));
+        assertTrue(containsText(activity.getWindow().getDecorView(),
+            "SecurityException: android.permission.UPDATE_APP_OPS_STATS"));
+        assertNull(button(activity.getWindow().getDecorView(), "允许"));
+        assertEquals(0, fake.settingsWrites);
+        assertEquals(Activity.RESULT_CANCELED, Shadows.shadowOf(activity).getResultCode());
+    }
+    private boolean containsText(View view, String expected) {
+        if (view instanceof android.widget.TextView && ((android.widget.TextView) view).getText().toString().contains(expected)) return true;
+        if (view instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++)
+            if (containsText(((ViewGroup) view).getChildAt(i), expected)) return true;
+        return false;
     }
     @Test public void failedVpnGrantNeverReportsSuccess() {
         fake.failWrite = true; TestConfirm activity = vpn(); click(activity, "允许");
@@ -150,7 +192,7 @@ public class AuthorizationConsentTest {
         Android9Backend backend = new Android9Backend(org.robolectric.RuntimeEnvironment.getApplication());
         try { backend.checkEnvironment(false); fail("must reject missing certificate"); } catch (Exception expected) { }
     }
-    @Test public void onlyTheTwoExistingCarPlayPackagesAreEligible() {
+    @Test public void bluetoothProxyClientAllowlistStillContainsOnlyTheTwoCarPlayPackages() {
         assertTrue(Android9Backend.supportedPackage("com.shihab.diplay"));
         assertTrue(Android9Backend.supportedPackage("com.shihab.diplay.hudtest"));
         assertFalse(Android9Backend.supportedPackage("com.shihab.diplay.evil"));

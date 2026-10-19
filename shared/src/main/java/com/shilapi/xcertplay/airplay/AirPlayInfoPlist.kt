@@ -46,7 +46,7 @@ object AirPlayInfoPlist {
             "rightHandDrive" to config.rightHandDrive,
             "keepAliveLowPower" to false,
             "keepAliveSendStatsAsBody" to false,
-            "modes" to modes(),
+            "modes" to modes(config),
         )
         if (!config.disableAudioOutput) {
             info["audioLatencies"] = audioLatencies()
@@ -93,10 +93,11 @@ object AirPlayInfoPlist {
         "unborrowConstraint" to CONSTRAINT_ANYTIME,
     )
 
-    private fun modes(): Map<String, Any?> = linkedMapOf(
-        // Match GeelyPlay v0.2.20.1: resource negotiation is retained in Bluetooth mode;
-        // audio features/formats and SETUP admission still follow disableAudioOutput.
-        "resources" to listOf(resource(RESOURCE_SCREEN), resource(RESOURCE_AUDIO)),
+    private fun modes(config: AirPlayConfig): Map<String, Any?> = linkedMapOf(
+        // Do not ask the phone to transfer main audio to a receiver that refuses audio SETUP.
+        // Native Bluetooth music keeps its own route; only the display is taken by CarPlay.
+        "resources" to if (config.disableAudioOutput) listOf(resource(RESOURCE_SCREEN))
+            else listOf(resource(RESOURCE_SCREEN), resource(RESOURCE_AUDIO)),
         "appStates" to listOf(
             linkedMapOf("appStateID" to 2, "state" to false),
             linkedMapOf("appStateID" to 1, "speechMode" to -1),

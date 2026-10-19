@@ -28,8 +28,9 @@ class BluetoothAutoConnectActivityTest {
         app.getSharedPreferences("diplay", 0).edit().clear().putBoolean("notification_asked", true).commit()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         CarPlayBackgroundSession.clear()
+        ConnectionAutoStart.resetForTest()
         DiPlayPreferences.savePhone(app, phone, "iPhone")
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         activity = Robolectric.buildActivity(DiPlayActivity::class.java).create().get()
         ReflectionHelpers.setField(activity, "setupError", null)
     }
@@ -37,6 +38,7 @@ class BluetoothAutoConnectActivityTest {
     @After fun cleanup() {
         ReflectionHelpers.getField<android.os.Handler>(activity, "handler").removeCallbacksAndMessages(null)
         CarPlayBackgroundSession.clear()
+        ConnectionAutoStart.resetForTest()
     }
 
     private fun wake(address: String = phone, at: Long = SystemClock.elapsedRealtime()) = Intent()
@@ -50,8 +52,20 @@ class BluetoothAutoConnectActivityTest {
     private fun connect() = ReflectionHelpers.callInstanceMethod<Unit>(activity,
         "connectFromBluetooth", from(String::class.java, phone))
 
+    @Test fun returningHomeRejectsQueuedWakeEvenAfterManualConnectionIsAllowedAgain() {
+        val queued = ConnectionAutoStart.stamp(wake())
+        assertTrue(accept(ConnectionAutoStart.stamp(wake())))
+        ConnectionAutoStart.cancel()
+        connect()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        ConnectionAutoStart.resume()
+        assertFalse(accept(queued))
+        assertTrue(accept(ConnectionAutoStart.stamp(wake())))
+        connect()
+        assertEquals(CarPlayHostActivity::class.java.name, shadowOf(activity).nextStartedActivity?.component?.className)
+    }
+
     @Test fun wakeSelectsWirelessEvenWhenDefaultTransportIsUsbAndConsumesOnlyOnce() {
-        DiPlayPreferences.saveDefaultConnectionMode(app, DefaultConnectionMode.USB)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         val intent = wake()
         assertTrue(accept(intent))
@@ -72,10 +86,10 @@ class BluetoothAutoConnectActivityTest {
 
     @Test fun selectionOrOptInChangesBeforeQueuedLaunchCancelTheRequest() {
         assertTrue(accept(wake()))
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, false)
+        DiPlayPreferences.saveAutoConnect(app, false)
         connect()
         assertNull(shadowOf(activity).nextStartedActivity)
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         assertTrue(accept(wake()))
         DiPlayPreferences.savePhone(app, "AA:BB:CC:DD:EE:FF", "Other")
         connect()

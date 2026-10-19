@@ -93,6 +93,21 @@ class CarPlayVpnConsentTest {
         assertFalse(field("awaitingVpnConsent"))
     }
 
+    @Test fun disablingAutomaticConnectionIgnoresLateVpnConsentButManualRetryStillWorks() {
+        UsbAutoConnect.markAutomaticRequest(activity.intent)
+        invoke("requestVpnConsent")
+        DiPlayPreferences.saveAutoConnect(activity, false)
+        VpnConsentTestShadow.failure = SecurityException("A disabled automatic request must not prepare VPN again")
+        result(Activity.RESULT_OK)
+        assertFalse(field("vpnReady"))
+        assertNull(ReflectionHelpers.getField<Any?>(activity, "controller"))
+        VpnConsentTestShadow.failure = null
+        VpnConsentTestShadow.consent = null
+        invoke("retryConnectionFromButton")
+        assertTrue(UsbAutoConnect.isManualRequest(activity.intent))
+        assertTrue(field("vpnReady"))
+    }
+
     @Test fun lateConsentDuringShutdownCannotStartAController() {
         invoke("requestVpnConsent")
         ReflectionHelpers.getField<AtomicBoolean>(activity, "shuttingDown").set(true)

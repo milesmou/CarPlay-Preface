@@ -27,7 +27,6 @@ import com.shilapi.xcertplay.host.R
 /** The key service feeds the shared media bindings and the optional CarPlay joystick. */
 class WheelKeyService : AccessibilityService() {
     private val keys = WheelZoomKeys()
-    private val navigationKeys = NavigationWheelKeyPolicy()
     private val joystick = WheelJoystick()
     private val mediaPresses = mutableSetOf<PhysicalWheelKey>()
     private val joystickPresses = mutableSetOf<PhysicalWheelKey>()
@@ -41,10 +40,7 @@ class WheelKeyService : AccessibilityService() {
         refreshEligibility()
         if (keys.timeOut() && eligibleRoute() != null) announce(zoomOn = false)
     }
-    // This read is nonblocking: no ADB, input-device query or network lock in the periodic poll.
-    internal var volumeEligible: () -> Boolean = { CarPlayMediaKeys.volumeKeysEligible(this) }
     internal var bluetoothMediaOwned: () -> Boolean = { CarPlayMediaKeys.usesCarBluetoothAudio() }
-    internal var adjustVolume: (Int) -> Boolean = { CarPlayWheelVolume.adjust(this, it) }
     internal var mapRoute: () -> Any? = { null } // Independent map output was removed.
     internal var session: () -> Any? = { CarPlayBackgroundSession.snapshot()?.controller?.activeAirPlaySessionToken() }
     internal var knob: (AirPlayKnobState) -> Boolean = { CarPlayBackgroundSession.snapshot()?.controller?.sendKnob(it) == true }
@@ -77,7 +73,7 @@ class WheelKeyService : AccessibilityService() {
     override fun onServiceConnected() {
         running = this
         WheelKeyLog.bound()
-        NavigationWheelSettings.recordAuthorization(this)
+        recordAuthorization(this)
         // Lets the watcher for other apps' calls run whenever this accessibility service does.
         PhoneAudioRoute.attach(this)
         refreshEligibility()
@@ -144,7 +140,6 @@ class WheelKeyService : AccessibilityService() {
             rearmTimedMode()
             return true
         }
-        if (navigationKeys.owns(event.keyCode, event.deviceId, event.downTime)) return navigationKey(event)
 
         val key = WheelKey.of(event)
         refreshEligibility()
@@ -186,7 +181,7 @@ class WheelKeyService : AccessibilityService() {
             },
         )
         when (action) {
-            WheelZoomKeys.Action.PASS -> return navigationKey(event)
+            WheelZoomKeys.Action.PASS -> return false
             WheelZoomKeys.Action.CONSUME -> Unit
             WheelZoomKeys.Action.MODE_ON -> announce(zoomOn = true)
             WheelZoomKeys.Action.MODE_OFF -> announce(zoomOn = false)
@@ -196,15 +191,6 @@ class WheelKeyService : AccessibilityService() {
         rearmTimedMode()
         return true
     }
-
-    private fun navigationKey(event: KeyEvent): Boolean = navigationKeys.onKey(
-        event.action, event.keyCode, event.deviceId, event.downTime, event.repeatCount,
-        eligible = navigationVolumeEligible(),
-    ) { delta -> if (navigationVolumeEligible()) adjustVolume(delta) else false }
-
-    private fun navigationVolumeEligible(): Boolean =
-        running === this && !inCall(this) && session() != null &&
-            volumeEligible()
 
     private fun eligibleRoute(): Any? = if (WheelZoomSettings.enabled(this)) mapRoute() else null
 
@@ -350,7 +336,6 @@ class WheelKeyService : AccessibilityService() {
 
         fun connected(): Boolean = running != null
         internal fun mediaKeyReserved(code: Int): Boolean = running?.joystickOwnsCode(code) == true
-        internal fun volumeKeysReserved(): Boolean = running?.let { it.keys.zoomMode || it.joystick.on || it.learning != null } == true
 
         /** The next key pressed is assigned to [role]; [done] runs on the service's thread. */
         /** A key already used by the shared media bindings is refused without changing either binding. */
@@ -389,7 +374,7 @@ class WheelKeyService : AccessibilityService() {
             val allowed = applyServiceSettings(context, adb::shell) {
                 mayAsk || wanted(context)
             }
-            if (allowed && mayAsk) NavigationWheelSettings.recordAuthorization(context)
+            if (allowed && mayAsk) recordAuthorization(context)
             if (allowed) Log.i(TAG, "wheel key service allowed over adb")
             if (allowed) access else LocalAdb.Access.UNREACHABLE
         }
@@ -447,8 +432,15 @@ class WheelKeyService : AccessibilityService() {
          * watcher for other apps' calls, which runs only while something keeps DiPlay alive.
          */
         internal fun wanted(context: Context): Boolean = WheelZoomSettings.anyEnabled(context) ||
-            NavigationWheelSettings.restoreAllowed(context) ||
-            PhoneAudioSettings.phoneAudioRouteApps(context)
+            (WheelMediaBindings.key(context, WheelMediaBindings.Action.SIRI)?.let {
+                it != WheelMediaBindings.Action.SIRI.defaultCode
+            } == true && context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE)
+                .getBoolean("authorized", false)) || PhoneAudioSettings.phoneAudioRouteApps(context)
+
+        internal fun recordAuthorization(context: Context) {
+            context.getSharedPreferences(RESTORE_PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("authorized", true).apply()
+        }
 
         /**
          * Android takes the service off the allowed list when the app is force-stopped (BYD's system does

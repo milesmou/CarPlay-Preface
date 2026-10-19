@@ -13,6 +13,12 @@ internal class SystemAuthorization(
     private val openVpnConsent: (Intent) -> Unit,
 ) {
     enum class Result { UNKNOWN, OPENED, ALLOWED, NOT_ALLOWED, CANCELLED, UNAVAILABLE }
+    fun canDrawOverlays(): Boolean = runCatching { Settings.canDrawOverlays(context) }.getOrDefault(false)
+
+    fun requestOverlay(): Result = try {
+        openSettings(AuthorizationComponentInstaller(context).overlaySettingsIntent())
+        Result.OPENED
+    } catch (_: RuntimeException) { Result.UNAVAILABLE }
 
     fun canWriteSettings(): Boolean = runCatching { Settings.System.canWrite(context) }.getOrDefault(false)
 

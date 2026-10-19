@@ -41,11 +41,15 @@ public class AuthorizationLayoutTest {
         app.getResources().updateConfiguration(config, app.getResources().getDisplayMetrics());
         AuthorizationConsentTest.fake = new AuthorizationConsentTest.FakeBackend();
         AuthorizationConsentTest.caller = "com.shihab.diplay.hudtest";
-        for (boolean vpn : new boolean[]{true, false}) {
+        new AdditionalAuthorizationTest().reset();
+        for (String page : new String[]{"vpn", "write", "overlay"}) {
+            boolean vpn = page.equals("vpn");
             Intent request = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.shihab.diplay.hudtest"));
+            if (page.equals("overlay")) request.setAction(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
             ActivityController<? extends AuthorizationActivity> controller = vpn
                 ? Robolectric.buildActivity(AuthorizationConsentTest.TestConfirm.class).setup()
-                : Robolectric.buildActivity(AuthorizationConsentTest.TestWrite.class, request).setup();
+                : page.equals("write") ? Robolectric.buildActivity(AuthorizationConsentTest.TestWrite.class, request).setup()
+                : Robolectric.buildActivity(AdditionalAuthorizationTest.TestActivity.class, request).setup();
             try {
                 View decor = controller.get().getWindow().getDecorView();
                 decor.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
@@ -54,7 +58,7 @@ public class AuthorizationLayoutTest {
                 decor.layout(0, 0, 1920, 720);
                 Button allow = AuthorizationConsentTest.button(decor, "允许");
                 Button cancel = AuthorizationConsentTest.button(decor, "取消");
-                assertNotNull(allow); assertNotNull(cancel);
+                assertNotNull(page + " allow", allow); assertNotNull(page + " cancel", cancel);
                 assertEquals(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR, allow.getLayoutDirection());
                 assertTrue(allow.getWidth() > 0); assertTrue(allow.getHeight() >= Math.round(64 * density / 160f));
                 assertEquals(allow.getHeight(), cancel.getHeight());
@@ -63,7 +67,7 @@ public class AuthorizationLayoutTest {
                 directory.mkdirs();
                 Bitmap bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888);
                 decor.draw(new Canvas(bitmap));
-                try (FileOutputStream output = new FileOutputStream(new File(directory, (vpn ? "vpn-" : "write-") + name + ".png"))) {
+                try (FileOutputStream output = new FileOutputStream(new File(directory, page + "-" + name + ".png"))) {
                     assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output));
                 }
                 bitmap.recycle();
@@ -78,7 +82,7 @@ public class AuthorizationLayoutTest {
                     assertTrue("Cancel must be reachable by scrolling", position[1] >= 0 && position[1] + cancel.getHeight() <= 720);
                     bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888);
                     decor.draw(new Canvas(bitmap));
-                    try (FileOutputStream output = new FileOutputStream(new File(directory, (vpn ? "vpn-" : "write-") + name + "-actions.png"))) {
+                    try (FileOutputStream output = new FileOutputStream(new File(directory, page + "-" + name + "-actions.png"))) {
                         assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output));
                     }
                     bitmap.recycle();

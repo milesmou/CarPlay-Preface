@@ -9,8 +9,8 @@
     <string name="settings_hotspot_password_length">热点密码须为 8–63 个字符；仅无密码热点可以留空。</string>
     <string name="settings_wireless_hotspot">无线连接</string>
     <string name="settings_hotspot_mode">热点方式</string>
-    <string name="settings_hotspot_next_connection">修改方式或热点信息后，在下一次连接生效，当前 CarPlay 会话会继续运行。</string>
-    <string name="settings_manual_hotspot_description">选择此方式后，应用尝试使用系统保存的配置开启车机热点。请填写完全一致的 SSID 和密码，iPhone 连接这个热点；应用不修改名称和密码，也不自动关闭热点。</string>
+    <string name="settings_hotspot_next_connection">更改在下次连接生效。</string>
+    <string name="settings_manual_hotspot_description">尝试开启车机已保存的热点；请填相同名称和密码。应用不更改配置，也不自动关闭热点。</string>
     <string name="settings_manual_hotspot_details">热点 SSID 和密码</string>
     <string name="settings_hotspot_not_configured">未配置</string>
     <string name="settings_manual_hotspot_join">确认车机热点已开启，SSID 和密码与“连接”中保存的一致。在 iPhone 上加入这个热点，并开启“自动加入”。</string>

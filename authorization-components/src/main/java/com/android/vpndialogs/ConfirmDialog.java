@@ -15,8 +15,8 @@ public class ConfirmDialog extends AuthorizationActivity {
                 action(R.string.close, this::finish);
                 return;
             }
-            if (backend.vpnPrepared(target)) { setResult(RESULT_OK); finish(); return; }
-            screen(R.string.vpn_title, getString(R.string.vpn_body, target.label));
+            if (backend.vpnAuthorized(target)) { setResult(RESULT_OK); finish(); return; }
+            screen(R.string.vpn_title, getString(R.string.vpn_body, target.label + "\n" + target.packageName));
             action(R.string.allow, () -> {
                 try {
                     if (!backend.allowVpn(target)) throw new IllegalStateException("authorization not confirmed");

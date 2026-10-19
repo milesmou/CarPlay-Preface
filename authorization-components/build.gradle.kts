@@ -7,8 +7,8 @@ android {
         applicationId = "com.android.vpndialogs"
         minSdk = 28
         targetSdk = 28
-        versionCode = 1
-        versionName = "preface-android9-1"
+        versionCode = 8
+        versionName = "preface-android9-8"
     }
     // Firmware repair for API 28, distributed locally; this is not a Google Play application.
     lint { disable += "ExpiredTargetSdkVersion" }
@@ -30,4 +30,22 @@ android {
 dependencies {
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.17")
+}
+
+// Sign/verify once even when multiple CarPlay modules are built in parallel.
+abstract class PrepareDistributionAssets : Exec() {
+    @get:OutputDirectory abstract val assetOutput: DirectoryProperty
+}
+val prepareDistributionAssets by tasks.registering(PrepareDistributionAssets::class) {
+    group = "build"
+    dependsOn("assembleRelease")
+    val unsigned = layout.buildDirectory.file("outputs/apk/release/authorization-components-release-unsigned.apk")
+    val metadata = layout.buildDirectory.file("outputs/apk/release/output-metadata.json")
+    val script = rootProject.layout.projectDirectory.file("scripts/android9_authorization.py")
+    inputs.files(unsigned, metadata, script,
+        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.pk8"),
+        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.x509.pem"))
+    assetOutput.set(layout.buildDirectory.dir("generated/distributionAssets"))
+    workingDir(rootProject.projectDir)
+    commandLine("python", script.asFile.absolutePath, "--sign", "--asset-output", assetOutput.get().asFile.absolutePath)
 }

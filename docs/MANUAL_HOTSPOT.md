@@ -49,3 +49,21 @@
 保留热点的通用控制通道错误也使用现有最多五次自动启动重试预算，不无限循环。次数用尽显示手动重试按钮，预约保留至明确断开；控制链路和监听已清理，此时手动加入 Wi-Fi 后仍须点击重试连接。日志记录预约保留、复用或失效重建的动作，不记录网络凭据，不猜测未知信道。手动车机热点的开启／关闭规则不变。
 
 本轮定向测试 34 项通过（common 21、shared 13），覆盖连续启动失败只创建一次、有效配置精确保留、失效替换、退出释放一次、旧清理与重复重试隔离、慢清理不阻塞、页面采用同一控制器、次数上限及成功会话保护。未运行全量 CI、Lint，未生成新 APK。报告设备仍为 IHU353G，参考固件身份和 SHA-256 仍为上文的 IHU519G/FS11A1 构建 327；这是工程修正，没有新增固件接口或实车验收证据，不能据此保证 iPhone 自动加入成功。
+
+
+## 2026-10-19：修改系统设置与热点配置读取是不同权限
+
+用户询问取得 WRITE_SETTINGS 后能否直接读取当前热点名称／密码。本轮核对参考 IHU519G / FS11A1 / Android 9 构建 327（OTA SHA-256 `f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01`）：仅 WRITE_SETTINGS 不足。
+
+参考 `system/framework/oat/arm64/wifi-service.vdex` SHA-256 `fae442801bd5c8033baaa35b941392f2382c5015f1d3cd1074aa0978ef9d7eba` 的 CompactDex 方法表明：
+
+- WifiServiceImpl.getWifiApConfiguration 代码偏移 921840：先 enforceAccessPermission，再按 Binder.getCallingUid 调用 checkConfigOverridePermission；缺少权限抛 SecurityException。
+- enforceAccessPermission 代码偏移 930562：要求 ACCESS_WIFI_STATE。
+- WifiPermissionsUtil.checkConfigOverridePermission 代码偏移 1247238 转到 WifiPermissionsWrapper.getOverrideWifiConfigPermission（1248356），后者直接用 IPackageManager.checkUidPermission 查询 OVERRIDE_WIFI_CONFIG。
+- framework-res.apk 的 manifest dump 第 1435–1436 行声明 OVERRIDE_WIFI_CONFIG protectionLevel=0x12（signature|privileged），不是 WRITE_SETTINGS app-op。平台签名匹配的补丁有申请该权限的条件，但仍须实际声明、确认授予与接口可用；当前补丁尚未增加此声明或读回通道。
+
+原始调用摘要 `catalog/hotspot-config-read-calls.txt`，再生成 `python agent_docs/firmware/inspect_hotspot_config_read.py`。系统身份下读取 SSID／密码的既有证据见 [HiCar 热点实现](HICAR_HOTSPOT_327.md)。返回的 WifiConfiguration 是系统保存的 SoftAP 配置，SSID 和 preSharedKey 可用于读取系统配置；不能只凭此配置就断言它一定对应正在广播的热点，仍需验证状态与归属。
+
+当前 ManualHotspotManager.readLegacyApConfiguration 会尝试该 getter，但仅提取 SSID／频段／信道／安全类型，读取异常时返回不可读；没有自动导入密码。应用自建 LocalOnlyHotspot 则从本应用仍有效的预约获得实际名称与密码，不依赖 WRITE_SETTINGS 或此系统配置 getter。
+
+后续若用户要求自动填入手动热点信息，可评估由匹配签名的补丁只读配置，经验证 CarPlay 调用者身份后返回；不修改热点配置、不重启热点，不向日志、诊断或无约束广播输出密码。本轮仅分析，没有变更应用权限或运行代码，没有打包测试；IHU353G 实车读取仍待验证。

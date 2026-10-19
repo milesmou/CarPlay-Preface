@@ -204,13 +204,15 @@ class BluetoothAudioHandoffTest {
         assertTrue(profile.connected.isEmpty())
     }
 
-    @Test fun missingNativeConnectIsReportedOnceInsteadOfRetryingEveryCallback() {
+    @Test fun missingNativeConnectAndMissingPlatformComponentNeverPretendMusicWasRestored() {
         profile.states[phone] = BluetoothProfile.STATE_DISCONNECTED
         shadowOf(adapter).setProfileProxy(11, DisconnectOnlyProfile(profile))
         val owner = nativeOwner()
         repeat(3) { owner.setSuppressed(false) }
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
-        assertEquals(1, log.count { it.contains("reconnect unavailable: NoSuchMethodException") })
+        assertEquals(1, log.count { it.contains("platform Bluetooth music reconnect accepted=false") })
+        assertTrue(log.any { it.contains("compatible authorization component 6 is required") })
+        assertFalse(log.any { it.contains("connection confirmed") })
         assertTrue(profile.connected.isEmpty())
     }
 
@@ -226,12 +228,29 @@ class BluetoothAudioHandoffTest {
     @Test fun manualMusicReconnectionCanBeConfirmedAfterConnectApiWasUnavailable() {
         profile.states[phone] = BluetoothProfile.STATE_DISCONNECTED
         shadowOf(adapter).setProfileProxy(11, DisconnectOnlyProfile(profile))
-        val owner = nativeOwner()
-        assertTrue(log.any { it.contains("reconnect unavailable: NoSuchMethodException") })
+        nativeOwner()
+        assertTrue(log.any { it.contains("platform Bluetooth music reconnect accepted=false") })
         profile.states[phone] = BluetoothProfile.STATE_CONNECTED
-        owner.setSuppressed(false)
+        context.sendBroadcast(Intent(ACTION_CONNECTION).putExtra(BluetoothDevice.EXTRA_DEVICE, phone)
+            .putExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_CONNECTED))
+        shadowOf(Looper.getMainLooper()).idle()
         assertTrue(log.any { it.contains("connection confirmed") })
         assertTrue(profile.disconnected.isEmpty())
+    }
+
+    @Test fun connectedBroadcastAfterRestoreDeadlineStillConfirmsTheRealConnection() {
+        profile.states[phone] = BluetoothProfile.STATE_DISCONNECTED
+        nativeOwner()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
+        assertTrue(log.any { it.contains("reconnect timed out") })
+        assertFalse(log.any { it.contains("connection confirmed") })
+        profile.states[phone] = BluetoothProfile.STATE_CONNECTED
+        context.sendBroadcast(Intent(ACTION_CONNECTION).putExtra(BluetoothDevice.EXTRA_DEVICE, phone)
+            .putExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_CONNECTED))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, log.count { it.contains("connection confirmed") })
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
+        assertEquals(listOf(phone), profile.connected)
     }
 
     @Test fun rejectedNativeConnectionRetriesOnlyWithinTheRestoreWindow() {
@@ -272,5 +291,8 @@ class BluetoothAudioHandoffTest {
         fun isA2dpPlaying(device: BluetoothDevice): Boolean { if (queryFails) error("unsupported"); return playing && getConnectionState(device) == BluetoothProfile.STATE_CONNECTED }
     }
 
-    companion object { const val ACTION_PLAYING = "android.bluetooth.a2dp-sink.profile.action.PLAYING_STATE_CHANGED" }
+    companion object {
+        const val ACTION_PLAYING = "android.bluetooth.a2dp-sink.profile.action.PLAYING_STATE_CHANGED"
+        const val ACTION_CONNECTION = "android.bluetooth.a2dp-sink.profile.action.CONNECTION_STATE_CHANGED"
+    }
 }

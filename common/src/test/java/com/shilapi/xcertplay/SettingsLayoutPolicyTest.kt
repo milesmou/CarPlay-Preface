@@ -51,7 +51,6 @@ class SettingsLayoutPolicyTest {
         val experimental = SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.EXPERIMENTAL)
         assertEquals(setOf(
             SettingsSection.ADVANCED_MEDIA,
-            SettingsSection.NAVIGATION_WHEEL,
             SettingsSection.EXTERNAL_CONTROLLER,
         ), experimental)
     }

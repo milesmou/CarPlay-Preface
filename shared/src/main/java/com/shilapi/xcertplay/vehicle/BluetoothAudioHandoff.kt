@@ -42,6 +42,8 @@ internal class BluetoothAudioHandoff(
     private var restoreUnavailable = false
     private var restoreTask: Runnable? = null
     private var lastConnectAt: Long? = null
+    private var platformConnector: PlatformBluetoothMusicConnector? = null
+    private var platformConnectAttempted = false
     private val playbackPoll = object : Runnable {
         override fun run() = synchronized(this@BluetoothAudioHandoff) {
             if (closed) return@synchronized
@@ -61,7 +63,10 @@ internal class BluetoothAudioHandoff(
                 val connected = runCatching { proxy?.getConnectionState(device) == BluetoothProfile.STATE_CONNECTED }.getOrDefault(false)
                 if (connected && state in setOf(STATE_PLAYING, STATE_NOT_PLAYING)) publishPlaying(state == STATE_PLAYING)
             } else when (intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)) {
-                BluetoothProfile.STATE_CONNECTED -> { disconnectPeer(); refreshPlaying() }
+                BluetoothProfile.STATE_CONNECTED -> {
+                    if (suppressed) disconnectPeer() else proxy?.let { restoreIfOwned(it) }
+                    refreshPlaying()
+                }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     publishPlaying(false)
                     if (!suppressed) proxy?.let { restoreActive(it) }
@@ -136,6 +141,7 @@ internal class BluetoothAudioHandoff(
     @Synchronized private fun publishPlaying(value: Boolean) {
         if (onPlaying == null || playing == value) return
         playing = value
+        report("Audio: selected Bluetooth music playing=$value nativeOutput=$nativeOutput")
         runCatching { onPlaying?.invoke(value) }
     }
 
@@ -188,6 +194,7 @@ internal class BluetoothAudioHandoff(
                     if (lease.disconnected || lastConnectAt != null) report("Audio: original Bluetooth music connection confirmed")
                     lease.disconnected = false
                     lastConnectAt = null
+                    platformConnector?.close(); platformConnector = null
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (restoreUnavailable) return true
@@ -200,7 +207,16 @@ internal class BluetoothAudioHandoff(
                     val now = SystemClock.elapsedRealtime()
                     if (lastConnectAt?.let { now - it < 1_000 } == true) return false
                     lastConnectAt = now
-                    val accepted = profile.javaClass.getMethod("connect", BluetoothDevice::class.java).invoke(profile, device) == true
+                    val connect = try {
+                        profile.javaClass.getMethod("connect", BluetoothDevice::class.java)
+                    } catch (missing: NoSuchMethodException) {
+                        // The platform-signed component can access Android 9's hidden sink API.
+                        // It only requests native music restoration, never a CarPlay disconnect.
+                        if (!selectedNative) throw missing
+                        requestPlatformConnect()
+                        return false
+                    }
+                    val accepted = connect.invoke(profile, device) == true
                     report("Audio: original Bluetooth music reconnect accepted=$accepted")
                     // Accepted is asynchronous; retain the restore obligation until CONNECTED.
                     return false
@@ -214,9 +230,28 @@ internal class BluetoothAudioHandoff(
         true
     }
 
+    private fun requestPlatformConnect() {
+        if (closed || suppressed || !nativeOutput || platformConnectAttempted) return
+        platformConnectAttempted = true
+        val next = PlatformBluetoothMusicConnector(app, peer) { accepted, reason ->
+            synchronized(this@BluetoothAudioHandoff) {
+                platformConnector = null
+                if (closed || suppressed || !nativeOutput) return@synchronized
+                report("Audio: platform Bluetooth music reconnect accepted=$accepted reason=$reason")
+                if (!accepted) {
+                    restoreUnavailable = true
+                    report("Audio: native Bluetooth music is not confirmed; connect this iPhone's media audio in vehicle Bluetooth settings")
+                }
+            }
+        }
+        platformConnector = next
+        next.start()
+    }
+
     // carlito | A disconnect may still be completing when focus is yielded.
     private fun restoreActive(profile: BluetoothProfile, deadline: Long = SystemClock.elapsedRealtime() + 5_000L) {
         if (closed || suppressed || proxy !== profile || restoreTask != null) return
+        platformConnectAttempted = false
         val task = object : Runnable {
             override fun run() = synchronized(this@BluetoothAudioHandoff) {
                 if (closed || suppressed || proxy !== profile) { cancelRestore(); return@synchronized }
@@ -224,6 +259,7 @@ internal class BluetoothAudioHandoff(
                 if (!done && SystemClock.elapsedRealtime() < deadline) main.postDelayed(this, 250L)
                 else {
                     restoreTask = null
+                    platformConnector?.close(); platformConnector = null
                     if (!done) report("Audio: original Bluetooth music reconnect timed out; media connection not confirmed; check vehicle Bluetooth settings")
                 }
             }
@@ -235,6 +271,7 @@ internal class BluetoothAudioHandoff(
     private fun cancelRestore() {
         restoreTask?.let(main::removeCallbacks)
         restoreTask = null
+        platformConnector?.close(); platformConnector = null
     }
 
     private fun restoreThenClose(profile: BluetoothProfile, deadline: Long = SystemClock.elapsedRealtime() + 5_000L) {

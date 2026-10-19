@@ -1,5 +1,5 @@
 <resources>
-    <string name="home_connection_hint">Connect your iPhone to the head unit using Bluetooth or USB.</string>
+    <string name="home_connection_hint">Connect your iPhone to the car’s Bluetooth, or plug it into USB.</string>
     <string name="settings_quick_dismiss_hint">Tap a blank area to return to CarPlay</string>
     <string name="settings_quick_volume">Volume</string>
     <string name="settings_volume_unavailable_value">Unavailable</string>
@@ -14,20 +14,26 @@
     <string name="settings_authorization">Authorization</string>
     <string name="settings_authorization_summary">Manage system authorization for this app.</string>
     <string name="settings_authorization_native_title">System authorization component</string>
-    <string name="settings_authorization_native_description">This APK includes the Android 9 authorization component. If it is missing and compatible with the system, install it below and confirm the system installer. Then grant each permission separately.</string>
-    <string name="settings_authorization_component_available">The bundled component can be installed. Installation does not grant permissions or start a connection.</string>
-    <string name="settings_authorization_component_install">Install authorization component · Open installer</string>
+    <string name="settings_authorization_native_description">Includes the Android 9 authorization component. If compatible, save to Downloads, install manually in the file manager, then grant each permission.</string>
+    <string name="settings_authorization_component_available">Save to Download, then install manually in the file manager.</string>
+    <string name="settings_authorization_component_update_available">An update is included. Save it and update manually in the file manager.</string>
+    <string name="settings_authorization_component_reinstall_required">Save the APK first. Manually uninstall only the old Xingrui authorization component, then install the saved APK. Keep the CarPlay app.</string>
+    <string name="settings_authorization_component_install">Save authorization APK</string>
     <string name="settings_authorization_component_preparing">Preparing authorization component…</string>
     <string name="settings_authorization_component_ready">Authorization component installed. Use the permission actions below.</string>
     <string name="settings_authorization_component_existing">A system component already exists and will be preserved. Use the permission actions below.</string>
     <string name="settings_authorization_component_permission_missing">The component is installed but unavailable or missing system permissions. Check its status in system settings.</string>
     <string name="settings_authorization_component_unsupported">The bundled component does not match this system or is not included in this build. Use the available system authorization pages below.</string>
-    <string name="settings_authorization_component_install_failed">Cannot open the component installer. Check system compatibility and installer availability, then try again.</string>
+    <string name="settings_authorization_component_install_failed">Could not save the component. Check system compatibility and available Downloads storage, then try again.</string>
+    <string name="settings_authorization_component_saved">Saved to: %1$s. Open this file in your file manager to install it manually.</string>
+    <string name="settings_authorization_component_already_saved">Authorization APK already saved to: %1$s. No need to save it again.</string>
+    <string name="settings_authorization_component_folder_unavailable">If Downloads does not open, open the Download folder manually in your file manager. A saved APK remains at the path shown above.</string>
+    <string name="settings_authorization_component_storage_denied">Storage permission was not granted. Allow storage access to save the component to Downloads.</string>
     <string name="settings_authorization_system">System authorization</string>
     <string name="settings_authorization_write">Modify system settings</string>
-    <string name="settings_authorization_write_description">Allows the app to turn on the configured car hotspot before connecting, if supported by the system. Temporary hotspots do not need this permission.</string>
+    <string name="settings_authorization_write_description">Allow the app to start the car hotspot before connecting. Not needed for temporary hotspots.</string>
     <string name="settings_authorization_vpn">Create VPN</string>
-    <string name="settings_authorization_vpn_description">Transfers CarPlay data over a local VPN for USB connections. This action only grants permission; the connection starts when you select USB.</string>
+    <string name="settings_authorization_vpn_description">For local USB data transfer. This action grants consent without starting a connection.</string>
     <string name="usb_vpn_transport_unavailable">USB local VPN failed; automatic retries stopped</string>
     <string name="connection_help_usb_vpn">Check VPN permission in Settings → Authorization and the system VPN components. Replug the iPhone and retry, or use wireless.</string>
     <string name="settings_authorization_allowed">Allowed</string>
@@ -35,10 +41,10 @@
     <string name="settings_authorization_last_allowed">Previously authorized</string>
     <string name="settings_authorization_check">Check and authorize</string>
     <string name="settings_authorization_waiting">Awaiting confirmation</string>
-    <string name="settings_authorization_unavailable">Cannot open system authorization. Install the compatible authorization component above, or check the existing system component and its permissions.</string>
+    <string name="settings_authorization_unavailable">Cannot open system authorization. Save and manually install the compatible component above, or check the existing system component and its permissions.</string>
     <string name="settings_authorization_cancelled">VPN authorization was cancelled. Tap to retry.</string>
     <string name="settings_authorization_not_completed">System VPN consent has not been granted. Tap to retry.</string>
-    <string name="settings_authorization_vpn_checked">This is the last manual check result. Tap to check again.</string>
+    <string name="settings_authorization_vpn_checked">Last check passed. Tap to check again.</string>
     <string name="hotspot_hint_local">Open Connection setup to save your built-in car hotspot details.</string>
     <string name="marker_centre_default">Centre · default</string>
     <string name="report_clip_label">Diagnostic report</string>
@@ -141,7 +147,7 @@
     <string name="carplay_session_ended_reconnecting">CarPlay session ended; reconnecting</string>
     <string name="carplay_settings">CarPlay settings</string>
     <string name="carplay_size">CarPlay size</string>
-    <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">Changes the size of CarPlay icons and text. Applying a size reconnects CarPlay.</string>
+    <string name="changes_the_size_of_carplay_icons_and_text_applying_a_size">Adjust CarPlay icon and text size. Applying a size reconnects CarPlay.</string>
     <string name="channel_0_auto">Channel (0 = auto)</string>
     <string name="channel_is_not_valid_for_the_selected_band">Channel is not valid for the selected band</string>
     <string name="channel_must_be_0_or_1_196">Channel must be 0 or 1-196</string>
@@ -157,7 +163,7 @@
     <string name="connect_phone">Connect phone</string>
     <string name="connect_when_diplay_opens">Connect when CarPlay opens</string>
     <string name="connect_when_iphone_bluetooth_connects">Connect when the selected iPhone reconnects</string>
-    <string name="connect_when_iphone_bluetooth_connects_description">After the car wakes, open CarPlay and start wireless CarPlay when the selected iPhone connects over Bluetooth. Some head units restrict background launches.</string>
+    <string name="connect_when_iphone_bluetooth_connects_description">Start wireless CarPlay when the selected iPhone connects by Bluetooth. Requires background launch support.</string>
     <string name="connect_with_usb">Connect with USB</string>
     <string name="connect_your_iphone_with_a_usb_cable">Connect your iPhone with a USB cable</string>
     <string name="connecting_bluetooth">Connecting Bluetooth</string>
@@ -320,9 +326,9 @@
     <string name="settings_navigation">Navigation</string>
     <string name="settings_vehicle">Vehicle</string>
     <string name="settings_advanced">Experimental</string>
-    <string name="settings_advanced_subtitle">Experimental features and their requirements.</string>
+    <string name="settings_advanced_subtitle">Enable as needed; turn off if problems occur.</string>
     <string name="settings_advanced_caution_title">Change with care</string>
-    <string name="settings_advanced_caution_description">These features can depend on vehicle firmware, ADB access, or experimental CarPlay behavior. Everyday settings are organized in the categories above.</string>
+    <string name="settings_advanced_caution_description">Some features depend on firmware or permissions and may affect sound, video or connection.</string>
     <string name="settings_search">Search</string>
     <string name="settings_search_hint">Search settings</string>
     <string name="settings_search_empty">No setting matches. Try another word.</string>
@@ -452,13 +458,13 @@
     <string name="wheel_zoom_mode_on">Volume keys now zoom the dashboard map</string>
     <string name="wheel_zoom_mode_off">Volume keys control the volume again</string>
     <string name="wheel_joystick">CarPlay joystick on the wheel</string>
-    <string name="wheel_joystick_description">Assign the joystick toggle, movement, selection and back keys below. These keys control CarPlay while joystick mode is on. During a call, keys keep their normal function.</string>
+    <string name="wheel_joystick_description">Learn the keys below to control CarPlay. Calls keep their original key actions.</string>
     <string name="settings_usb_connection">USB connection</string>
     <string name="settings_usb_charging">iPhone charging</string>
     <string name="settings_usb_charging_normal">Normal (2.4 A)</string>
     <string name="settings_usb_charging_reduced">Reduced (1.5 A)</string>
     <string name="settings_usb_charging_low">Low (0.5 A)</string>
-    <string name="settings_usb_charging_description">How much charging current CarPlay offers the iPhone over USB. If wired CarPlay drops every few seconds and the iPhone reconnects by itself, the car\'s USB port may not supply enough power: try Reduced, then Low. The iPhone then charges more slowly. Applies at the next USB connection.</string>
+    <string name="settings_usb_charging_description">For frequent USB disconnects, try Reduced, then Low. Charging will be slower. Applies at the next USB connection.</string>
     <string name="wheel_joystick_auto_off">Joystick turns off by itself</string>
     <string name="wheel_joystick_auto_off_description">After 15 seconds without a press, and when a route starts, the keys go back to music and volume.</string>
     <string name="wheel_joystick_on">Joystick on</string>
@@ -471,7 +477,7 @@
     <string name="wheel_key_none">none</string>
     <string name="wheel_key_role_back">back</string>
     <string name="wheel_key_service_label">CarPlay wheel keys</string>
-    <string name="wheel_key_service_description">Optional wheel key filtering for navigation volume during spoken guidance, dashboard map zoom, CarPlay joystick and call controls. No screen content is read.</string>
+    <string name="wheel_key_service_description">Enable wheel, navigation volume and call controls. Does not read screen content.</string>
     <string name="hotspot_network_not_ready">Hotspot network is not ready</string>
     <string name="first_tcp_timeout">The iPhone did not connect to CarPlay in time</string>
     <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
@@ -480,29 +486,29 @@
     <string name="carplay_dock_automatic">Automatic</string>
     <string name="carplay_dock_driver_side">Driver\'s side</string>
     <string name="carplay_dock_bottom">Bottom</string>
-    <string name="carplay_dock_hint">Where CarPlay shows its apps, clock and status. Between Driver\'s side and Bottom it moves at once; Automatic leaves it to the iPhone and applies after a reconnect.</string>
+    <string name="carplay_dock_hint">Switch between driver side and bottom immediately. Auto is chosen by the iPhone and applies after reconnecting.</string>
     <string name="main_buffered_audio">Buffered music (experimental)</string>
-    <string name="main_buffered_audio_description">Apps that support it, such as Apple Music, send up to about two minutes of music ahead, so short Wi-Fi gaps are not heard. Other apps keep the normal stream. Reconnects CarPlay.</string>
+    <string name="main_buffered_audio_description">Supported music apps buffer ahead to reduce interruptions from brief network drops. Reconnects CarPlay.</string>
     <string name="settings_car_bluetooth_audio">Music and wheel controls over Bluetooth (experimental)</string>
-    <string name="settings_car_bluetooth_audio_description">Keep the iPhone connected to the car for Bluetooth music and select the car\'s Bluetooth audio source. Music and media wheel controls stay with the car; DiPlay stops forwarding media keys and requesting music focus. CarPlay picture and touch remain available. This mode offers no CarPlay audio, so navigation, calls and Siri audio may also change routes. If sound is missing or plays on the iPhone, choose a CarPlay mode.</string>
+    <string name="settings_car_bluetooth_audio_description">Connect iPhone Bluetooth audio and select the car’s Bluetooth source. The car handles audio and media keys; CarPlay keeps video and touch. Switch back to CarPlay audio if navigation, calls or Siri are silent.</string>
     <string name="call_echo_cancellation">Call echo cancellation (experimental)</string>
-    <string name="call_echo_cancellation_description">Tries to reduce speaker echo sent to the other person during CarPlay calls. Results depend on the head unit. Applies at the next CarPlay connection.</string>
+    <string name="call_echo_cancellation_description">Reduce call echo. Results depend on the car. Applies at the next connection.</string>
     <string name="call_voice_filter">Clearer call voices (experimental)</string>
-    <string name="call_voice_filter_description">Cuts bass from CarPlay call audio. This may change how voices sound. Applies at the next CarPlay connection.</string>
+    <string name="call_voice_filter_description">Reduce bass in calls; voice tone may change. Applies at the next connection.</string>
     <string name="phone_audio_route">Car phone audio for CarPlay calls (experimental)</string>
-    <string name="phone_audio_route_description">Holds a Telecom call during CarPlay calls so the car switches to its phone audio state and its own echo cancellation works. CarPlay’s echo canceller stays out of those calls. Your voice can come out louder or distorted. Off by default; applies at the next call.</string>
+    <string name="phone_audio_route_description">Use the car’s call audio and echo cancellation instead of CarPlay echo cancellation. Voice may become louder or distorted. Off by default; applies to the next call.</string>
     <string name="phone_audio_route_apps">Car phone audio for VoIP calls in other apps (experimental)</string>
-    <string name="phone_audio_route_apps_description">Does the same while another app, such as WhatsApp, Telegram or Zoom, is in a voice or video call. Voice notes and plain recordings are left alone because the car mutes the plain microphone in this state. Needs CarPlay running, so this also turns on the wheel-key accessibility service. Off by default.</string>
+    <string name="phone_audio_route_apps_description">Use car call audio for other apps’ calls, excluding voice messages. Also enables the wheel accessibility service. Off by default.</string>
     <string name="smooth_video">Smooth video (experimental)</string>
-    <string name="smooth_video_description">Shows each main-screen CarPlay frame at the time the iPhone stamped on it plus a short delay, instead of as soon as it is decoded. The delay adjusts itself so that most frames are decoded in time; frames still not ready by their time are shown at once. Scrolling can look more even, but touches respond later. Picture adjustments do not apply. Reconnects CarPlay.</string>
+    <string name="smooth_video_description">Smooth video with added touch delay. Picture adjustments are unavailable. Reconnects CarPlay.</string>
     <string name="settings_mtk_decoder_tuning">MTK decoder low latency (experimental)</string>
-    <string name="settings_mtk_decoder_tuning_description">Detected %1$s for the selected video format. Uses a dedicated MTK low-latency decoder when available. Legacy OMX decoders instead try no-reorder plus low latency, then low latency alone. Automatically falls back if the decoder rejects or fails. It may reduce video delay, but some firmware can stutter or fail. Applies at the next CarPlay connection.</string>
+    <string name="settings_mtk_decoder_tuning_description">Try lower video latency with automatic fallback on failure. Turn off if video stutters. Applies at the next connection.</string>
     <string name="settings_direct_video_output">Direct video output (experimental)</string>
-    <string name="settings_direct_video_output_description">Sends the CarPlay picture straight to the head unit\'s compositor instead of drawing it inside the CarPlay window. Can lower the delay by about one screen refresh. Picture adjustments do not apply. Reconnects CarPlay.</string>
+    <string name="settings_direct_video_output_description">Reduce video latency. Picture adjustments are unavailable. Reconnects CarPlay.</string>
     <string name="settings_low_latency_decoder">Low-latency decoding (experimental)</string>
-    <string name="settings_low_latency_decoder_description">Asks Qualcomm video decoders to output each frame as soon as it is decoded instead of holding the next ones, and shows each decoded frame from a dedicated thread without waiting for the next one to arrive. Can lower the delay by tens of milliseconds. Turn it off if the picture shows artifacts or freezes. Applies at the next connection.</string>
+    <string name="settings_low_latency_decoder_description">Reduce decode latency. Turn off if video corrupts or freezes. Applies at the next connection.</string>
     <string name="settings_fps_counter">FPS counter</string>
-    <string name="settings_fps_counter_description">Shows a counter in the top-right corner of CarPlay: frames shown per second (green from 50, yellow from 30, red below), frames received from the iPhone per second, and the decode time. A still screen shows few frames because the iPhone sends none.</string>
+    <string name="settings_fps_counter_description">Show frame rates and decode time at the top right. Frame rates drop when the picture is still.</string>
     <string name="fps_counter_text" translatable="false">%1$d FPS\nRX %2$d · %3$s</string>
     <string name="fps_counter_millis" translatable="false">%1$d ms</string>
     <string name="fps_counter_no_value" translatable="false">–</string>
@@ -511,14 +517,14 @@
     <string name="car_button_icon">Icon</string>
     <string name="car_button_icon_custom">Custom icon</string>
     <string name="car_button_name">Name</string>
-    <string name="car_button_description">CarPlay shows this icon and name in its app list. Tap it to return to the car\'s own screen. Changes apply the next time CarPlay connects.</string>
+    <string name="car_button_description">Tap this icon in CarPlay to return to the car interface. Name and icon changes apply at the next connection.</string>
     <string name="car_button_saved_next_connection">Saved. CarPlay shows the new icon and name the next time it connects.</string>
     <string name="this_head_unit_has_no_image_picker">This head unit has no image picker.</string>
 
     <string name="settings_ambient_title">Ambient lighting (experimental)</string>
     <string name="settings_interface_size">Interface size</string>
     <string name="settings_interface_size_preface_12_3">Preface 12.3-inch</string>
-    <string name="settings_interface_size_hint" formatted="false">Defaults to the Preface 12.3-inch, 1920×720 screen. You can also choose 75% to 150% of the system size. Only this app changes; the CarPlay picture is unaffected.</string>
+    <string name="settings_interface_size_hint" formatted="false">Defaults to the Xingrui 12.3-inch screen. Changes only this app’s interface.</string>
     <string name="update_check">Check for updates</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You\'re up to date</string>
@@ -531,14 +537,14 @@
     <string name="update_saved_to">Saved to %1$s</string>
     <string name="backup_title">Back up settings</string>
     <string name="backup_open">Back up or restore on a phone</string>
-    <string name="backup_open_description">Show a QR code so a phone browser on the same network can export or import CarPlay settings. The service stops when you leave the page.</string>
+    <string name="backup_open_description">Scan with a phone on the same network to import or export settings. The service stops when you leave.</string>
     <string name="backup_page_hint">Scan the code with the phone camera to open this page in its browser. Export saves a settings file, import loads one.</string>
     <string name="backup_other_addresses">If the code does not open, try changing the IP address in your browser to %1$s.</string>
     <string name="backup_no_network">No usable Wi-Fi network. Turn on the car hotspot or connect the phone to the car Wi-Fi first.</string>
     <string name="backup_summary">Imported %1$d settings, skipped %2$d.</string>
     <string name="backup_import_invalid">This file is not a CarPlay settings backup.</string>
     <string name="settings_background_update_checks">Check for updates in the background</string>
-    <string name="settings_background_update_checks_description">Once a day, CarPlay checks GitHub for a new version and shows it on the home screen. It never downloads without your tap.</string>
+    <string name="settings_background_update_checks_description">Check for updates daily. Downloads start only when tapped.</string>
     <string name="settings_return_to_home">Return to home</string>
     <string name="settings_quick_menu">Quick actions</string>
     <string name="settings_all_settings">All settings</string>
@@ -558,13 +564,13 @@
     <string name="settings_gesture_disabled_hint">Swipe-down shortcut is disabled.</string>
     <string name="settings_gesture_disabled_action">Quick menu · swipe disabled (tap to change)</string>
     <string name="settings_disable_media_key_audio_focus">Disable media-key audio focus (experimental)</string>
-    <string name="settings_disable_media_key_audio_focus_description">Stops CarPlay from requesting media audio focus while CarPlay music is active. Enable this if your head unit routes its physical volume buttons to CarPlay and they no longer adjust volume. Steering-wheel play, pause and track controls may stop working on head units that require focus. Applies at the next CarPlay connection.</string>
+    <string name="settings_disable_media_key_audio_focus_description">Try this if physical volume keys stop working. Media wheel keys may stop working instead. Applies at the next connection.</string>
     <string name="settings_hotspot_name_non_english">Names with Chinese or other non-English characters can leave CarPlay on “Getting CarPlay ready…”: some head units broadcast them in a form the iPhone doesn’t find. If that happens, rename the car hotspot with English letters and digits.</string>
     <string name="settings_speech_without_low_rates">Clearer navigation voice over USB (experimental)</string>
-    <string name="settings_speech_without_low_rates_description">Over USB the iPhone can send navigation prompts and Siri’s spoken replies as 8 kHz phone-quality audio. This stops offering 8 and 16 kHz for that audio so the iPhone picks a higher rate. If prompts go silent, turn it off. Reconnects CarPlay.</string>
+    <string name="settings_speech_without_low_rates_description">Improve USB navigation and Siri speech quality. Turn off if speech is silent. Reconnects CarPlay.</string>
     <string name="bluetooth_connections_not_real">This head unit’s Android Bluetooth reports a connection, but nothing reaches the iPhone: even a connection to a service that does not exist succeeds. Bluetooth here is handled by the maker’s own module, which apps cannot use, so wireless CarPlay cannot work on this head unit. Try a USB connection.</string>
     <string name="settings_cluster_music">Music on cluster (experimental)</string>
-    <string name="settings_cluster_music_description">Show a square album cover over the cluster map. Choose temporary (8 seconds) or permanent artwork; the title and artist always appear over the cover for 8 seconds when the song changes. Position and size apply immediately. Requires cluster projection and iPhone metadata.</string>
+    <string name="settings_cluster_music_description">Show artwork and song details on the cluster map. Requires cluster projection and iPhone song data. Position and size apply immediately.</string>
     <string name="settings_cluster_music_mode">Album cover visibility</string>
     <string name="settings_cluster_music_temporary">Temporary · 8 seconds</string>
     <string name="settings_cluster_music_permanent">Permanent</string>
@@ -572,9 +578,12 @@
     <string name="settings_cluster_music_vertical">Music card · vertical position</string>
     <string name="settings_cluster_music_size">Music card · size</string>
     <string name="settings_cluster_music_unknown">Unknown artist</string>
-    <string name="settings_fixed_resolution_hint">Hide navigation bar: 1920×720. Show navigation bar: 1760×720. The CarPlay resolution changes at the next connection.</string>
+    <string name="settings_fixed_resolution_hint">Hidden: 1920×720; shown: 1760×720. Applies at the next connection.</string>
     <string name="settings_music_buffer_wireless">Music buffer (wireless CarPlay)</string>
     <string name="settings_music_buffer_wired">Music buffer (USB cable)</string>
     <string name="settings_music_buffer_ms">%1$d ms</string>
-    <string name="settings_music_buffer_next_connection">Buffer changes apply at the next connection.</string>
+    <string name="settings_music_buffer_next_connection">Larger buffers improve stability but add audio delay. Applies at the next connection.</string>
+    <string name="settings_authorization_open_downloads">Open save folder</string>
+    <string name="settings_authorization_overlay">Display over other apps</string>
+    <string name="settings_authorization_overlay_description">Allow floating controls. Granting permission does not show them automatically.</string>
 </resources>

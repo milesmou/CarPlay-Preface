@@ -9,8 +9,8 @@
     <string name="settings_hotspot_password_length">The hotspot password must contain 8–63 characters. Leave it empty only for an open hotspot.</string>
     <string name="settings_wireless_hotspot">Wireless connection</string>
     <string name="settings_hotspot_mode">Hotspot mode</string>
-    <string name="settings_hotspot_next_connection">Mode and credential changes take effect at the next connection. Your current CarPlay session continues.</string>
-    <string name="settings_manual_hotspot_description">Selecting this mode attempts to turn on the head unit hotspot with its saved configuration. Enter the matching SSID and password here. Your iPhone connects to this hotspot. The app does not rename it, change its password, or turn it off.</string>
+    <string name="settings_hotspot_next_connection">Changes apply at the next connection.</string>
+    <string name="settings_manual_hotspot_description">Try to start the saved car hotspot. Enter its exact name and password. The app does not change its configuration or turn it off automatically.</string>
     <string name="settings_manual_hotspot_details">Hotspot SSID and password</string>
     <string name="settings_hotspot_not_configured">Not configured</string>
     <string name="settings_manual_hotspot_join">Check that the head unit’s hotspot is on and its SSID and password match those saved in Connection settings. On your iPhone, join this hotspot and enable Auto-Join.</string>

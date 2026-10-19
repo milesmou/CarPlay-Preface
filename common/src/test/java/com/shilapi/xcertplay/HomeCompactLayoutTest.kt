@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.content.res.Configuration
 import android.view.View
+import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
@@ -23,22 +24,24 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class HomeCompactLayoutTest {
-    @Test fun headUnitLandscape() = capture("full", 1f, true)
-    @Test fun headUnitLandscapeLargeFont() = capture("full-font150", 1.5f, true)
+    @Test fun headUnitLandscape() = capture("full", 1f)
+    @Test fun headUnitLandscapeLargeFont() = capture("full-font150", 1.5f)
     @Test @Config(qualifiers = "zh-rCN-w640dp-h240dp-land-xxhdpi")
-    fun highDensityLandscapeLargeFont() = capture("high-density-font150", 1.5f, true)
+    fun highDensityLandscapeLargeFont() = capture("high-density-font150", 1.5f)
     @Test @Config(qualifiers = "zh-rCN-w480dp-h180dp-land-xxxhdpi")
-    fun narrowAvailableWindowLargeFont() = capture("narrow-font150", 1.5f, false)
+    fun narrowAvailableWindowLargeFont() = capture("narrow-font150", 1.5f)
 
     @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    fun landscapeRightToLeftLargeFont() = capture("rtl-font150", 1.5f, true)
+    fun landscapeRightToLeftLargeFont() = capture("rtl-font150", 1.5f)
 
     private fun views(view: View): Sequence<View> = sequence {
         yield(view)
         if (view is ViewGroup) for (i in 0 until view.childCount) yieldAll(views(view.getChildAt(i)))
     }
 
-    private fun capture(name: String, fontScale: Float, columns: Boolean) {
+    private fun capture(name: String, fontScale: Float) {
+        UsbAutoConnect.resetForTest()
+        CarPlayBackgroundSession.clear()
         val app = RuntimeEnvironment.getApplication()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         app.getSharedPreferences("diplay", 0).edit().clear().commit()
@@ -83,18 +86,27 @@ class HomeCompactLayoutTest {
                 it.text == activity.getString(R.string.home_connection_hint)
             })
             val wireless = views(decor).filterIsInstance<TextView>().single { it.tag == "home-phone:12:34:56:78:90:AB" }
-            val usb = text(R.string.home_usb_waiting)
-            val first = (wireless.parent as View).parent as View
-            val second = usb.parent as View
-            assertEquals(first.width, second.width)
-            if (columns) {
-                assertTrue(second.left >= first.right || second.right <= first.left)
-                assertEquals(first.top, second.top)
-                assertEquals(first.height, second.height)
-                val position = IntArray(2)
-                wireless.getLocationOnScreen(position)
-                assertTrue("Primary connection action must fit on the first screen", position[1] + wireless.height <= height)
-            } else assertTrue(second.top >= first.bottom)
+            val list = ReflectionHelpers.getField<android.widget.LinearLayout>(activity, "homePhoneList")
+            assertEquals("Only one device appears on home", 1, list.childCount)
+            assertFalse(views(decor).any { it.tag == "home-phone:12:34:56:78:90:AC" })
+            val body = views(decor).single { it.tag == "home-connection-content" }
+            assertNull("Connection content has no card background", body.background)
+            val bodyPosition = IntArray(2)
+            val viewportPosition = IntArray(2)
+            body.getLocationOnScreen(bodyPosition)
+            homeScroll.getLocationOnScreen(viewportPosition)
+            assertEquals("Connection content is horizontally centered", width / 2f,
+                bodyPosition[0] + body.width / 2f, 1f)
+            assertEquals("Connection content is vertically centered below the header",
+                viewportPosition[1] + homeScroll.height / 2f, bodyPosition[1] + body.height / 2f, 1f)
+            assertTrue("Connection content fits the window and has a bounded width",
+                body.width <= minOf(homeScroll.width, (640 * activity.resources.displayMetrics.density).toInt()))
+            assertEquals(Gravity.CENTER, wireless.gravity)
+            assertEquals(Gravity.CENTER, text(R.string.home_connection_hint).gravity)
+            assertTrue(bodyPosition[1] >= viewportPosition[1])
+            val position = IntArray(2)
+            wireless.getLocationOnScreen(position)
+            assertTrue("Connection action must fit on the first screen", position[1] + wireless.height <= height)
             for (control in listOf(wireless, text(R.string.settings))) {
                 assertTrue("${control.text}: height=${control.height}, minimum=${control.minimumHeight}", control.height >= control.minimumHeight)
                 assertTrue(control.layout.height + control.compoundPaddingTop + control.compoundPaddingBottom <= control.height)
@@ -111,13 +123,15 @@ class HomeCompactLayoutTest {
                 assertFalse("Repeated home copy: ${activity.getString(id)}", activity.getString(id) in visibleText)
             }
             assertFalse(visibleText.any { it.startsWith("公开预览") || it.startsWith("Public preview") })
-            assertEquals(1, visibleText.count { it == activity.getString(R.string.wireless_carplay) })
-            assertEquals(1, visibleText.count { it == activity.getString(R.string.usb_carplay) })
+            for (id in listOf(R.string.wireless_carplay, R.string.usb_carplay,
+                R.string.home_connected_devices, R.string.home_usb_waiting)) {
+                assertFalse("No transport card heading", activity.getString(id) in visibleText)
+            }
             if (name.startsWith("full")) {
                 val scroll = ReflectionHelpers.getField<ScrollView>(activity, "rootScroll")
                 assertTrue("Home must fit without scrolling at normal density", scroll.getChildAt(0).height <= scroll.height)
             }
-            val directory = File("../agent_docs/screenshots/home-devices-test-renders").apply { mkdirs() }
+            val directory = File("../agent_docs/screenshots/home-centered-test-renders").apply { mkdirs() }
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             decor.draw(Canvas(bitmap))
             File(directory, "1920x720-$name.png").outputStream().use {
@@ -126,6 +140,8 @@ class HomeCompactLayoutTest {
             bitmap.recycle()
         } finally {
             controller.pause().stop().destroy()
+            CarPlayBackgroundSession.clear()
+            UsbAutoConnect.resetForTest()
             app.applicationInfo.flags = previousFlags
             AppAppearanceRuntime.resetForTest()
         }

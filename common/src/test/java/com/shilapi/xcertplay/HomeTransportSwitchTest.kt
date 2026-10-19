@@ -85,6 +85,73 @@ class HomeTransportSwitchTest {
         assertTrue(AirPlayPersistence.loadWirelessEnabled(app))
     }
 
+    @Test fun onlyTheSavedPhoneAmongLiveBluetoothDevicesIsShown() {
+        val activity = home()
+        setPhones(activity, listOf(ConnectedPhone("OTHER", "Other iPhone"),
+            ConnectedPhone("12:34:56:78:90:AB", "My iPhone")))
+        assertEquals(1, phoneList(activity).childCount)
+        assertEquals("home-phone:12:34:56:78:90:AB", phoneList(activity).getChildAt(0).tag)
+    }
+
+    @Test fun noDeviceLeavesOnlyTheConnectionHint() {
+        val activity = home()
+        setPhones(activity, emptyList())
+        assertEquals(0, phoneList(activity).childCount)
+    }
+
+    @Test fun usbPriorityShowsOneUsbDeviceInsteadOfBluetoothDevices() {
+        attachFailedUsb()
+        UsbAutoConnect.beginWiredAttempt(app)
+        val activity = home()
+        assertEquals(1, phoneList(activity).childCount)
+        val device = phoneList(activity).getChildAt(0)
+        assertEquals("home-device:usb", device.tag)
+        assertFalse("USB starts automatically, without a connect button", device.isClickable)
+    }
+
+    @Test fun activeWirelessSessionStaysVisibleWhenBluetoothDrops() {
+        retain(CarPlayTransport.WIRELESS, active = true)
+        val activity = home()
+        setPhones(activity, emptyList())
+        assertEquals(1, phoneList(activity).childCount)
+        assertEquals("home-session:wireless", phoneList(activity).getChildAt(0).tag)
+        phoneList(activity).getChildAt(0).performClick()
+        assertProjection(activity)
+        assertEquals(0, stops)
+    }
+
+    @Test fun activeWiredSessionShowsOnlyUsbEvenAfterAFailedAttempt() {
+        attachFailedUsb()
+        retain(CarPlayTransport.WIRED, active = true)
+        val activity = home()
+        assertEquals(1, phoneList(activity).childCount)
+        assertEquals("home-device:usb", phoneList(activity).getChildAt(0).tag)
+    }
+
+    @Test fun changingSessionTransportRefreshesTheSingleDevice() {
+        retain(CarPlayTransport.WIRELESS, active = true)
+        val activity = home()
+        assertEquals("home-session:wireless", phoneList(activity).getChildAt(0).tag)
+        attachFailedUsb()
+        retain(CarPlayTransport.WIRED, active = true)
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "refreshStatus")
+        assertEquals(1, phoneList(activity).childCount)
+        assertEquals("home-device:usb", phoneList(activity).getChildAt(0).tag)
+        CarPlayBackgroundSession.clear()
+        val usbManager = shadowOf(app.getSystemService(UsbManager::class.java))
+        UsbAutoConnect.attached(app)?.let { usbManager.removeUsbDevice(it) }
+        setPhones(activity, emptyList())
+        assertEquals(0, phoneList(activity).childCount)
+    }
+
+    private fun phoneList(activity: DiPlayActivity) =
+        ReflectionHelpers.getField<android.widget.LinearLayout>(activity, "homePhoneList")
+
+    private fun setPhones(activity: DiPlayActivity, phones: List<ConnectedPhone>) {
+        ReflectionHelpers.setField(activity, "connectedPhoneState", ConnectedPhoneState(true, true, phones))
+        ReflectionHelpers.callInstanceMethod<Unit>(activity, "refreshStatus")
+    }
+
     private fun retain(mode: CarPlayTransport, active: Boolean = false, closed: Boolean = false): CarPlayController {
         val controller = mock(CarPlayController::class.java)
         `when`(controller.connectionTransport()).thenReturn(mode)
@@ -118,11 +185,11 @@ class HomeTransportSwitchTest {
         assertTrue(AirPlayPersistence.loadWirelessEnabled(app))
     }
 
-    @Test fun unpluggedUsbStillWaitingCannotBeResumedByTheWirelessCard() {
+    @Test fun unpluggedUsbStillWaitingCannotBeResumedByTheWirelessDevice() {
         retain(CarPlayTransport.WIRED)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         val activity = home()
-        assertEquals("iPhone · ${activity.getString(R.string.home_bluetooth_connected)}", wireless(activity).text.toString())
+        assertEquals("iPhone · ${activity.getString(R.string.wireless_carplay)}", wireless(activity).text.toString())
         wireless(activity).performClick()
         assertEquals(1, stops)
         assertNull(shadowOf(activity).nextStartedActivity)
@@ -131,14 +198,14 @@ class HomeTransportSwitchTest {
         assertProjection(activity)
     }
 
-    @Test fun evenAnActiveUsbSnapshotMustStopBeforeWirelessStarts() {
+    @Test fun activeUsbSnapshotIsShownInsteadOfAWirelessChoice() {
         retain(CarPlayTransport.WIRED, active = true)
         val activity = home()
-        wireless(activity).performClick()
-        assertEquals(1, stops)
-        assertNull(shadowOf(activity).nextStartedActivity)
-        release!!()
-        assertProjection(activity)
+        val device = phoneList(activity).getChildAt(0)
+        assertEquals("home-device:usb", device.tag)
+        device.performClick()
+        assertEquals(0, stops)
+        assertEquals(CarPlayHostActivity::class.java.name, shadowOf(activity).nextStartedActivity?.component?.className)
     }
 
     @Test fun savedWirelessPreferenceCannotMisidentifyAnActualUsbController() {
@@ -156,7 +223,7 @@ class HomeTransportSwitchTest {
         retain(CarPlayTransport.WIRELESS, active = true)
         AirPlayPersistence.saveWirelessEnabled(app, false)
         val activity = home()
-        assertEquals("iPhone · ${activity.getString(R.string.home_bluetooth_connected)}", wireless(activity).text.toString())
+        assertEquals("iPhone · ${activity.getString(R.string.wireless_carplay)}", wireless(activity).text.toString())
         wireless(activity).performClick()
         assertEquals(0, stops)
         assertProjection(activity)

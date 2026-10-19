@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_wheel_learning_hint">Learn, restore or disable previous, next and Siri keys. Choose Learn key, then press a key within 10 seconds. Only keys received by the app can be learned. Phone, volume, system and typing keys cannot be assigned. Disabling stops app forwarding; the car retains its own actions. Bluetooth media keys remain with the car. No CarPlay reconnect is needed.</string>
+    <string name="settings_wheel_learning_hint">Tap an action to learn, restore or disable it immediately. Only received keys can be learned; call, volume, system and typing keys are reserved. Disabling keeps car actions; Bluetooth media keys stay with the car.</string>
     <string name="settings_wheel_previous">Previous track</string>
     <string name="settings_wheel_next">Next track</string>
     <string name="settings_wheel_siri">Siri key</string>

@@ -37,7 +37,7 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [29])
+@Config(sdk = [29], shadows = [VpnConsentTestShadow::class])
 @LooperMode(LooperMode.Mode.PAUSED)
 class CarPlayHostDisplaySizeTest {
     private lateinit var activity: CarPlayHostActivity
@@ -45,11 +45,15 @@ class CarPlayHostDisplaySizeTest {
     private val sizeClass = Class.forName("com.shilapi.xcertplay.CarPlayHostActivity\$DisplaySize")
 
     @Before fun setUp() {
+        VpnConsentTestShadow.consent = null
+        VpnConsentTestShadow.failure = null
         activity = Robolectric.buildActivity(CarPlayHostActivity::class.java).get()
         // Source-only tests have no provisioned local authentication identity.
         AirPlayPersistence.saveMfiTarget(activity, MfiTarget.USB_CH341)
         // Exercise host startup without launching vendor-service workers or real transports.
-        controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, _ ->
+        controllerConstruction = mockConstruction(CarPlayController::class.java) { controller, construction ->
+            val runtime = construction.arguments()[1] as CarPlayRuntimeConfig
+            org.mockito.Mockito.`when`(controller.connectionTransport()).thenReturn(runtime.transport)
             org.mockito.Mockito.`when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
             org.mockito.Mockito.`when`(controller.awaitClosed(org.mockito.ArgumentMatchers.anyLong())).thenReturn(true)
         }
@@ -465,13 +469,13 @@ class CarPlayHostDisplaySizeTest {
         startSession()
         val view = View(activity).apply { layout(0, 0, 1920, 942) }
         touch(view, MotionEvent.ACTION_DOWN, 1f, 471f)
-        assertEquals(true, getField("touchOutsideContent"))
+        assertEquals(true, activity.touchController.ignoringOutsideContent)
         touch(view, MotionEvent.ACTION_MOVE, 960f, 471f)
-        assertEquals(true, getField("touchOutsideContent"))
+        assertEquals(true, activity.touchController.ignoringOutsideContent)
         touch(view, MotionEvent.ACTION_UP, 960f, 471f)
-        assertEquals(false, getField("touchOutsideContent"))
+        assertEquals(false, activity.touchController.ignoringOutsideContent)
         touch(view, MotionEvent.ACTION_DOWN, 960f, 471f)
-        assertEquals(false, getField("touchOutsideContent"))
+        assertEquals(false, activity.touchController.ignoringOutsideContent)
     }
 
     @Test fun adoptingABackgroundSessionPreservesItsCanvasOnResize() {
@@ -532,6 +536,8 @@ class CarPlayHostDisplaySizeTest {
         setField("airPlayIdentity", AirPlayIdentity.generate())
         setField("mfiTarget", MfiTarget.LOCAL)
         setField("microphonePermissionResolved", true)
+        // This fixture tests display teardown, with prerequisite authorization already resolved.
+        setField("vpnReady", true)
     }
 
     private fun finishTeardown() {

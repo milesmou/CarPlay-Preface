@@ -252,7 +252,7 @@ class WirelessStartupRecoveryTest {
         `when`(controller.matchesWirelessPhone(address)).thenReturn(true)
         val app = org.robolectric.RuntimeEnvironment.getApplication()
         DiPlayPreferences.savePhone(app, address, "iPhone")
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         val stop: ((() -> Unit) -> Unit) = { fail("Must not stop existing owner") }
         ReflectionHelpers.setField(CarPlayBackgroundSession, "stopAction", stop)
         val context = object : android.content.ContextWrapper(app) {

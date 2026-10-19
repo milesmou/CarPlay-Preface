@@ -23,15 +23,18 @@ class PhoneBluetoothReceiverTest {
     private val selected = "12:34:56:78:9A:BC"
 
     @Before fun reset() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, false)
+        DiPlayPreferences.saveAutoConnect(app, false)
         app.getSharedPreferences("diplay_phone_wake", Context.MODE_PRIVATE).edit().clear().commit()
         app.getSharedPreferences("diplay_phone_wake_diagnostics", Context.MODE_PRIVATE).edit().clear().commit()
         CarPlayBackgroundSession.clear()
+        ConnectionAutoStart.resetForTest()
         shadowOf(app).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT)
         // Saved in lowercase on purpose: the receiver must match the (always uppercase) device
         // address case-insensitively; Robolectric refuses to build a lowercase remote device.
         DiPlayPreferences.savePhone(app, selected.lowercase(), "iPhone")
     }
+
+    @org.junit.After fun cleanupLaunchPolicy() { ConnectionAutoStart.resetForTest() }
 
     private fun event(address: String): Intent {
         val device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address)
@@ -39,7 +42,32 @@ class PhoneBluetoothReceiverTest {
             .putExtra(BluetoothDevice.EXTRA_DEVICE, device)
     }
 
-    @Test fun onlySelectedPhoneWithOptInLaunchesOnce() {
+    @Test fun returningHomeSuppressesEvenANewBluetoothProfileConnection() {
+        DiPlayPreferences.saveAutoConnect(app, true)
+        ConnectionAutoStart.cancel()
+        PhoneBluetoothReceiver().onReceive(app, event(selected))
+        assertNull(shadowOf(app).nextStartedActivity)
+        assertTrue(PhoneWakeDiagnostics.report(app).contains("cancelled-on-home"))
+    }
+
+    @Test fun aNewInstallConnectsTheEventPhoneByDefault() {
+        app.getSharedPreferences("diplay", 0).edit().clear().commit()
+        assertTrue(DiPlayPreferences.autoConnect(app))
+        PhoneBluetoothReceiver().onReceive(app, event(selected))
+        assertEquals(selected, DiPlayPreferences.phoneAddress(app))
+        assertEquals(DiPlayActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
+    }
+
+    @Test fun anotherConnectedPhoneCannotReplaceAnExistingSession() {
+        DiPlayPreferences.saveAutoConnect(app, true)
+        val stop: ((() -> Unit) -> Unit) = { fail("Automatic connection must preserve the current session") }
+        org.robolectric.util.ReflectionHelpers.setField(CarPlayBackgroundSession, "stopAction", stop)
+        PhoneBluetoothReceiver().onReceive(app, event("AA:BB:CC:DD:EE:FF"))
+        assertEquals(selected.lowercase(), DiPlayPreferences.phoneAddress(app))
+        assertNull(shadowOf(app).nextStartedActivity)
+    }
+
+    @Test fun currentPhoneLaunchesOnceWithoutASeparateOptInOrPhoneSelection() {
         val launches = mutableListOf<Intent>()
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) { launches += intent }
@@ -47,14 +75,14 @@ class PhoneBluetoothReceiverTest {
         val receiver = PhoneBluetoothReceiver()
         receiver.onReceive(context, event(selected))
         assertTrue(launches.isEmpty())
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
-        receiver.onReceive(context, event("AA:BB:CC:DD:EE:FF"))
-        assertTrue(launches.isEmpty())
-        receiver.onReceive(context, event(selected))
-        receiver.onReceive(context, event(selected))
+        DiPlayPreferences.saveAutoConnect(app, true)
+        val current = "AA:BB:CC:DD:EE:FF"
+        receiver.onReceive(context, event(current))
+        receiver.onReceive(context, event(current))
         assertEquals(1, launches.size)
+        assertEquals(current, DiPlayPreferences.phoneAddress(app))
+        assertEquals(current, launches.single().getStringExtra(PhoneBluetoothReceiver.EXTRA_PHONE_ADDRESS))
         assertEquals(DiPlayActivity::class.java.name, launches.single().component?.className)
-        assertTrue(launches.single().getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false))
         assertTrue(PhoneWakeDiagnostics.report(app).contains("result=startActivity-returned"))
     }
 
@@ -62,7 +90,7 @@ class PhoneBluetoothReceiverTest {
         for (action in PhoneBluetoothReceiver.ACTIONS.keys.filter { it != BluetoothDevice.ACTION_ACL_CONNECTED &&
             it != BluetoothDevice.ACTION_ACL_DISCONNECTED }) {
             reset()
-            DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+            DiPlayPreferences.saveAutoConnect(app, true)
             val launches = mutableListOf<Intent>()
             val context = object : ContextWrapper(app) {
                 override fun startActivity(intent: Intent) { launches += intent }
@@ -72,9 +100,6 @@ class PhoneBluetoothReceiverTest {
                 BluetoothProfile.STATE_DISCONNECTING, -1)) {
                 receiver.onReceive(context, event(selected).setAction(action).putExtra(BluetoothProfile.EXTRA_STATE, state))
             }
-            receiver.onReceive(context, event("AA:BB:CC:DD:EE:FF").setAction(action)
-                .putExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_CONNECTED))
-            assertTrue(launches.isEmpty())
             receiver.onReceive(context, event(selected).setAction(action)
                 .putExtra(BluetoothProfile.EXTRA_STATE, BluetoothProfile.STATE_CONNECTED))
             receiver.onReceive(context, event(selected))
@@ -84,7 +109,7 @@ class PhoneBluetoothReceiverTest {
     }
 
     @Test fun failedActivityLaunchDoesNotBlockFollowingProfileEvent() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         var attempts = 0
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) {
@@ -101,15 +126,16 @@ class PhoneBluetoothReceiverTest {
         assertTrue(PhoneWakeDiagnostics.report(app).contains("result=startActivity-returned"))
     }
 
-    @Test fun missingSelectedPhoneIsVisibleInDiagnostics() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+    @Test fun aConnectedPhoneDoesNotRequirePreselection() {
+        DiPlayPreferences.saveAutoConnect(app, true)
         app.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit().remove("phone_address").commit()
         PhoneBluetoothReceiver().onReceive(app, event(selected))
-        assertTrue(PhoneWakeDiagnostics.report(app).contains("lastEventDecision=no-selected-phone"))
+        assertEquals(selected, DiPlayPreferences.phoneAddress(app))
+        assertEquals(DiPlayActivity::class.java.name, shadowOf(app).nextStartedActivity?.component?.className)
     }
 
     @Test fun aRealDisconnectAllowsAnImmediateReconnectButOtherPhoneDoesNot() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         val launches = mutableListOf<Intent>()
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) { launches += intent }
@@ -127,7 +153,7 @@ class PhoneBluetoothReceiverTest {
     }
 
     @Test fun changingSelectedPhoneDoesNotInheritPreviousPhoneDebounce() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         var launches = 0
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) { launches++ }
@@ -140,7 +166,7 @@ class PhoneBluetoothReceiverTest {
     }
 
     @Test fun rebootDoesNotInheritElapsedTimeDebounce() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         var launches = 0
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) { launches++ }
@@ -154,7 +180,7 @@ class PhoneBluetoothReceiverTest {
     }
 
     @Test @Config(sdk = [33]) fun missingBluetoothPermissionDoesNotLaunch() {
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         shadowOf(app).denyPermissions(Manifest.permission.BLUETOOTH_CONNECT)
         var launches = 0
         val context = object : ContextWrapper(app) {

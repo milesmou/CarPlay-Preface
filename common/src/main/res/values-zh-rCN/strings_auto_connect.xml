@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_auto_connect">自动连接</string>
+    <string name="settings_auto_connect_hint">iPhone 连上蓝牙或插入 USB 后自动连接。</string>
+    <string name="settings_start_on_boot">开机自启</string>
+    <string name="settings_start_on_boot_hint">车机启动后打开应用，受系统启动设置影响。</string>
+</resources>

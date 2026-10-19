@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.backup
 
+import com.shilapi.xcertplay.settings.AirPlayPreferenceKeys
 import android.content.Context
 import android.content.SharedPreferences.Editor
 import org.json.JSONArray
@@ -20,44 +21,42 @@ object SettingsBackupCodec {
      * detected screen size, the car's hotspot) and consents (sharing the map with other apps) stay out too.
      */
     private val AIRPLAY_KEYS = setOf(
-        "cluster_content",
-        "cluster_small_window_mode",
-        "cluster_turn_card_overlay_x_percent",
-        "cluster_turn_card_overlay_y_percent",
-        "cluster_turn_card_overlay_size_percent",
-        "cluster_turn_card_opacity_percent",
-        "cluster_marker_x_percent",
-        "cluster_marker_y_percent",
-        "cluster_small_window_marker_x_percent",
-        "cluster_small_window_marker_y_percent",
-        "cluster_turn_card_theme",
-        "cluster_small_window_card_theme",
-        "cluster_small_window_card_size",
-        "cluster_small_window_card_x",
-        "cluster_small_window_card_y",
-        "cluster_small_window_card_opacity_percent",
+        AirPlayPreferenceKeys.KEY_CLUSTER_CONTENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_MODE,
+        AirPlayPreferenceKeys.KEY_CLUSTER_TURN_CARD_OVERLAY_X,
+        AirPlayPreferenceKeys.KEY_CLUSTER_TURN_CARD_OVERLAY_Y,
+        AirPlayPreferenceKeys.KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE_PERCENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_TURN_CARD_OPACITY,
+        AirPlayPreferenceKeys.KEY_CLUSTER_MARKER_X_PERCENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_MARKER_Y_PERCENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_MARKER_X_PERCENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_MARKER_Y_PERCENT,
+        AirPlayPreferenceKeys.KEY_CLUSTER_TURN_CARD_THEME,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_CARD_THEME,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_CARD_SIZE,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_CARD_X,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_CARD_Y,
+        AirPlayPreferenceKeys.KEY_CLUSTER_SMALL_WINDOW_CARD_OPACITY,
         "cluster_safe_area_1920x720",
-        "display_scale_percent", "ui_scale_percent", "hevc_enabled", "hevc_software_decoder",
-        "advanced_audio_channel_mapping", "audio_focus_enabled", "audio_focus_auto_yield",
-        "disable_media_key_audio_focus", "media_audio_channel", "navigation_audio_channel",
-        "wireless_enabled",
-        "app_appearance",
-        "ambient_lux_threshold", "display_fps", "media_buffer_ms", "main_buffered_audio",
-        "speech_without_8_16_khz", "car_bluetooth_audio", "call_echo_cancellation", "call_voice_filter",
-        "smooth_video", "direct_video_output", "low_latency_decoder", "mtk_decoder_tuning", "fps_counter",
-        "settings_gesture_fingers", "display_width_physical_mm",
-        "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
-        "safe_area_draw_outside", "main_display_disable_safe_area",
-        "auto_start_on_boot",
-        "location_reporting_enabled", "usb_charging_current",
+        "display_scale_percent", AirPlayPreferenceKeys.KEY_UI_SCALE_PERCENT, AirPlayPreferenceKeys.KEY_HEVC_ENABLED, AirPlayPreferenceKeys.KEY_HEVC_SOFTWARE_DECODER,
+        AirPlayPreferenceKeys.KEY_ADVANCED_AUDIO_CHANNEL_MAPPING, AirPlayPreferenceKeys.KEY_AUDIO_FOCUS_ENABLED, AirPlayPreferenceKeys.KEY_AUDIO_FOCUS_AUTO_YIELD,
+        AirPlayPreferenceKeys.KEY_DISABLE_MEDIA_KEY_AUDIO_FOCUS, AirPlayPreferenceKeys.KEY_MEDIA_AUDIO_CHANNEL, AirPlayPreferenceKeys.KEY_NAVIGATION_AUDIO_CHANNEL,
+        AirPlayPreferenceKeys.KEY_WIRELESS_ENABLED,
+        AirPlayPreferenceKeys.KEY_APP_APPEARANCE,
+        AirPlayPreferenceKeys.KEY_AMBIENT_LUX_THRESHOLD, AirPlayPreferenceKeys.KEY_FPS, AirPlayPreferenceKeys.KEY_MEDIA_BUFFER_MS, AirPlayPreferenceKeys.KEY_MAIN_BUFFERED_AUDIO,
+        AirPlayPreferenceKeys.KEY_SPEECH_WITHOUT_8_16_KHZ, AirPlayPreferenceKeys.KEY_CAR_BLUETOOTH_AUDIO, AirPlayPreferenceKeys.KEY_CALL_ECHO_CANCELLATION, AirPlayPreferenceKeys.KEY_CALL_VOICE_FILTER,
+        AirPlayPreferenceKeys.KEY_SMOOTH_VIDEO, AirPlayPreferenceKeys.KEY_DIRECT_VIDEO_OUTPUT, AirPlayPreferenceKeys.KEY_LOW_LATENCY_DECODER, AirPlayPreferenceKeys.KEY_MTK_DECODER_TUNING, AirPlayPreferenceKeys.KEY_FPS_COUNTER,
+        AirPlayPreferenceKeys.KEY_SETTINGS_GESTURE_FINGERS, AirPlayPreferenceKeys.KEY_WIDTH_PHYSICAL_MM,
+        AirPlayPreferenceKeys.KEY_PHYSICAL_SIZE_BASIS, AirPlayPreferenceKeys.KEY_RIGHT_HAND_DRIVE, AirPlayPreferenceKeys.KEY_HIDE_TOP_BAR, AirPlayPreferenceKeys.KEY_HIDE_BOTTOM_BAR,
+        AirPlayPreferenceKeys.KEY_SAFE_AREA_DRAW_OUTSIDE, AirPlayPreferenceKeys.KEY_MAIN_DISPLAY_DISABLE_SAFE_AREA,
+        AirPlayPreferenceKeys.KEY_AUTO_START_ON_BOOT,
+        AirPlayPreferenceKeys.KEY_LOCATION_REPORTING_ENABLED, AirPlayPreferenceKeys.KEY_USB_CHARGING_CURRENT,
     )
 
     /** Families of layout settings with many keys and nothing sensitive in them. */
     private val AIRPLAY_PREFIXES = listOf("cluster_music_", "cluster_speedometer_", "carplay_night_")
     private val DIPLAY_KEYS = setOf(
         "auto_connect",
-        "connect_on_phone_bluetooth",
-        "default_connection_mode",
         "settings_force_full_layout",
         "app_appearance_button",
         "picture_controls",

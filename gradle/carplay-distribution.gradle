@@ -1,0 +1,91 @@
+import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.file.DirectoryProperty
+
+// Shared distribution policy for all CarPlay application modules.
+def authenticationAssets = providers.environmentVariable('DIPLAY_AUTH_ASSETS_DIR')
+    .orNull?.with { file(it).canonicalFile } ?: rootProject.file('runtime-assets').canonicalFile
+
+def repositorySigning = new groovy.json.JsonSlurper().parseText(
+    providers.fileContents(rootProject.layout.projectDirectory.file('signing/signing.json')).asText.get())
+def repositoryKeystore = rootProject.file("signing/${repositorySigning.keystoreFile}").canonicalFile
+def signingValue = { String environment, Object fallback ->
+    def value = providers.environmentVariable(environment).orNull
+    value != null && !value.isBlank() ? value : fallback
+}
+
+android {
+    sourceSets.main.assets.srcDir(authenticationAssets)
+    signingConfigs {
+        release {
+            storeFile = file(signingValue('ANDROID_KEYSTORE_PATH', repositoryKeystore.absolutePath))
+            storeType = signingValue('ANDROID_KEYSTORE_TYPE', repositorySigning.keystoreType)
+            storePassword = signingValue('ANDROID_KEYSTORE_PASSWORD', repositorySigning.storePassword)
+            keyAlias = signingValue('ANDROID_KEY_ALIAS', repositorySigning.keyAlias)
+            keyPassword = signingValue('ANDROID_KEY_PASSWORD', repositorySigning.keyPassword)
+        }
+    }
+    buildTypes.configureEach { signingConfig = signingConfigs.release }
+}
+
+// Only the selected accessory pair may be credentials in APK assets.
+def credentialAssets = files(android.sourceSets.collectMany { source ->
+    source.assets.directories.collect { directory ->
+        fileTree(directory) {
+            include '**/offline-mfi/**', '**/*.pk8', '**/*.p7b', '**/*.key',
+                '**/*.pem', '**/*.p12', '**/*.pfx', '**/*.jks', '**/*.keystore'
+        }
+    }
+})
+def rejectBundledCredentials = tasks.register('rejectBundledCredentials') {
+    group = 'verification'
+    description = 'Reject unexpected credential files in APK assets.'
+    def allowed = ['identity.pk8', 'certificate.p7b'].collect {
+        new File(authenticationAssets, "offline-mfi/$it").canonicalFile
+    }.toSet()
+    inputs.files(credentialAssets)
+    doLast {
+        if (!allowed.every { it.isFile() && it.length() > 0 }) {
+            throw new GradleException('Runtime authentication assets are incomplete')
+        }
+        if (!credentialAssets.files.every { it.canonicalFile in allowed }) {
+            throw new GradleException('Unexpected credential files in APK assets')
+        }
+    }
+}
+tasks.named('preBuild') { dependsOn(rejectBundledCredentials) }
+
+// The component remains a separate platform-signed APK inside each distributable app.
+abstract class PrepareAuthorizationAssets extends Sync {
+    @OutputDirectory abstract DirectoryProperty getAssetOutput()
+}
+def authorizationAssets = layout.buildDirectory.dir('generated/authorizationAssets')
+def prepareAuthorizationAssets = tasks.register('prepareAuthorizationAssets', PrepareAuthorizationAssets) {
+    group = 'build'
+    dependsOn(':authorization-components:prepareDistributionAssets')
+    assetOutput.set(authorizationAssets)
+    from(rootProject.layout.projectDirectory.dir('authorization-components/build/generated/distributionAssets'))
+    into(assetOutput)
+}
+androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareAuthorizationAssets, { task -> task.assetOutput })
+}
+
+def verifyStandaloneAuthentication = tasks.register('verifyStandaloneAuthentication') {
+    group = 'verification'
+    description = 'Verify runtime authentication input for a standalone car-test APK.'
+    doLast {
+        if (!['identity.pk8', 'certificate.p7b'].every {
+            def input = new File(authenticationAssets, "offline-mfi/$it")
+            input.isFile() && input.length() > 0
+        }) {
+            throw new GradleException('Standalone CarPlay authentication files are missing or empty')
+        }
+    }
+}
+tasks.named('preBuild') { mustRunAfter(verifyStandaloneAuthentication) }
+tasks.register('assembleStandaloneDebug') {
+    group = 'build'
+    description = 'Build a standalone car-test APK with explicitly provisioned authentication.'
+    dependsOn(verifyStandaloneAuthentication, 'assembleDebug')
+}

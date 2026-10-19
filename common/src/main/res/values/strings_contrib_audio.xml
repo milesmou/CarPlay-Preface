@@ -3,9 +3,9 @@
     <string name="contrib_audio_home_choice_summary">%1$s · %2$s</string>
     <string name="contrib_audio_home_media_channel_label">Media audio stream</string>
     <string name="contrib_audio_home_nav_channel_label">Navigation audio stream</string>
-    <string name="contrib_audio_home_nav_channel_note">0 = automatic routing. Values 1–20 select legacy audio stream IDs, including vendor-specific outputs where supported by the head unit. Tap a value to preview it. Changes apply on reconnect.</string>
+    <string name="contrib_audio_home_nav_channel_note">0 is automatic; 1–20 select an audio stream. Tap to preview. Applies after reconnecting.</string>
     <string name="contrib_audio_home_toggle_audio_focus">Audio focus</string>
-    <string name="contrib_audio_home_toggle_audio_focus_desc">CarPlay playback and media keys share audio focus. Guidance lowers CarPlay music; calls and Siri mute it while speaking. If your head unit refuses focus, turn this off. Changes apply on reconnect.</string>
+    <string name="contrib_audio_home_toggle_audio_focus_desc">Lower music for navigation and mute it for calls or Siri speech. Try turning off if audio is silent. Applies after reconnecting.</string>
     <string name="audio_focus_auto_yield">Mute media when audio focus is lost</string>
-    <string name="audio_focus_auto_yield_desc">When audio focus is enabled, mute media during Android audio interruptions, including calls. Restore audio when focus returns. Disable if your head unit does not return focus. Changes apply on reconnect.</string>
+    <string name="audio_focus_auto_yield_desc">Mute during audio interruptions and resume when focus returns. Turn off if audio does not resume. Applies after reconnecting.</string>
 </resources>

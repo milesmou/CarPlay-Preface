@@ -18,6 +18,25 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun automaticConnectionBacksUpOnlyTheUnifiedOption() {
+        val values = prefs("diplay")
+        values.edit().clear().putBoolean("auto_connect", false)
+            .putBoolean("connect_on_phone_bluetooth", true).putString("default_connection_mode", "usb").commit()
+        val document = JSONObject(SettingsBackupCodec.export(context, "0.1.1").toString(Charsets.UTF_8))
+        val saved = document.getJSONObject("settings").getJSONObject("diplay")
+        assertFalse(saved.getBoolean("auto_connect"))
+        assertFalse(saved.has("connect_on_phone_bluetooth"))
+        assertFalse(saved.has("default_connection_mode"))
+        values.edit().clear().commit()
+        val imported = """{"format":"diplay-settings","version":1,"settings":{"diplay":{
+            "auto_connect":false,"connect_on_phone_bluetooth":true,"default_connection_mode":"usb"}}}""".toByteArray()
+        val result = SettingsBackupCodec.import(context, imported)
+        assertEquals(1, result.applied)
+        assertEquals(2, result.skipped)
+        assertFalse(com.shilapi.xcertplay.DiPlayPreferences.autoConnect(context))
+        assertFalse(values.contains("default_connection_mode"))
+    }
+
     @Test fun wheelBindingsRoundTripWithoutIncludingUnrelatedInputData() {
         val values = prefs("diplay_media_wheel")
         values.edit().clear().putInt("PREVIOUS", 131).putInt("NEXT", -1)

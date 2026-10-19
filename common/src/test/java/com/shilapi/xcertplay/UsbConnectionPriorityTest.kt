@@ -156,6 +156,46 @@ class UsbConnectionPriorityTest {
         assertEquals(UsbManager.ACTION_USB_DEVICE_ATTACHED, shadowOf(app).nextStartedActivity?.action)
     }
 
+    @Test fun returnHomeBlocksPollingDuplicateAttachAndOldLaunchUntilCableReplug() {
+        UsbAutoConnect.register(app)
+        val device = attach()
+        UsbAutoConnect.request(activity)
+        val oldLaunch = shadowOf(activity).nextStartedActivity!!
+        ConnectionAutoStart.cancel()
+        UsbAutoConnect.cancelForHome(app)
+        repeat(3) { assertFalse(UsbAutoConnect.request(activity)) }
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(ConnectionAutoStart.paused)
+        assertNull(shadowOf(app).nextStartedActivity)
+        assertFalse(UsbAutoConnect.isCurrentRequest(oldLaunch))
+        assertTrue(UsbAutoConnect.canChooseWireless(app))
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_DETACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        app.sendBroadcast(Intent(UsbManager.ACTION_USB_DEVICE_ATTACHED).putExtra(UsbManager.EXTRA_DEVICE, device))
+        shadowOf(Looper.getMainLooper()).idle()
+        val launch = shadowOf(app).nextStartedActivity!!
+        assertEquals(UsbManager.ACTION_USB_DEVICE_ATTACHED, launch.action)
+        assertTrue(ConnectionAutoStart.accepts(launch))
+        assertFalse(ConnectionAutoStart.accepts(oldLaunch))
+    }
+
+    @Test fun delayedWirelessLaunchCannotEscapeCancellationAfterAnotherManualRequest() {
+        val controller = mock(CarPlayController::class.java)
+        var done: (() -> Unit)? = null
+        CarPlayBackgroundSession.store(controller, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
+            CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, true, true, 1920, 720)) { done = it }
+        requestWireless()
+        assertNotNull(done)
+        ConnectionAutoStart.cancel()
+        ConnectionAutoStart.resume()
+        CarPlayBackgroundSession.clear()
+        done!!()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertNull(shadowOf(activity).nextStartedActivity)
+        requestWireless()
+        assertEquals(CarPlayHostActivity::class.java.name, shadowOf(activity).nextStartedActivity?.component?.className)
+    }
+
     @Test fun otherUsbAccessoriesDoNotTakePriority() {
         attach(0x1a86)
         assertNull(UsbAutoConnect.attached(app))
@@ -184,7 +224,7 @@ class UsbConnectionPriorityTest {
 
     @Test fun bluetoothWakeCannotResumeWirelessWhenUsbIsPresent() {
         attach()
-        DiPlayPreferences.saveConnectOnPhoneBluetooth(app, true)
+        DiPlayPreferences.saveAutoConnect(app, true)
         PhoneBluetoothReceiver().onReceive(activity, Intent(BluetoothDevice.ACTION_ACL_CONNECTED)
             .putExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothAdapter.getDefaultAdapter().getRemoteDevice(phone)))
         assertEquals(UsbManager.ACTION_USB_DEVICE_ATTACHED, shadowOf(activity).nextStartedActivity?.action)

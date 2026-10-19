@@ -1,183 +1,69 @@
-# Build DiPlay
+# 构建与交付
 
-Use this procedure to build the DiPlay app for an Android head unit.
-Run the commands from the repository root, where `gradlew` and `settings.gradle.kts` are located.
+车机主应用使用 `:mobile`；common、shared 为库，home、maphost 是示例，automotive 是独立应用。不要用未限定模块的 assembleDebug 代替主应用任务。
 
-## Select the application
+## 环境
 
-This repository contains several Android applications.
-Select `mobile` to build the main DiPlay app.
+复用 agent_docs/build-environment.local.json、local.properties 与当前环境变量，检查工具路径有效。项目要求 JDK 25、Android SDK Platform android-37.0、Build-Tools 36.0.0、Platform-Tools 和 NDK 28.2.13676358，使用仓库 Gradle Wrapper。缺少工具或版本不符时先取得用户提供的路径／获取方式，不自动下载或替换版本。
 
-| Gradle module | Purpose | Debug APK |
-| --- | --- | --- |
-| `:mobile` | Main DiPlay app for Android head units | `mobile/build/outputs/apk/debug/mobile-debug.apk` |
-| `:maphost` | Sample application that displays a map from DiPlay | `samples/maphost/build/outputs/apk/debug/maphost-debug.apk` |
-| `:home` | Optional DiPlay Home launcher | `samples/home/build/outputs/apk/debug/home-debug.apk` |
-| `:automotive` | Separate Android Automotive application inherited from xcertplay | `automotive/build/outputs/apk/debug/automotive-debug.apk` |
+JAVA_HOME 指向 JDK，ANDROID_HOME 指向 SDK；或在 Git 忽略的 local.properties 设置 sdk.dir。工具放稳定本地目录，缓存只记路径、版本和必要参数，不保存密码或密钥，不修改全局环境。
 
-The `:common` and `:shared` modules are libraries.
-The applications use these libraries.
+## 按需构建
 
-If the installed app is **DiPlay map host**, you selected `:maphost` or its APK.
-Build `:mobile` and select `mobile-debug.apk` to install the main app.
-A command such as `./gradlew assembleDebug` can build more than one application.
-Use the module name in each build command to select the required application.
+日常修改不自动构建、签名或安装；用户明确要求打包时，默认仅执行：
 
-## Prepare the build environment
-
-Install these tools:
-
-- JDK 25.
-- Android SDK Platform 37 (`platforms;android-37.0`).
-- Android SDK Build-Tools 36.0.0.
-- Android SDK Platform-Tools.
-- Android NDK 28.2.13676358.
-
-Use the Gradle wrapper included in this repository.
-The first build needs an internet connection to download dependencies.
-
-1. Open the repository root in Android Studio.
-2. Install the Android SDK packages with **Tools → SDK Manager**.
-3. Set **Gradle JDK** to JDK 25 in the Android Studio Gradle settings.
-4. Wait for Gradle sync to finish.
-
-For a terminal build, set `JAVA_HOME` to your JDK 25 directory.
-Set `ANDROID_HOME` to your Android SDK directory.
-You can also specify the SDK directory in the root `local.properties` file:
-
-```properties
-sdk.dir=/absolute/path/to/Android/sdk
+```powershell
+./gradlew.bat :mobile:assembleDebug
 ```
 
-Keep `local.properties` outside Git.
-Check the Java version before the build:
-
-```sh
-java -version
-```
-
-The output must identify Java 25.
-On Windows, use `gradlew.bat` in place of `./gradlew` in the commands below.
-
-## Build the main app
-
-For a main-app build with the repository's bundled experimental runtime assets:
-
-```sh
-./gradlew :mobile:assembleDebug
-```
-
-Check that this file exists:
+不附加单元测试、Lint 或所有模块检查。Debug 包名 com.shihab.diplay.hudtest，Release 为 com.shihab.diplay。原产物 mobile/build/outputs/apk/debug/mobile-debug.apk 和 output-metadata.json 保留；按实际版本复制为：
 
 ```text
-mobile/build/outputs/apk/debug/mobile-debug.apk
+CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 ```
 
-The debug application ID is `com.shihab.diplay.hudtest`.
-The release application ID is `com.shihab.diplay`.
+当前开发 versionName 为 0.1.1，正式发布前不自动递增；升级 versionCode 必须递增。其他按需任务：
 
-The main APK includes the two reviewed files from `runtime-assets/offline-mfi/` by default.
-They were imported from the official DiPlay v0.2.18 APK; see [resource provenance](CARPLAY_AUTH_RESOURCES.md).
-They enable local authentication testing, but do not establish iPhone or vehicle acceptance.
-Tests generate synthetic identities at runtime.
-Keep test private keys outside Git.
-
-### Use Android Studio
-
-1. Open **Run → Edit Configurations**.
-2. Select an **Android App** configuration, or create one.
-3. Set **Module** to `mobile`.
-4. Select this configuration in the toolbar.
-5. Select the Android device.
-6. Click **Run** to install the main debug app.
-
-To build an APK without installation, run `:mobile:assembleDebug` in the Android Studio terminal.
-Select the APK from the `mobile` output directory.
-
-## Check the source build
-
-Run the unit tests, lint checks, and main debug build:
-
-```sh
-./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintDebug :mobile:assembleDebug
-```
-
-Check that Gradle reports `BUILD SUCCESSFUL`.
-For the complete CI procedure, see [the Android workflow](../.github/workflows/android.yml).
-That workflow also checks and builds the `home` and `maphost` applications.
-
-## Build a standalone car-test APK
-
-The repository already contains the runtime authentication files:
-
-```text
-runtime-assets/
-└── offline-mfi/
-    ├── identity.pk8
-    └── certificate.p7b
-```
-
-The public-tree check permits only these two fixed paths and their reviewed SHA-256 values.
-APK signing keys and other credentials remain excluded. The build rejects unexpected credential containers in APK assets.
-
-Run the standalone debug task to verify the selected pair and build the APK:
-
-```sh
-./gradlew :mobile:assembleStandaloneDebug
-```
-
-The task stops if either required file is absent or empty.
-Its APK output is `mobile/build/outputs/apk/debug/mobile-debug.apk`.
-Check both files in the APK against the selected input directory:
-
-- `assets/offline-mfi/identity.pk8`.
-- `assets/offline-mfi/certificate.p7b`.
-
-Use this APK for a standalone connection test.
-Mobile and Automotive Debug APKs use the same repository `signing/` keystore and configuration as Release, including `assembleStandaloneDebug`; they no longer use the default Android debug certificate. See [signing documentation](../signing/README.md). Unless explicitly choosing another signature, leave the signing override environment variables unset.
-Update the existing test app with the same signing key to keep its settings.
-Different signing keys cannot update the same installed application.
-
-To use a different locally provisioned pair, set `DIPLAY_AUTH_ASSETS_DIR` to an external assets directory with the same structure. It replaces the default runtime directory. Keep that replacement outside Git; the repository exception does not apply to it.
-
-## Build a release APK
-
-The reviewed runtime assets and the owner-authorized public signing material in `signing/` are selected by default. No private signing configuration is required. These environment variables optionally override the Gradle defaults:
-
-| Variable | Value |
+| 目的 | Gradle 任务 |
 | --- | --- |
-| `DIPLAY_AUTH_ASSETS_DIR` | Optional external runtime assets directory; defaults to repository `runtime-assets/` |
-| `ANDROID_KEYSTORE_PATH` | Optional alternative signing keystore path |
-| `ANDROID_KEYSTORE_TYPE` | Optional alternative keystore type |
-| `ANDROID_KEYSTORE_PASSWORD` | Optional alternative keystore password |
-| `ANDROID_KEY_ALIAS` | Optional alternative signing key alias |
-| `ANDROID_KEY_PASSWORD` | Optional alternative signing key password |
+| 检查认证资料并构建独立连接测试包 | :mobile:assembleStandaloneDebug |
+| Release | :mobile:assembleRelease |
+| 完整测试 | 仅用户明确要求时按 [验证说明](TESTING.md) 执行 CI 命令 |
 
-The repository's existing keystore and signing passwords are intentionally public at the owner's request; see [signing documentation](../signing/README.md). Keep other signing material and local overrides outside Git. The APK itself does not bundle the signing keystore or configuration.
-Run the release checks and build:
+## 认证与签名
 
-```sh
-./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintRelease :mobile:assembleRelease
+主 APK 默认内置 runtime-assets/offline-mfi/identity.pk8、certificate.p7b；来源和 SHA-256 见 [认证资源](CARPLAY_AUTH_RESOURCES.md)。DIPLAY_AUTH_ASSETS_DIR 可指定外部替换目录，资料不入库。包内应为 assets/offline-mfi/ 下的两项，构建会拒绝意外凭据资产。
+
+Debug、Release 及 assembleStandaloneDebug 使用仓库 signing/ 的同一证书，不使用 Android 默认 Debug 密钥，不另行生成测试密钥；无用户明确指定时不设置 ANDROID_KEYSTORE_* 或 ANDROID_KEY_* 覆盖。详见 [签名说明](../signing/README.md)。
+
+主证书 SHA-256：`75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`。公开签名材料不得进入 APK 资产，其他密钥和本地配置继续忽略。
+
+## 必须内置授权组件
+
+`mobile` 与 `automotive` 的 Debug、Release 和 StandaloneDebug 通过 `gradle/carplay-distribution.gradle` 统一主应用签名、认证资产限制与授权组件内置。组件构建后的签名及校验由 `:authorization-components:prepareDistributionAssets` 统一执行，各应用仅同步结果，避免并行构建重复写同一产物。主应用自动依赖该流程。新环境须显式准备固定来源的公开 AOSP 输入：
+
+```powershell
+python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public-aosp-key
 ```
 
-The output is `mobile/build/outputs/apk/release/mobile-release.apk`.
-The APK contains the selected runtime identity.
-Recipients can extract that identity from the APK.
-The APK excludes the Android signing key.
-See [the project notices](THIRD_PARTY_NOTICES.md) for the experimental identity used in public releases.
+后续使用有效缓存。每次交付核对主 APK 的 assets/authorization/authorization.apk、manifest.json，确认内置 APK 字节 SHA-256、包名、版本、平台证书和元数据一致；同时核对主应用证书。签名输入不得打包，失败不交付缺组件的 APK，不以旧组件替代。细节及当前构建记录见 [授权组件](ANDROID9_AUTHORIZATION_COMPONENTS.md)。
 
-The public source archive matches the release tag.
-For this branch it includes the two reviewed experimental runtime assets, the owner-authorized public APK signing material, and their provenance/checksums. It excludes other credentials, local configuration, and build output. The already-published v0.1.0 source-preview tag predates these imports.
-The retired `build-beta.py` helper is no longer part of the build procedure.
+## 覆盖安装
 
-## Correct build problems
+完成构建、命名和核验后运行 adb devices -l。只有状态 device 可安装；一台安装到该台，多台且未指定目标则全部安装：
 
-| Symptom | Action |
+```powershell
+adb -s <serial> install -r <本次命名后的APK>
+```
+
+保留数据，无在线设备就交付路径，不自行启动模拟器。签名冲突、降级或安装失败时报告设备和错误，不卸载、清数据或强制降级。安装主应用不等于安装内置组件；组件仍由用户在设置中保存后手动安装。
+
+## 常见问题
+
+| 问题 | 检查 |
 | --- | --- |
-| Installed app is DiPlay map host | Select `mobile` in Android Studio. Build and install the APK from the `mobile` output directory. |
-| Gradle cannot find the Android SDK | Set `ANDROID_HOME` or the `sdk.dir` value in `local.properties`. |
-| A required SDK or NDK package is absent | Install the listed package with SDK Manager. |
-| Java or Gradle JDK version is incorrect | Set the terminal JDK and Android Studio Gradle JDK to Java 25. |
-| Main APK cannot load local authentication | Check the selected pair and its hashes; use `:mobile:assembleStandaloneDebug`. An external directory must contain both files. |
-| Standalone task reports missing authentication files | Check the external directory path and both required files. |
-| Android rejects an app update | Use the same application ID and signing key as the installed app. |
+| 装成 map host | 是否构建 mobile、选取 mobile 输出 |
+| 找不到 SDK／Java 不匹配 | 缓存路径、ANDROID_HOME／sdk.dir、JAVA_HOME 与 java -version |
+| 认证资料缺失 | 所选目录及两项文件 SHA-256，StandaloneDebug 校验结果 |
+| 组件签名或资产生成失败 | 固定 AOSP 输入、平台证书和本次生成元数据，不跳过依赖 |
+| 覆盖安装失败 | 已装包名、证书和 versionCode，保留数据并报告错误 |

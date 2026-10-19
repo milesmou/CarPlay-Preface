@@ -50,6 +50,12 @@ abstract class AuthorizationActivity extends Activity {
     }
 
     protected Button action(int text, Runnable clicked) { return action(getString(text), clicked); }
+    protected Button navigation(int text, Runnable clicked) {
+        Button button = action(text, clicked);
+        // Returning from a child page must leave the menu entry usable.
+        button.setOnClickListener(view -> clicked.run());
+        return button;
+    }
     protected Button action(CharSequence text, Runnable clicked) {
         Button button = new Button(this);
         button.setText(text); button.setTextSize(20); button.setAllCaps(false);
@@ -63,8 +69,13 @@ abstract class AuthorizationActivity extends Activity {
     }
 
     protected void unavailable(Exception failure) {
-        Log.w("PrefaceAuthorization", "Authorization unavailable: " + failure.getClass().getSimpleName());
-        screen(R.string.unavailable_title, getString(R.string.unavailable_body));
+        Throwable reason = failure;
+        while (reason instanceof java.lang.reflect.InvocationTargetException && reason.getCause() != null)
+            reason = reason.getCause();
+        Log.w("PrefaceAuthorization", "Authorization unavailable", reason);
+        String detail = reason.getClass().getSimpleName();
+        if (reason.getMessage() != null) detail += ": " + reason.getMessage();
+        screen(R.string.unavailable_title, getString(R.string.unavailable_body) + getString(R.string.unavailable_reason, detail));
         action(R.string.close, this::finish);
     }
 }

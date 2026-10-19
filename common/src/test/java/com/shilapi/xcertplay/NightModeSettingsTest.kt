@@ -220,7 +220,7 @@ class NightModeSettingsTest {
         val separator = if (activity.resources.configuration.locales[0].language == "zh") "" else " "
         val nightHint = activity.getString(R.string.carplay_night_hint) + separator + activity.getString(R.string.carplay_night_time_note)
         assertTrue(nightHint, views(page).filterIsInstance<TextView>().single { it.text == nightHint }.isShown)
-        assertTrue(activity.getString(R.string.picture_adjustments), label(R.string.picture_adjustments).isShown)
+        assertFalse(views(page).filterIsInstance<TextView>().any { it.text == activity.getString(R.string.picture_adjustments) })
     }
 
     private fun assertScheduleVisible(expected: Boolean) {

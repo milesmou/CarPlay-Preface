@@ -1,51 +1,28 @@
-# Buffered music (CarPlay main buffered audio)
+# 预缓冲音乐（实验性）
 
-Apple calls it "Enhanced buffering" ([WWDC23, Optimize CarPlay for vehicle systems](https://developer.apple.com/videos/play/wwdc2023/10150/)): for apps that support it, the iPhone sends music ahead of time and the car keeps the timing, so short wireless gaps are not heard. DiPlay implements the receiving side. It is off by default: **Settings → Display and performance → Buffered music (experimental)**, which reconnects CarPlay.
+此功能对应 CarPlay main buffered audio，默认关闭。支持的 iPhone 应用会提前发送音乐，由接收端按时间播放，以抵抗短暂传输间隙；不支持的应用仍使用普通音乐流。它与日常音乐缓冲时长设置不同，不保证每个应用／iOS 版本采用该流。
 
-## What changes
+背景参考：[Apple WWDC23](https://developer.apple.com/videos/play/wwdc2023/10150/)。上游其他车型的播放测试不是 E02 实车结论；本分支设置归入高级实验选项，按界面提示重连生效。
 
-- **Which apps:** Apple Music uses it; the SETUP names the client (`clientID=com.apple.Music`). Spotify kept the normal stream in my tests. Apps that do not use it are unaffected.
-- **How much ahead:** the iPhone sent about 1 minute 43 seconds of music within 8 seconds, then topped it up as playback went on. During a Wi-Fi Direct reconnection the queue fell from 25 to 14 seconds and nothing was heard.
-- **Playback:** the frames go to DiPlay's normal media renderer about one second ahead of playback, so audio focus, ducking under navigation and Siri, and the audio channel settings apply as for any music. Frames in that preload are retained until the estimated audible position passes them, so pausing and destroying the renderer does not discard the next second of music.
-- **Limits and cancellation:** the advertised 8 MiB limit is enforced locally, including the outstanding renderer preload, with an additional two-minute frame-count limit. A full buffer applies TCP backpressure. Only the control session's peer address can claim the TCP stream. Pause, flush and close serialize with sink delivery, including a reentrant pause during renderer start; closing also cancels an accepted or waiting TCP sender. Invalid short framing closes this stream. A malformed control body, unsupported rate or unsupported packetization cannot start playback.
+## 实现摘要
 
-## How it works
+- /info 同时声明 mainBufferedInfo 和 type 103 AAC-LC 音频格式，协商 mainBuffered；不支持或音频输出关闭时不启动。
+- 单一控制会话拥有共享 renderer。替换必须取消旧 TCP 预加载、完成清理；退役会话的迟到 SETUP／控制／关闭不能抢回，新连接需新控制会话。
+- SETUP 返回 dataPort 和 audioBufferSize。只接受控制会话同地址的 TCP 发送端；帧按长度、RTP 和 ChaCha20-Poly1305 校验后交付。
+- 本地限制 8 MiB 和两分钟帧数，包含已交给 renderer 但尚未实际播放的预加载；满时施加 TCP 背压，不无限堆积。
+- 暂停、flush、替换与关闭和交付串行化；关闭取消正在等待或已接收的发送端，错误帧、速率或包格式明确失败。
+- 音频沿用普通 renderer 的路由、焦点和导航／Siri 混音。锚点将 RTP 样本定位到会话时钟；暂停保留必要预加载，换曲／seek 清除指定旧段。
 
-Names come from the strings of Xcode's CarPlay Simulator and its CarPlaySDK; the behaviour was observed between DiPlay and an iPhone.
+| 控制 | 用途 |
+| --- | --- |
+| SETRATE | 从指定 RTP 样本开始，并返回时间锚点 |
+| GETANCHOR | 查询当前锚点 |
+| SETRATEANCHORTIME | rate 0 暂停 |
+| FLUSHBUFFERED | 丢弃指定序列／时间戳前的音频 |
+| /feedback | 报告播放位置 |
 
-- **Offer:** `/info` carries `mainBufferedInfo` (an empty dictionary is accepted) and an `audioFormats` entry `{type 103, audioType media, audioOutputFormats AAC-LC}`. The iPhone proposes the session feature `mainBuffered` in its SETUP, and DiPlay enables it. Enabling the feature without `mainBufferedInfo`, or the reverse, makes the iPhone drop the session.
-- **Ownership:** only one control session can own the shared buffered music renderer. A valid replacement cancels the previous TCP preload and completes its output cleanup before the new stream starts. Retired sessions cannot reclaim it with late SETUP/control/teardown requests; a fresh control session is required. Concurrent SETUP during retirement is declined. Session identities are weakly retained, and closed sessions cannot negotiate a new buffered stream.
-- **Stream SETUP (type 103):** `ct 4` (AAC), `audioFormat`, `spf 1024`, `isMedia`, `clientID`, `streamConnectionID` and `shk` (the stream key). DiPlay answers `{type 103, dataPort, audioBufferSize}` and listens on TCP.
-- **Data:** each frame is a 2-byte length (including itself), a 12-byte RTP header (sequence +1, timestamp +1024) and the payload sealed with ChaCha20-Poly1305 under `shk` (the header's timestamp and SSRC as associated data), followed by an 8-byte nonce. The payload is a raw AAC-LC access unit.
-- **Control:**
+## 限制与验证
 
-  | Request | Body | Meaning |
-  |---|---|---|
-  | `SETRATE` | `{rtpTime, rate 1}` | start at that sample; the car answers with the anchor |
-  | `GETANCHOR` | `{rate}` | the iPhone polls the anchor until it gets one |
-  | `SETRATEANCHORTIME` | `{rate 0}` | pause |
-  | `FLUSHBUFFERED` | `{flushUntilSeq, flushUntilTS}` | drop what was sent before (track change, seek) |
+当前只接收 AAC-LC，不宣称无损或空间音频。固定锚点延迟估计可能影响进度显示，链路长期低于音频码率时不能靠预缓冲解决卡顿。
 
-- **Anchor:** `{rtpTime, networkTimeSecs, networkTimeFrac, rate}`: sample `rtpTime` plays at that time on the session's timing clock. `networkTimeSecs` counts from the 1970 epoch (NTP seconds minus 2208988800) and `networkTimeFrac` is a 64-bit fraction. With NTP's 1900 seconds the iPhone sent only about 0.6 s and waited.
-- **/feedback** reports the buffered stream's position like the other audio streams.
-
-## Lossless
-
-Apple Music's lossless setting does not reach the car this way. With only PCM 48 kHz 16-bit, PCM 48 kHz 24-bit or ALAC 48 kHz 24-bit offered for type 103, the iPhone opened no music stream at all and played on its own speaker; offered together with AAC, it chose AAC. So over CarPlay the music arrives as AAC-LC (about 260 kbit/s measured). Whether another iOS version, or an offer we did not find, would allow a lossless buffered stream is not known.
-
-## Tested
-
-2024 BYD Tang (DiLink 5.0), iPhone on iOS 27, wireless CarPlay (Wi-Fi Direct and the car's hotspot), Apple Music:
-
-- music played from the car, with pause, resume and track changes;
-- navigation prompts ducked the music, a call paused it and it resumed afterwards, Siri worked over it (tested together with #295, which Siri needs on main); Spotify used the normal stream;
-- unit tests cover the offer and disabled-output SETUP gate, authenticated frame opening and malformed headers, split/coalesced TCP framing, byte/frame limits, anchor format, wrap-safe timestamps, pause/resume preload retention, in-flight pause/flush/close ordering, accepted/waiting socket cancellation, and rejected SETUP replacements.
-
-The hardware results above were supplied by the original author before the review corrections. The corrected bounded-buffer and pause/resume paths have source-level regression coverage; they have not been rerun on physical hardware by the reviewer. Recheck Apple Music pause/resume, seek/track change, navigation ducking and call/Siri interruption on the corrected build before treating this experimental option as generally supported.
-
-## Limits
-
-- Experimental and off by default; only AAC-LC is accepted.
-- It cannot help when the link is slower than the music itself. With Wi-Fi Direct on 5 GHz (5745 MHz) while the car was also joined to a home network on 5 GHz (5200 MHz), the buffered stream arrived at 49–281 kbit/s, the queue never filled and the music stuttered; the normal stream (Spotify) stuttered as well, losing packets. A 2.4 GHz Wi-Fi Direct channel fixed both. The log line "Buffered audio: queued N s, received … kbit/s" shows which case applies.
-- The anchor latency is a fixed estimate (about 400 ms), which only shifts the iPhone's progress bar slightly.
-- Spatial audio (APAC formats in the simulator's list) is not offered.
+源码测试涵盖协商、认证帧、TCP 拆分／合并、容量、锚点、RTP 回绕、暂停／flush／关闭和会话替换；不能据此宣称实车已通过。E02 应逐项验证 Apple Music 或实际采用该流的应用的暂停恢复、seek／切歌、导航压低、电话和 Siri，以及断线重连。普通音乐积压修正另见 [v0.2.21](UPSTREAM_SYNC_0.2.21.md)。

@@ -23,6 +23,8 @@ class WheelKeyPermissionSetupTest {
     private var allow = true
 
     @Before fun setup() {
+        context.getSharedPreferences("wheel_key_restore", 0).edit().clear().commit()
+        context.getSharedPreferences(WheelMediaBindings.PREFS, 0).edit().clear().commit()
         context.getSharedPreferences("diplay_navigation_wheel", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         WheelZoomSettings.setEnabled(context, false)
         WheelZoomSettings.setJoystick(context, false)
@@ -117,17 +119,21 @@ class WheelKeyPermissionSetupTest {
         assertEquals(1, commands.size)
     }
 
-    @Test fun navigationOnlyRestorationRequiresRecordedAuthorizationAndStopsWhenDisabled() {
-        val prefs = context.getSharedPreferences("diplay_navigation_wheel", android.content.Context.MODE_PRIVATE)
-        assertTrue(NavigationWheelSettings.enabled(context))
-        prefs.edit().putBoolean("enabled", true).commit()
-        assertFalse(WheelKeyService.needsRestore(context))
-        NavigationWheelSettings.recordAuthorization(context)
-        assertTrue(WheelKeyService.needsRestore(context))
-        prefs.edit().putBoolean("enabled", false).commit()
+    @Test fun removedNavigationVolumePreferenceDoesNotRestoreTheService() {
+        context.getSharedPreferences("diplay_navigation_wheel", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("enabled", true).putBoolean("authorized", true).commit()
         assertFalse(WheelKeyService.needsRestore(context))
         assertFalse(WheelKeyService.applyServiceSettings(context, ::shell) { WheelKeyService.needsRestore(context) })
         assertTrue(commands.isEmpty())
+    }
+
+    @Test fun customSiriKeepsItsAuthorizedServiceRestoreWithoutTheRemovedVolumeFeature() {
+        assertTrue(WheelMediaBindings.assign(context, WheelMediaBindings.Action.SIRI, android.view.KeyEvent.KEYCODE_F6))
+        assertFalse(WheelKeyService.needsRestore(context))
+        WheelKeyService.recordAuthorization(context)
+        assertTrue(WheelKeyService.needsRestore(context))
+        assertTrue(WheelMediaBindings.assign(context, WheelMediaBindings.Action.SIRI, null))
+        assertFalse(WheelKeyService.needsRestore(context))
     }
 
     private fun shell(command: String): String? {
