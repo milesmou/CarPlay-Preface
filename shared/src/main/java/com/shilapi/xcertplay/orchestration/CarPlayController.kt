@@ -207,6 +207,7 @@ class CarPlayController(
     @Volatile private var mux: Iap2UsbMuxHost? = null
     @Volatile private var csm: Iap2Session? = null
     @Volatile private var activeSession: AirPlaySession? = null
+    private val phoneCalls = com.shilapi.xcertplay.hud.CarPlayCallState()
     @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
     private val clusterUiLock = Any()
     private var clusterUiStream: Pair<AirPlaySession, Int>? = null
@@ -298,6 +299,7 @@ class CarPlayController(
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
             val replacement = activeSession !== session
+            if (replacement && activeSession != null) synchronized(phoneCalls) { phoneCalls.clear() }
             if (replacement) {
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                 // The gear may have changed since /info.
@@ -324,6 +326,7 @@ class CarPlayController(
             }
             if (activeSession === session) {
                 activeSession = null
+                synchronized(phoneCalls) { phoneCalls.clear() }
                 synchronized(albumReplayLock) { initialArtworkReplay = null }
                 NavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
@@ -626,20 +629,24 @@ class CarPlayController(
     }
 
     /** Answers the ringing call on the iPhone (telephony Hook Switch), as the wheel's call button does. */
-    fun answerCall(): Boolean = sendTelephony(TELEPHONY_HOOK_SWITCH)
+    fun answerCall(): Boolean = answerCall { true }
+
+    fun answerCall(eligible: () -> Boolean): Boolean = sendTelephony(CarPlayPhoneCommand.ANSWER, eligible)
 
     /** Ends the current call or declines the ringing one (telephony Drop). */
-    fun endCall(): Boolean = sendTelephony(TELEPHONY_DROP)
+    fun endCall(): Boolean = endCall { true }
 
-    private fun sendTelephony(index: Int): Boolean {
+    fun endCall(eligible: () -> Boolean): Boolean = sendTelephony(CarPlayPhoneCommand.END, eligible)
+
+    fun phoneCallControl(): com.shilapi.xcertplay.hud.CarPlayCallControl? =
+        if (closed || activeSession == null) null else synchronized(phoneCalls) { phoneCalls.control() }
+
+    private fun sendTelephony(command: CarPlayPhoneCommand, eligible: () -> Boolean): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
-        return try {
-            touchExecutor.execute { session.sendTelephony(index) }
-            true
-        } catch (_: Exception) {
-            false
-        }
+        return enqueuePhoneCommand(touchExecutor, command, ::phoneCallControl,
+            eligible = { !closed && activeSession === session && eligible() },
+            send = session::sendTelephony, report = ::debugLog)
     }
 
     /** Frozen with the negotiated session; saved setting changes apply at the next connection. */
@@ -678,6 +685,7 @@ class CarPlayController(
         val teardownStarted = System.nanoTime()
         connectionDiagnostic("teardown begin transport=${config.transport}")
         videoGate?.close()
+        synchronized(phoneCalls) { phoneCalls.clear() }
         NavigationOutputs.endNow()
         com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
         closeReceivers()
@@ -817,6 +825,8 @@ class CarPlayController(
 
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
+        if (closed) return
+        synchronized(phoneCalls) { phoneCalls.accept(frame) }
         NavigationOutputs.onFrame(frame)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         synchronized(playbackStatus) {
@@ -3030,9 +3040,6 @@ class CarPlayController(
 
     companion object {
         const val CONNECTION_DIAGNOSTIC_PREFIX = "CONNECTION_DIAGNOSTIC"
-        // Indices in the telephony HID report (AirPlayHid.telephonyDescriptor).
-        private const val TELEPHONY_HOOK_SWITCH = 1
-        private const val TELEPHONY_DROP = 3
         private val diagnosticAttempts = AtomicInteger()
         private const val IAP2_IPHONE_UUID = "00000000-deca-fade-deca-deafdecacafe"
         // BluetoothProfile.A2DP_SINK and HEADSET_CLIENT, hidden from the public SDK.

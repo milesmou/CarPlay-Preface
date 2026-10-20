@@ -69,4 +69,31 @@ class CarPlayCallStateTest {
         assertNull(state.current())
     }
 
+    @Test fun commandIdentitySurvivesMetadataButNotAReplacementCallOrClear() {
+        state.accept(update("a", 2, "First"))
+        val first = state.control()!!
+        state.accept(update("a", 2, "Updated"))
+        assertEquals(first, state.control())
+        state.accept(update("a", 4))
+        assertTrue(first.token === state.control()!!.token)
+        assertFalse(first == state.control())
+        state.clear(); state.accept(update("a", 2, "First"))
+        assertFalse(first.token === state.control()!!.token)
+    }
+
+    @Test fun waitingAndUnknownCallsDoNotOfferUntargetedPhoneCommands() {
+        state.accept(update("a", 4))
+        state.accept(update("b", 2))
+        assertNull(state.control())
+        state.accept(update("b", 0))
+        assertEquals(CarPlayCallCard.Phase.ACTIVE, state.control()!!.phase)
+        state.accept(update("a", 99))
+        assertNull(state.control())
+    }
+
+    @Test fun missingCallIdentityCannotCreateAnActionableCall() {
+        state.accept(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) { u8(2, 2) })
+        assertNull(state.control())
+    }
+
 }

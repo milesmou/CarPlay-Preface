@@ -14,6 +14,7 @@
 | 授权 | [使用入口](SYSTEM_AUTHORIZATION.md)、[组件、升级与构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md) |
 | 屏幕与设置 | [屏幕基准](PREFACE_SCREEN_LAYOUT.md)、[固定分辨率](PREFACE_FIXED_RESOLUTION.md)、[说明和间距](SETTINGS_COPY_SIMPLIFICATION.md)、[快捷操作](QUICK_ACTIONS_UI.md) |
 | 音频与方控 | [当前移除与交接保留](MEDIA_ASSISTANT_REMOVAL_2026-10-20.md)、[交接实现与助手历史](AUDIO_HANDOFF_MEDIA_ASSISTANT_2026-10-20.md)、[Linkco 音频](LINKCO_CARPLAY_AUDIO.md)、[音频方案](BLUETOOTH_MUSIC_WHEEL.md)、[蓝牙与方控跟踪](BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md) |
+| 电话接听与挂断 | [星瑞电话键](PREFACE_PHONE_WHEEL_2026-10-20.md)：源码已接入短按接听／挂断，HFP 原车路径优先，尚未重新打包。 |
 
 ## 工程依据与来源
 

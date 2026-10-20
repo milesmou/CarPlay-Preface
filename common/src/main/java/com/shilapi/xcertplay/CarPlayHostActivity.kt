@@ -908,6 +908,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private val windowMediaPresses = mutableSetOf<Triple<Int, Int, Int>>()
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (CarPlayMediaKeys.onWindowPhoneKey(event) == true) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) returnHomeFromConnection()
             return true

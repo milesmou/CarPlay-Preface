@@ -120,6 +120,7 @@ class WheelKeyService : AccessibilityService() {
     }
 
     private fun handleWheelKey(event: KeyEvent): Boolean {
+        if (CarPlayMediaKeys.onWindowPhoneKey(event) == true) return true
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         if (WheelMediaLearning.offer(event)) return true
         val down = event.action == KeyEvent.ACTION_DOWN

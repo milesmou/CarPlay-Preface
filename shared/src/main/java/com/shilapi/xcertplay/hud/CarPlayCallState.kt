@@ -7,6 +7,9 @@ data class CarPlayCallCard(val phase: Phase, val name: String, val activeSinceMi
     enum class Phase { RINGING, DIALING, ACTIVE }
 }
 
+/** Opaque call identity: phone commands never need to expose a number, name or UUID. */
+data class CarPlayCallControl(val token: Any, val phase: CarPlayCallCard.Phase)
+
 /**
  * The iPhone's calls from iAP2 CallStateUpdate (0x4155): remote id (0), display name (1), status (2)
  * and call UUID (4). Status: 0 disconnected, 1 sending, 2 ringing, 3 connecting, 4 active, 5 held,
@@ -14,7 +17,7 @@ data class CarPlayCallCard(val phase: Phase, val name: String, val activeSinceMi
  * first, then a connected (active or held) one, then an outgoing one.
  */
 class CarPlayCallState(private val clock: () -> Long = System::currentTimeMillis) {
-    private data class Call(val status: Int, val name: String, val activeSince: Long?)
+    private data class Call(val status: Int, val name: String, val activeSince: Long?, val token: Any)
 
     private val calls = LinkedHashMap<String, Call>()
     private var last: CarPlayCallCard? = null
@@ -27,6 +30,7 @@ class CarPlayCallState(private val clock: () -> Long = System::currentTimeMillis
         val remote = runCatching { body.optionalString(REMOTE_ID) }.getOrNull()?.trim().orEmpty()
         val display = runCatching { body.optionalString(DISPLAY_NAME) }.getOrNull()?.trim().orEmpty()
         val id = runCatching { body.optionalString(CALL_UUID) }.getOrNull()?.takeIf { it.isNotBlank() } ?: remote
+        if (id.isBlank()) return false
         if (status == DISCONNECTED || status == DISCONNECTING) {
             calls.remove(id)
         } else {
@@ -36,6 +40,7 @@ class CarPlayCallState(private val clock: () -> Long = System::currentTimeMillis
                 status = status,
                 name = display.ifEmpty { remote }.ifEmpty { previous?.name.orEmpty() },
                 activeSince = previous?.activeSince ?: if (connected) clock() else null,
+                token = previous?.token ?: Any(),
             )
         }
         val next = card()
@@ -45,6 +50,13 @@ class CarPlayCallState(private val clock: () -> Long = System::currentTimeMillis
     }
 
     fun current(): CarPlayCallCard? = last
+
+    /** Untargeted Hook/Drop is ambiguous during call waiting or multiple calls. */
+    fun control(): CarPlayCallControl? {
+        val call = calls.values.singleOrNull() ?: return null
+        val phase = last?.phase ?: return null
+        return CarPlayCallControl(call.token, phase)
+    }
 
     fun clear() {
         calls.clear()

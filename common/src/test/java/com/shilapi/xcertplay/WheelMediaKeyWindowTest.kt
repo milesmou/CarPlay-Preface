@@ -51,6 +51,7 @@ class WheelMediaKeyWindowTest {
         host.getSystemService(AudioManager::class.java).mode = AudioManager.MODE_NORMAL
         // A session has to exist: outside one the wheel keeps the car's own action.
         controller = mock(CarPlayController::class.java)
+        `when`(controller.bluetoothHandoffReady).thenReturn(true)
         `when`(controller.sendMediaButton(anyInt())).thenReturn(true)
         field("controller", controller)
         field("activeAirPlaySession", mock(AirPlaySession::class.java))
@@ -104,6 +105,22 @@ class WheelMediaKeyWindowTest {
         verify(controller).sendMediaButton(CarPlayMediaButton.PLAY_PAUSE)
         assertFalse(host.dispatchKeyEvent(key(353, true)))
         verify(controller, times(1)).sendMediaButton(anyInt())
+    }
+
+    @Test @Config(sdk = [28])
+    fun anUnconfirmedBluetoothHandoffStillBlocksWindowAndBroadcastMediaKeys() {
+        `when`(controller.bluetoothHandoffReady).thenReturn(false)
+        `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        CarPlayMediaKeys.attach(host, controller) { true }
+        CarPlayBackgroundSession.active = true
+        try {
+            val down = key(KeyEvent.KEYCODE_MEDIA_NEXT, true)
+            assertFalse(host.dispatchKeyEvent(down))
+            host.sendBroadcast(Intent(Intent.ACTION_MEDIA_BUTTON).addCategory(Intent.CATEGORY_DEFAULT)
+                .putExtra(Intent.EXTRA_KEY_EVENT, down))
+            shadowOf(Looper.getMainLooper()).idle()
+            verify(controller, never()).sendMediaButton(anyInt())
+        } finally { CarPlayMediaKeys.detach(controller) }
     }
 
     @Test @Config(sdk = [28])

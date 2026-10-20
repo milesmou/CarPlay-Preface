@@ -74,6 +74,8 @@ internal object CarPlayMediaKeys {
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
     private var placeholder: Bitmap? = null
     private var prefaceReceiver: PrefaceMediaButtonReceiver? = null
+    private var phoneKeys: PrefacePhoneKeys? = null
+    private var prefacePhoneReceiver: PrefacePhoneButtonReceiver? = null
     private var trackInterception: PrefaceTrackKeyInterception? = null
     private var mediaCenter: PrefaceMediaCenter? = null
     private var audioDiagnostics: CarAudioDiagnostics? = null
@@ -158,6 +160,7 @@ internal object CarPlayMediaKeys {
             audioDiagnostics = CarAudioDiagnostics(context.applicationContext, ::reportDiagnostic).also { it.start() }
         }
         registerPrefaceVoiceReceiver(context, next)
+        registerPrefacePhoneReceiver(context, next)
         if (!next.usesCarBluetoothAudio) registerPrefaceReceiver(context, next)
         else reportDiagnostic("Media route=car-bluetooth; wheel keys and music remain vehicle-owned")
         if (adoptingStartupRegistration) {
@@ -446,6 +449,10 @@ internal object CarPlayMediaKeys {
         trackInterception = null
         prefaceVoiceReceiver?.let { receiver -> runCatching { appContext?.unregisterReceiver(receiver) } }
         prefaceVoiceReceiver = null
+        phoneKeys?.close()
+        phoneKeys = null
+        prefacePhoneReceiver?.let { receiver -> runCatching { appContext?.unregisterReceiver(receiver) } }
+        prefacePhoneReceiver = null
         lastPrefaceSiriRequest = null
         prefaceReceiver?.let { receiver -> runCatching { appContext?.unregisterReceiver(receiver) } }
         prefaceReceiver = null
@@ -477,6 +484,7 @@ internal object CarPlayMediaKeys {
         "carBluetoothRoute=${controller?.usesCarBluetoothAudio == true} " +
         "focusRequested=${focusRequest != null} focusHeld=$focusHeld mediaStreamActive=$mediaAudioActive " +
         "broadcastRegistered=${prefaceReceiver != null} voiceBroadcastRegistered=${prefaceVoiceReceiver != null} " +
+        "phoneBroadcastRegistered=${prefacePhoneReceiver != null} " +
         "siriBlocked=${siriUnavailableReason() ?: "none"}; ${trackInterception?.report() ?: "Track interception not initialized"}; " +
         (mediaCenter?.report() ?: "OEM media center not initialized")
 
@@ -575,6 +583,8 @@ internal object CarPlayMediaKeys {
     }
 
     /** Null retains ordinary Android key handling when no CarPlay receiver owns the window. */
+    internal fun onWindowPhoneKey(event: KeyEvent): Boolean? = synchronized(this) { phoneKeys }?.window(event)
+
     internal fun onWindowMediaKey(event: KeyEvent): Boolean? {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         val receiver = synchronized(this) { prefaceReceiver }
@@ -628,6 +638,35 @@ internal object CarPlayMediaKeys {
         usesCarBluetoothAudio(), trackInterception?.status(), mediaCenter?.status())
 
     private var callback: CarPlayMediaCallback? = null
+
+    private fun registerPrefacePhoneReceiver(context: Context, expected: CarPlayController) {
+        if (phoneKeys != null) return
+        lateinit var keys: PrefacePhoneKeys
+        keys = PrefacePhoneKeys(
+            current = expected::phoneCallControl,
+            eligible = { synchronized(this) { controller === expected && phoneKeys === keys } && CarPlayBackgroundSession.active },
+            route = { prefacePhoneKeyRoute(context.applicationContext) },
+            send = { command, valid ->
+                if (command == com.shilapi.xcertplay.orchestration.CarPlayPhoneCommand.ANSWER) expected.answerCall(valid)
+                else expected.endCall(valid)
+            },
+            diagnostic = ::reportDiagnostic,
+        )
+        phoneKeys = keys
+        val receiver = PrefacePhoneButtonReceiver(keys::shortPress, keys::longPress)
+        runCatching {
+            // RCALL is an unprotected ordinary broadcast. Require the sender's platform input
+            // permission rather than trusting action/extras from arbitrary installed apps.
+            ContextCompat.registerReceiver(context.applicationContext, receiver,
+                IntentFilter(PrefacePhoneButtonReceiver.ACTION).apply { addCategory(Intent.CATEGORY_DEFAULT) },
+                "android.permission.INJECT_EVENTS", mainHandler, ContextCompat.RECEIVER_EXPORTED)
+        }.onSuccess {
+            prefacePhoneReceiver = receiver
+            reportDiagnostic("Phone key receiver registered=true senderPermission=INJECT_EVENTS musicFocusRequired=false")
+        }.onFailure {
+            reportDiagnostic("Phone key receiver unavailable failureClass=${it.javaClass.simpleName}")
+        }
+    }
 
     /** The E02 voice event belongs to the connected projection, independently of its music route. */
     private fun registerPrefaceVoiceReceiver(context: Context, expected: CarPlayController) {

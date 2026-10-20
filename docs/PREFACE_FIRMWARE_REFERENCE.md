@@ -23,6 +23,7 @@
 | 主题 | 当前说明与证据 |
 | --- | --- |
 | 方控、输入观察者、SDK 准入 | [构建 98 Siri 方控](PREFACE_SIRI_WHEEL_2026-10-20.md)、[QQ 授权接入、保留原签名](QQ_MEDIA_AUTHORIZATION.md)、[构建 327 分析](PREFACE_FIRMWARE_327.md)、[Linkco 媒体按键](LINKCO_APK_MEDIA_KEYS_REFERENCE.md)、[完整媒体链路移植](PREFACE_LINKCO_MEDIA_REPLICA.md) |
+| 电话接听／挂断键 | [电话键接入](PREFACE_PHONE_WHEEL_2026-10-20.md)：299→200005 短按接听／挂断，独立于音乐焦点；HFP 存在或未知时保留原车，避免双发。94 项定向测试通过，尚未打包或实车验证。 |
 | 音频流、焦点、导航混音 | [构建 98 通话音量残留](CONNECTION_REPORT_2026-10-20_BUILD98_VOLUME.md)、[Linkco 音频](LINKCO_CARPLAY_AUDIO.md)、[音频方案](BLUETOOTH_MUSIC_WHEEL.md)、[元数据](PREFACE_MEDIA_METADATA.md) |
 | 蓝牙交接、自动暂停、方控跳页 | [构建 100：组件交接生效、助手被拒](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md)、[构建 99 自动暂停与切歌转蓝牙](CONNECTION_REPORT_2026-10-20_BUILD99_AUDIO.md)、[构建 97 原车日志与修正](CONNECTION_REPORT_2026-10-20_BUILD97.md)、[v0.2.20.1 移植](GEELYPLAY_BLUETOOTH_0.2.20.1.md)、[后续修正](BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md)、[构建 91 报告](CONNECTION_REPORT_2026-10-19_BUILD91.md) |
 | 连接入口、取消与自动连接 | [主页优先级](HOME_CONNECTION_PRIORITY.md)、[自动连接](AUTOMATIC_CONNECTION.md)、[蓝牙重连复核](BLUETOOTH_AUTO_RECONNECT_2026-10-16.md) |

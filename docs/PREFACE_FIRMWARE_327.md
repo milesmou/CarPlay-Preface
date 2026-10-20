@@ -77,7 +77,7 @@ IHU353G 用户报告仍出现切歌成功但打开原车多媒体页。工程在
 | 播放／暂停 | HiCar SDK 请求 85，HMI 回调转发 85 | 随媒体归属请求，转 CarPlay PLAY_PAUSE；重复 DOWN 不重复触发 |
 | 语音按钮 | SDK 请求 298；输入服务 `ECarXRVoiceAssistAction` 发有序广播，事件码 200231、动作 0/1 | 配对释放唤起 Siri；另注册语音广播作为接口不可用时的回退，仅在会话符合条件且 Siri 请求被接受后中止有序广播；两路 400 ms 去重 |
 | 音量加减 | HMI 的 24/25/301/302 分支未调节音量；原车 `ECarXRVolumeAdjustActionBase` 实际调节当前 0/3/9/12 流，不适用时退回媒体 3 | 私有观察回调保留原车处理；可被应用消费的标准键按播放状态选流，默认 3/12，通话优先 |
-| 电话、挂断 | HiCar 根据自身连接和 `callState` 决定 5/6/299 转发 | 保留原车；没有以 HiCar 通话状态冒充 CarPlay 通话状态 |
+| 电话、挂断 | HiCar 根据自身连接和 `callState` 决定 5/6/299 转发；原输入服务的 200005 发普通 RCALL 广播 | 已按 iPhone 自身通话状态接入短按接听／挂断；HFP 存在或未知时保留原车，详见[实现与待实车验证](PREFACE_PHONE_WHEEL_2026-10-20.md)，不使用 HiCar 状态 |
 | 方向／确认 | SDK 请求 19–23，但转换表 21/22 都返回 RIGHT，不能照搬 | 保留原车；已有 CarPlay 自定义摇杆机制继续使用 |
 | 快进／快退、静音 | HMI 有 89/90/91/164 分支；当前 CarPlay 媒体 HID 没有对应动作 | 不请求这些键，不用切歌或暂停冒充其动作 |
 | 语音唤醒词 | HMI 有 `onVoiceWakeup` 回调，但 `VrVoiceObserverUtil.init/starObserver/stopObserver` 全部为空 | 不移植空实现，不宣称支持唤醒词 |
