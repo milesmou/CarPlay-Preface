@@ -4,7 +4,7 @@ import android.content.Intent
 
 /** Main-thread, process-local cancellation barrier for automatic and queued connection launches. */
 internal object ConnectionAutoStart {
-    private const val EXTRA_GENERATION = "com.shihab.diplay.CONNECTION_LAUNCH_GENERATION"
+    private const val EXTRA_GENERATION = "com.preface.carplay.CONNECTION_LAUNCH_GENERATION"
     private var requests = ConnectionRequestGate()
     val generation get() = requests.generation
     val paused get() = requests.paused

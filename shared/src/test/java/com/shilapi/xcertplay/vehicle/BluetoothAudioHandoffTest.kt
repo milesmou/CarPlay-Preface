@@ -211,7 +211,7 @@ class BluetoothAudioHandoffTest {
         repeat(3) { owner.setSuppressed(false) }
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6))
         assertEquals(1, log.count { it.contains("platform Bluetooth music reconnect accepted=false") })
-        assertTrue(log.any { it.contains("compatible authorization component 6 is required") })
+        assertTrue(log.any { it.contains("compatible authorization component 11 is required") })
         assertFalse(log.any { it.contains("connection confirmed") })
         assertTrue(profile.connected.isEmpty())
     }

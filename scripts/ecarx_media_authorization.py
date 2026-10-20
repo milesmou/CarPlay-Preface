@@ -125,7 +125,7 @@ def main():
     except (OSError, ValueError, zipfile.BadZipFile, KeyError, subprocess.SubprocessError):
         # Source/JSON/tool exceptions can include input contents. Print only a fixed message.
         parser.exit(1, 'ECARX media input verification failed; check local files and source hashes.\n')
-    print('QQ media build inputs verified; package/signing unchanged; OEM admission unconfirmed.')
+    print('QQ media build inputs verified; OEM admission unconfirmed.')
 
 
 if __name__ == '__main__':

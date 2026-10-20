@@ -123,7 +123,7 @@ IHU353G 用户报告仍出现切歌成功但打开原车多媒体页。工程在
 
 ## 可复核的本地证据
 
-2026-10-15 新增 [Linkco 盒子切歌对照](LINKCO_APK_MEDIA_KEYS_REFERENCE.md)：用户确认同一台星瑞 E02 上盒子切歌不跳页。盒子 APK 通过 ECARX MediaCenterAPI 注册播放音源、接收 MusicClient 回调；参考 OTA 的 boot openapi VDEX 已确认同名类型及方法定义。本轮按用户要求默认尝试原厂音源接入，不受音量选流开关控制；接口／准入失败保留原路径。定向测试验证生命周期与去重，准入及切歌不跳页待同车实测，不能推断观察者去重已解决原车跳页。
+2026-10-15 新增 Linkco 盒子切歌对照（分析文档已清理）：用户确认同一台星瑞 E02 上盒子切歌不跳页。盒子 APK 通过 ECARX MediaCenterAPI 注册播放音源、接收 MusicClient 回调；参考 OTA 的 boot openapi VDEX 已确认同名类型及方法定义。本轮按用户要求默认尝试原厂音源接入，不受音量选流开关控制；接口／准入失败保留原路径。定向测试验证生命周期与去重，准入及切歌不跳页待同车实测，不能推断观察者去重已解决原车跳页。
 
 - `agent_docs/firmware/ihu519g-327/metadata.txt`、`system/build.prop`。
 - `agent_docs/firmware/ihu519g-327/audio-framework-constants.json`。

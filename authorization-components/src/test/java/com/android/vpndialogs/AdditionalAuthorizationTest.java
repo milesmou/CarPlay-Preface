@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config;
 @Config(sdk = 28, qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi", shadows = NativeAppOpsManagerShadow.class)
 public class AdditionalAuthorizationTest {
     static Backend fake;
-    static final AuthorizationBackend.Target TARGET = new AuthorizationBackend.Target("com.shihab.diplay.hudtest", 10123, "CarPlay");
+    static final AuthorizationBackend.Target TARGET = new AuthorizationBackend.Target("com.preface.carplay", 10123, "CarPlay");
     public static class TestActivity extends AdditionalAuthorizationActivity {
         @Override protected AdditionalAuthorizationBackend createBackend() { return fake; }
     }
@@ -94,7 +94,7 @@ public class AdditionalAuthorizationTest {
     @Test public void unrelatedPackagesMalformedUrisAndRemovedActionsAreRejected() {
         for (Intent intent : new Intent[]{new Intent(), new Intent("arbitrary", Uri.parse("package:" + TARGET.packageName)),
             new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:com.other.app")),
-            new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("file:com.shihab.diplay")),
+            new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("file:com.preface.carplay")),
             new Intent("android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS", Uri.parse("package:" + TARGET.packageName))}) {
             TestActivity page = open(intent);
             assertNull(AuthorizationConsentTest.button(page.getWindow().getDecorView(), "允许"));

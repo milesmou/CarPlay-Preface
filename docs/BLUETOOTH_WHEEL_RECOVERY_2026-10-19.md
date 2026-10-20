@@ -43,7 +43,7 @@
 - 本地 `catalog/bluetooth-music-bridge-classes.json` 由 `python agent_docs/firmware/inspect_bluetooth_music_bridge.py` 生成。`boot-framework.vdex` SHA-256 `3b40cf31d181d325410c8efb1c1983c038c7c2a09ea7222572133b2294a9b08b`：BluetoothA2dpSink 类偏移 1612216，connect 代码偏移 5319852，disconnect 5320050，isA2dpPlaying 5320392；ApplicationInfo 的 isAllowedToUseHiddenApis／getHiddenApiEnforcementPolicy／isSignedWithPlatformKey 偏移分别为 5525074／4146950／4146760。优化指令只保留原字节，不猜测其调用目标。
 - 同一镜像提取的 `system/app/Bluetooth/oat/arm64/Bluetooth.vdex` SHA-256 `f2275b8926c61962c32dba434299cdd3b136fe16b2900a99b30c418346df65ba`：A2dpSinkService.connect 代码偏移 1422466 包含 BLUETOOTH_ADMIN 权限检查，getConnectionState／getConnectedDevices／isA2dpPlaying 偏移 1423080／1423166／1422598 包含 BLUETOOTH 检查；Binder connect 偏移 1422066。参考类没有 setConnectionPolicy，未添加对此固件无效的现代 API 回退。
 
-OpenAPI 服务端缓存另确认，系统应用快捷准入检查的是 ApplicationInfo 系统／更新系统标志，其他调用者走 license 校验，并核对实际 Binder UID／PID／包名；手动安装的平台签名补丁不自动拥有系统应用标志。因此本轮补丁只代办蓝牙音乐连接，不替主应用冒用媒体身份或绕过媒体准入。证据为 `agent_docs/apk-reference/netease-track-service/decompiled/sources/com/ecarx/sdk/openapi/f/f.java:124–126,225–233`、`f/c.java:64–69`、`f/e.java:181–186`，输入 APK SHA-256 及限制见 [服务端对照](NETEASE_TRACK_SERVICE_REFERENCE.md)。
+OpenAPI 服务端缓存另确认，系统应用快捷准入检查的是 ApplicationInfo 系统／更新系统标志，其他调用者走 license 校验，并核对实际 Binder UID／PID／包名；手动安装的平台签名补丁不自动拥有系统应用标志。因此本轮补丁只代办蓝牙音乐连接，不替主应用冒用媒体身份或绕过媒体准入。证据为 `agent_docs/apk-reference/netease-track-service/decompiled/sources/com/ecarx/sdk/openapi/f/f.java:124–126,225–233`、`f/c.java:64–69`、`f/e.java:181–186`，输入 APK SHA-256 及限制见 服务端对照（分析文档已清理）。
 
 源码修正阶段完成静态审阅，准备了回归测试源码但未执行。后续实车需分别确认：同手机 A2DP／AVRCP 已连接、持续播放不自动暂停、一次方控只切一曲、CarPlay 音频 `ready=true → registered → request-play-accepted` 后不跳原车页面，以及主动选择收音机／通话／断开后的归属。若始终 ready=false，仍需实际厂商拒绝原因，不能声称方控接管已修复。
 

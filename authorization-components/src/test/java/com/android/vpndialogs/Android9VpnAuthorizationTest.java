@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28, shadows = NativeAppOpsManagerShadow.class)
 public class Android9VpnAuthorizationTest {
-    private static final AuthorizationBackend.Target TARGET = new AuthorizationBackend.Target("com.shihab.diplay.hudtest", 10123, "CarPlay");
+    private static final AuthorizationBackend.Target TARGET = new AuthorizationBackend.Target("com.preface.carplay", 10123, "CarPlay");
     private Context context;
     private Backend backend;
     private class Backend extends Android9Backend {

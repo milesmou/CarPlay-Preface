@@ -130,7 +130,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--adb", default=environment.get("adbPath") or "adb")
     parser.add_argument("--serial", required=True)
-    parser.add_argument("--package", default="com.shihab.diplay.hudtest")
+    parser.add_argument("--package", default="com.preface.carplay")
     parser.add_argument("--require-text", action="append", required=True,
                         help="Visible text prefix identifying the expected page; repeat as needed")
     parser.add_argument("--output", type=Path, required=True)

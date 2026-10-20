@@ -59,7 +59,7 @@ internal class PlatformBluetoothMusicConnector(
     fun start() {
         if (closed || bound) return
         if (!BluetoothAdapter.checkBluetoothAddress(peer) || !available()) {
-            finish(false, "compatible authorization component 6 is required")
+            finish(false, "compatible authorization component 11 is required")
             return
         }
         try {
@@ -76,7 +76,7 @@ internal class PlatformBluetoothMusicConnector(
         val platform = pm.getPackageInfo("android", PackageManager.GET_SIGNATURES)
         val application = pm.getApplicationInfo(PACKAGE, PackageManager.GET_META_DATA)
         val service = pm.getServiceInfo(COMPONENT, 0)
-        Build.VERSION.SDK_INT == 28 && component.longVersionCode >= 6 &&
+        Build.VERSION.SDK_INT == 28 && component.longVersionCode >= 11 &&
             component.versionName == "preface-android9-${component.longVersionCode}" &&
             application.metaData?.getString("preface.authorization.component") == "android9-v1" &&
             (application.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP or ApplicationInfo.FLAG_DEBUGGABLE)) == 0 &&

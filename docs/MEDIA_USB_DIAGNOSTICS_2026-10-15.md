@@ -1,6 +1,6 @@
 # 2026-10-15：音源、蓝牙与 USB 定位日志补充
 
-针对 [第五份报告](CONNECTION_REPORT_2026-10-15_5.md) 与 [OpenAPI 服务端参考](NETEASE_TRACK_SERVICE_REFERENCE.md) 的证据缺口补充只读诊断。不改变初始化时机、调用线程、播放／切歌策略或 USB 连接策略。没有构建 APK，现有 **0.1.1-64 不包含本页新增日志**。
+针对 [第五份报告](CONNECTION_REPORT_2026-10-15_5.md) 与 OpenAPI 服务端参考（分析文档已清理） 的证据缺口补充只读诊断。不改变初始化时机、调用线程、播放／切歌策略或 USB 连接策略。没有构建 APK，现有 **0.1.1-64 不包含本页新增日志**。
 
 ## 原厂 SDK
 
@@ -30,7 +30,7 @@ attach、手机播放／暂停、媒体命令及蓝牙事件触发音频快照�
 - `dhcp4Messages`：UDP／BOOTP 长度、cookie 和有界 option 校验后只累计 option 53 类型：discover／offer／request／ack／nak／other／malformed。无名称、ID、地址或其它 option，不发送 DHCP，也不把该帧当作 IPv4 CarPlay 会话。
 - `usbStatus`：在已有通知读取线程分类 CDC link up／down 和上下行速率，原始通知字节不导出。无端点、未知和格式错误分别记录；link up 不证明 IP 可达，保留 `ipReachability=unconfirmed`。
 
-新增结果逐行输出，经过现有脱敏与 700 字符上限。原始测试窗口、首次完整写入前的 20 ms 短超时、负返回值解释、退出释放、重新插拔提示、无 VPN／root／应用 TCP/IP 备用通路的约束不变。见 [NCM 帧测试](USB_NCM_FRAME_DIAGNOSTICS.md)、[系统 USB 诊断](USB_SYSTEM_NETWORK_DIAGNOSTICS.md)。
+新增结果逐行输出，经过现有脱敏与 700 字符上限。原始测试窗口、首次完整写入前的 20 ms 短超时、负返回值解释、退出释放、重新插拔提示、无 VPN／root／应用 TCP/IP 备用通路的约束不变。这些历史诊断已退出主流程，事实保留在 [固件索引](firmware/ihu519g-327.json)，当前方案见 [NCM＋本地 VPN](USB_VPN_RESTORE_0.2.20.md)。
 
 ## 报告与验证
 

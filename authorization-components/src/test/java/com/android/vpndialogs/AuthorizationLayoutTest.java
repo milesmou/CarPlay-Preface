@@ -37,11 +37,11 @@ public class AuthorizationLayoutTest {
 
         app.getResources().updateConfiguration(config, app.getResources().getDisplayMetrics());
         AuthorizationConsentTest.fake = new AuthorizationConsentTest.FakeBackend();
-        AuthorizationConsentTest.caller = "com.shihab.diplay.hudtest";
+        AuthorizationConsentTest.caller = "com.preface.carplay";
         new AdditionalAuthorizationTest().reset();
         for (String page : new String[]{"vpn", "write", "overlay"}) {
             boolean vpn = page.equals("vpn");
-            Intent request = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.shihab.diplay.hudtest"));
+            Intent request = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.preface.carplay"));
             if (page.equals("overlay")) request.setAction(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
             ActivityController<? extends AuthorizationActivity> controller = vpn
                 ? Robolectric.buildActivity(AuthorizationConsentTest.TestConfirm.class).setup()

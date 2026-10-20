@@ -1,16 +1,12 @@
 # Android 9 授权组件
 
-当前源码已按用户要求[移除独立媒体助手](MEDIA_ASSISTANT_REMOVAL_2026-10-20.md)，后续主 APK 仅内置授权组件 **preface-android9-10 / 10**，包名 `com.android.vpndialogs`，与主应用独立签名，仅适用于 API 28、平台证书匹配且实际权限可授予的系统。此次未重新打包；最近已交付的 CarPlay **0.1.1 / 100** 历史 APK 仍含媒体助手 1，其原核验记录保留在文末。
+当前组件为 **preface-android9-11 / 11**，包名 `com.android.vpndialogs`，平台签名不变，仅适用于 API 28、匹配平台证书和系统身份的设备。主 APK 仅内置授权组件，独立媒体助手已移除。
 
-授权组件 10 保留当前会话所选 iPhone 的 A2DP 临时断开／恢复租约，主应用确认实际断开后再申请音乐焦点；构建 100 的[实车日志](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md)已记录无线和 USB 的断开及退出恢复。六项系统授权边界保持原值。“保存授权 APK”只导出授权组件，由用户手动安装；仅升级主应用不会更新车机上的授权组件。
-
-此前已按用户要求构建：CarPlay **0.1.1 / 99**、组件 **preface-android9-9 / 9**，主应用已覆盖安装到在线模拟器，组件未单独安装。组件 9 修正构建 97 实车照片中的 `VPN service missing`：受 `BIND_VPN_SERVICE` 保护且启用的非导出服务也能申请授权，仍只接受系统提供的调用包身份。详见 [构建 97 日志分析](CONNECTION_REPORT_2026-10-20_BUILD97.md) 及文末构建核验；组件修正及 CarPlay 实车结果仍待验证。
+组件 11 将蓝牙代理的调用方统一为采用仓库原证书的 `com.preface.carplay`，六项授权和 A2DP 会话租约边界保持不变。新包名需保存并手动安装／升级组件 11；仅升级主应用不会更新组件。旧组件 10 的交接实车证据见 [构建 100](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md)，不代表新包名已通过实车验收。
 
 ## 使用与升级
 
-构建 100 交付后的源码调整（2026-10-20，尚未重新打包）：移除独立“系统授权组件”提示卡片，将其完整说明放在“系统授权”卡片标题下方，随后显示当前组件状态及原有保存／授权入口。说明只出现一次，页面恢复时不自动申请 VPN。授权页及分类布局共 29 项定向测试通过；1920×720 横屏、160／320 dpi、150% 字体的中文测试渲染位于 `agent_docs/screenshots/authorization-merged-description-20261020-test-renders/`，属于 Robolectric 渲染，不是安装后截图。
-
-主 APK 已包含组件，无需另传第二个 APK。在 CarPlay“设置 → 授权”点击“保存授权 APK”，保存到公共 `Download` 根目录，再由用户通过文件管理器手动安装。主应用不调用 APK 安装器、不申请安装来源权限、不静默安装或授权。
+主 APK 已包含组件，无需另传第二个 APK。在 CarPlay“设置 → 授权”点击“保存授权 APK”，保存到公共 `Download` 根目录，再由用户通过文件管理器手动安装。授权组件导出流程不调用 APK 安装器、不申请安装来源权限、不静默安装或授权；主应用更新功能已有的安装权限与此流程独立。
 
 “保存授权 APK”和“打开保存目录”始终同行、等宽等高。授权组件保存为固定文件名 `Preface-Android9-Authorization.apk`，文件名不带版本号。保存时先复制并校验临时文件，再覆盖同名旧文件，不追加编号；相同内容提示已保存，不重复写入或自动打开目录。目录按钮独立可用，优先系统下载入口，再尝试文件管理器；系统受理不等于目录实际显示。Android 9 缺少存储权限时仅请求导出所需权限。
 
@@ -23,9 +19,9 @@
 | VPN 确认 | 任何符合条件的当前用户应用可发起系统 ConfirmDialog；目标只取 getCallingPackage()，须有已启用且受 BIND_VPN_SERVICE 保护的服务，允许非导出服务供系统显式绑定，保留用户限制及其他 always-on VPN 检查。没有代选应用／Intent extra 授权入口，仅授权，不创建 TUN；其他应用的实际 VPN 范围由其自身实现决定。 |
 | 修改系统设置、悬浮窗 | 支持当前用户下已安装、启用、未暂停且声明对应权限的应用，不要求目标采用 CarPlay 签名；记录并复核 UID、版本和签名。标准 Settings Intent 无 package: 时选择应用，有 package: 时进入该应用的确认页；逐项允许／撤销、读回状态，保留系统策略检查。悬浮窗不再额外要求 WRITE_SETTINGS。CarPlay 仍优先原生页面，缺失时使用就绪补丁。 |
 | 安装未知应用、使用情况访问、无障碍管理 | 仅补丁标准 Settings 入口提供；选择同用户下已安装、声明对应权限／服务且符合策略的应用，CarPlay 主授权页不增加这些项目。 |
-| 蓝牙音乐连接及会话交接 | 仅供两个已核对签名的 CarPlay 包使用；原连接操作只连接所选已配对 iPhone。组件 10 源码另提供仅限当前 CarPlay 会话的 A2DP 临时断开／恢复租约，以真实状态确认，只恢复自己请求断开的连接；保留当前用户、权限、通话、其他手机及取消检查。 |
+| 蓝牙音乐连接及会话交接 | 仅供采用仓库原证书的 `com.preface.carplay` 使用；原连接操作只连接所选已配对 iPhone。组件 10 源码另提供仅限当前 CarPlay 会话的 A2DP 临时断开／恢复租约，以真实状态确认，只恢复自己请求断开的连接；保留当前用户、权限、通话、其他手机及取消检查。 |
 
-六项授权均校验当前用户、目标 UID、签名、版本、启用状态及权限／服务声明；签名校验用于确认用户选中的身份未发生变化，不将其他应用限定为 CarPlay 签名。确认时重新检查，失败显示原因，拒绝遮挡触摸。组件 7 及更早版本的前三项仅接受两个固定签名 CarPlay 包，此限制从组件 8 源码起解除。组件本身仍要求匹配平台签名与系统 UID；其持有的系统权限不会转授给目标应用。不提供任意 app-op、批量授权、通知使用权或电池优化白名单。蓝牙代理仍只接受 `com.shihab.diplay` 和 `com.shihab.diplay.hudtest`。组件 10 仅按用户新授权提供会话内 A2DP 临时断开与本租约恢复，不提供通用断开、配对、HFP/SCO、切音源或全局蓝牙设置。
+六项授权均校验当前用户、目标 UID、签名、版本、启用状态及权限／服务声明；签名校验用于确认用户选中的身份未发生变化，不将其他应用限定为 CarPlay 签名。确认时重新检查，失败显示原因，拒绝遮挡触摸。组件 7 及更早版本的前三项仅接受两个固定签名 CarPlay 包，此限制从组件 8 源码起解除。组件本身仍要求匹配平台签名与系统 UID；其持有的系统权限不会转授给目标应用。不提供任意 app-op、批量授权、通知使用权或电池优化白名单。组件 11 的蓝牙代理仅接受 `com.preface.carplay` 和仓库原证书。组件 10 仅按用户新授权提供会话内 A2DP 临时断开与本租约恢复，不提供通用断开、配对、HFP/SCO、切音源或全局蓝牙设置。
 
 其他应用使用入口：修改系统设置 `android.settings.action.MANAGE_WRITE_SETTINGS`，悬浮窗 `android.settings.action.MANAGE_OVERLAY_PERMISSION`，安装来源 `android.settings.MANAGE_UNKNOWN_APP_SOURCES`，使用情况 `android.settings.USAGE_ACCESS_SETTINGS`，无障碍 `android.settings.ACCESSIBILITY_SETTINGS`；可由应用或系统设置入口打开。组件没有桌面图标；VPN 应由目标应用调用 `VpnService.prepare()` 并通过 `startActivityForResult` 发起，不能从其他应用传包名代办。CarPlay 主授权页继续只管理自身权限。
 
@@ -61,7 +57,15 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
-## 当前验证记录
+## 0.2.0 构建核验
+
+`:mobile:assembleRelease` 成功，正式包为 `CarPlay-Preface-0.2.0-1202.apk`，包名 `com.preface.carplay`。主证书保持原值，内置组件 11 的包名、版本、平台证书、系统 UID 和 SHA-256 均已核对；包内无媒体助手资产或运行实现。已安装到在线模拟器 `emulator-5558`，没有安装独立组件或清除旧应用数据。包名与授权相关 114 项定向测试通过，未运行完整 CI；新包名的车机准入及实车功能仍待复核。
+
+主 APK SHA-256：`4c06bf13ff22678bd5869d68b306f161041a589a0c4cc8047cea08a595253d04`。
+
+组件 11 SHA-256：`09258b868ea339da1854c59e23172306f8fd90d2973e67250e7c2bad8168bab3`。
+
+## 历史验证记录
 
 2026-10-19 仅执行 `:mobile:assembleDebug`，没有追加单元测试、Lint 或完整 CI。主包已 adb install -r 安装到 API 34 模拟器 emulator-5558，版本查询为 0.1.1 / 95，保留数据；没有替换模拟器系统 VpnDialogs。
 

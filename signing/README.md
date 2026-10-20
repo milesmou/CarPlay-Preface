@@ -22,7 +22,7 @@ CarPlay 测试包也使用同一签名：`mobile` 和 `automotive` 的 Debug／R
 ./gradlew :mobile:assembleDebug
 ```
 
-主应用测试包仍使用 `com.shihab.diplay.hudtest` 包名。旧测试包若使用 Android 默认 Debug 密钥，首次覆盖安装会因签名不同而失败；构建流程只报告错误，不自动卸载或清除原数据。
+主应用正式版和测试版统一使用 `com.preface.carplay` 包名及仓库原有证书，可相互覆盖。旧包名应用不会自动升级或迁移数据；相同包名若使用不同密钥，覆盖安装会因签名不同而失败，构建流程只报告错误，不自动卸载或清除原数据。
 
 也可在 PowerShell 7.4+ 中运行：
 

@@ -1,5 +1,7 @@
 # 蓝牙会话交接与独立媒体助手历史记录
 
+后续交付：上述当前源码已进入 [0.2.0 正式包](RELEASE-NOTES-0.2.0.md)（统一包名 `com.preface.carplay`、构建 1202、授权组件 11），已核验签名并安装到模拟器；下文未打包等表述属于当时阶段，不表示当前版本已通过实车验收。
+
 **最新源码决定（2026-10-20）：用户已要求移除独立媒体助手。** 模块、探测、IPC、签名打包及导出均已移除，授权组件 10 的 A2DP 会话交接继续保留，详见[移除记录](MEDIA_ASSISTANT_REMOVAL_2026-10-20.md)。本次尚未重新打包；下文保留构建 100 当时的实现、产物和验证记录，不作为后续打包要求。
 
 2026-10-20，针对 [构建 99 实车日志](CONNECTION_REPORT_2026-10-20_BUILD99_AUDIO.md) 修正源码。用户明确允许将授权组件扩展为仅针对当前会话所选 iPhone 的 A2DP 临时断开／恢复，并允许新增独立平台签名媒体助手、先验证助手自身准入。
@@ -53,7 +55,7 @@
 
 ## 复核依据与验收
 
-参考固件仍为 IHU519G / FS11A1 / 327，OTA SHA-256 `f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01`。蓝牙 connect／disconnect 的签名和平台隐藏 API 范围沿用本地 `catalog/bluetooth-music-bridge-classes.json`；MediaCenterAPI／MusicClient／MusicPlaybackInfo 签名沿用 `catalog/media-center-classes.json`。SDK 初始化顺序及媒体列表发布顺序见 [Linkco 对照](PREFACE_LINKCO_MEDIA_REPLICA.md)。原车拒绝与双路方控证据见构建 99 报告。
+参考固件仍为 IHU519G / FS11A1 / 327，OTA SHA-256 `f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01`。蓝牙 connect／disconnect 的签名和平台隐藏 API 范围沿用本地 `catalog/bluetooth-music-bridge-classes.json`；MediaCenterAPI／MusicClient／MusicPlaybackInfo 签名沿用 `catalog/media-center-classes.json`。SDK 初始化顺序及媒体列表发布顺序见 Linkco 对照（分析文档已清理）。原车拒绝与双路方控证据见构建 99 报告。
 
 新包实车需依次验证：
 

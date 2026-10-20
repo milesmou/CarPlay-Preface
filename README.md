@@ -1,8 +1,8 @@
 # CarPlay-Preface
 
-基于 [DiPlay](https://github.com/shihabal3amri/DiPlay)，专为吉利星瑞 E02 车机适配的 CarPlay 应用。
+基于 [DiPlay](https://github.com/shihabal3amri/DiPlay)，适配 **2023 款吉利星瑞 1.5T（E02）车机**，**无飞屏功能**。
 
-应用版本：**0.1.1（开发中）**。上游基线：**DiPlay v0.2.21（选择性同步）**，范围见[同步说明](docs/UPSTREAM_SYNC_0.2.21.md)。
+应用版本：**0.2.0**。正式版和测试版统一包名：`com.preface.carplay`，使用相同签名，可相互覆盖。上游基线：**DiPlay v0.2.21（选择性同步）**。
 
 ## 相对上游的主要改动
 

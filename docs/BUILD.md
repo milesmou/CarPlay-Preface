@@ -16,19 +16,21 @@ JAVA_HOME 指向 JDK，ANDROID_HOME 指向 SDK；或在 Git 忽略的 local.prop
 ./gradlew.bat :mobile:assembleDebug
 ```
 
-不附加单元测试、Lint 或所有模块检查。Debug 包名 com.shihab.diplay.hudtest，Release 为 com.shihab.diplay。原产物 mobile/build/outputs/apk/debug/mobile-debug.apk 和 output-metadata.json 保留；按实际版本复制为：
+不附加单元测试、Lint 或所有模块检查。Debug 与 Release 的包名均为 `com.preface.carplay`，同签名变体可相互覆盖。原产物 mobile/build/outputs/apk/debug/mobile-debug.apk 和 output-metadata.json 保留；按实际版本复制为：
 
 ```text
 CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 ```
 
-当前开发 versionName 为 0.1.1，正式发布前不自动递增；升级 versionCode 必须递增。其他按需任务：
+本次发布 versionName 为 0.2.0、versionCode 为 1202；mobile／automotive 统一版本和包名，避免同包名变体版本倒退。升级构建号必须递增。其他按需任务：
 
 | 目的 | Gradle 任务 |
 | --- | --- |
 | 检查认证资料并构建独立连接测试包 | :mobile:assembleStandaloneDebug |
 | Release | :mobile:assembleRelease |
 | 完整测试 | 仅用户明确要求时按 [验证说明](TESTING.md) 执行 CI 命令 |
+
+正式版执行 `:mobile:assembleRelease`，保留原始输出及元数据，交付文件命名为 `CarPlay-Preface-<versionName>-<versionCode>.apk`。旧包名不会自动迁移数据，不自动卸载。
 
 ## 认证与签名
 
@@ -67,3 +69,16 @@ adb -s <serial> install -r <本次命名后的APK>
 | 认证资料缺失 | 所选目录及两项文件 SHA-256，StandaloneDebug 校验结果 |
 | 组件签名或资产生成失败 | 固定 AOSP 输入、平台证书和本次生成元数据，不跳过依赖 |
 | 覆盖安装失败 | 已装包名、证书和 versionCode，保留数据并报告错误 |
+
+## 本机媒体构建输入
+
+构建还需要用户已指定的媒体授权输入，保存在 Git 忽略的 `agent_docs/runtime-ecarx-media/`：`assets/license.txt`、`manifest-values.json`、`provenance.json`。仅授权文件及配套 Manifest 参数进入主 APK，来源记录不打包；缺失或哈希不一致时构建明确失败。
+
+新环境取得用户提供的固定来源 APK 后，使用已配置 SDK 的 aapt2 导入：
+
+```powershell
+python scripts/ecarx_media_authorization.py --import-source --apk '<用户提供的源 APK>' --aapt2 '<已有 SDK 的 aapt2.exe>'
+python scripts/ecarx_media_authorization.py --verify
+```
+
+可用 `--directory` 和 `DIPLAY_ECARX_MEDIA_AUTH_DIR` 指定同内容本机目录。授权原文和参数不入库，不扩大公开凭据白名单，不更换 APK 签名或修改授权。文件正确、换包名均不代表厂商媒体准入成功，运行时仍检查真实 ready、注册 token 和 requestPlay。

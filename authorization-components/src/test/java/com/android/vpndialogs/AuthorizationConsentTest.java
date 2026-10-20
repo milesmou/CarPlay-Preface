@@ -49,7 +49,7 @@ public class AuthorizationConsentTest {
             settingsWrites++; changedPackage = target.packageName; allowed = value; return !failWrite;
         }
     }
-    @Before public void reset() { fake = new FakeBackend(); caller = "com.shihab.diplay.hudtest"; }
+    @Before public void reset() { fake = new FakeBackend(); caller = "com.preface.carplay"; }
     static Button button(View view, String label) {
         if (view instanceof Button && label.contentEquals(((Button) view).getText())) return (Button) view;
         if (view instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
@@ -61,7 +61,7 @@ public class AuthorizationConsentTest {
     private TestConfirm vpn() { return Robolectric.buildActivity(TestConfirm.class).setup().get(); }
     private TestWrite settings(Intent intent) { return Robolectric.buildActivity(TestWrite.class, intent).setup().get(); }
     private Intent settingsIntent() {
-        return new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.shihab.diplay.hudtest"));
+        return new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:com.preface.carplay"));
     }
     private void click(Activity activity, String label) {
         Button control = button(activity.getWindow().getDecorView(), label);
@@ -108,7 +108,7 @@ public class AuthorizationConsentTest {
     @Test public void anotherVpnAppCanRequestConsentOnlyForItsActualCallerIdentity() {
         caller = "com.example.other";
         TestConfirm activity = Robolectric.buildActivity(TestConfirm.class,
-            new Intent().putExtra("package", "com.shihab.diplay").setData(Uri.parse("package:com.shihab.diplay"))).setup().get();
+            new Intent().putExtra("package", "com.preface.carplay").setData(Uri.parse("package:com.preface.carplay"))).setup().get();
         assertEquals(0, fake.vpnWrites);
         click(activity, "允许");
         assertEquals("com.example.other", fake.changedPackage);
@@ -158,7 +158,7 @@ public class AuthorizationConsentTest {
     @Test public void writePermissionChangesOnlyAfterAllow() {
         TestWrite activity = settings(settingsIntent()); assertEquals(0, fake.settingsWrites);
         click(activity, "允许"); assertTrue(fake.allowed); assertEquals(1, fake.settingsWrites);
-        assertEquals("com.shihab.diplay.hudtest", fake.changedPackage); assertEquals(0, fake.vpnWrites);
+        assertEquals("com.preface.carplay", fake.changedPackage); assertEquals(0, fake.vpnWrites);
     }
     @Test public void writePermissionCanBeRevokedExplicitly() {
         fake.allowed = true; TestWrite activity = settings(settingsIntent());
@@ -170,7 +170,7 @@ public class AuthorizationConsentTest {
     }
     @Test public void malformedSettingsRequestsAndOtherPackagesAreRejected() {
         for (Intent intent : new Intent[]{new Intent(), new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                Uri.parse("package:com.other.app")), new Intent("untrusted", Uri.parse("package:com.shihab.diplay"))}) {
+                Uri.parse("package:com.other.app")), new Intent("untrusted", Uri.parse("package:com.preface.carplay"))}) {
             TestWrite activity = settings(intent);
             assertNull(button(activity.getWindow().getDecorView(), "允许")); assertEquals(0, fake.settingsWrites);
             activity.finish();
@@ -192,10 +192,12 @@ public class AuthorizationConsentTest {
         Android9Backend backend = new Android9Backend(org.robolectric.RuntimeEnvironment.getApplication());
         try { backend.checkEnvironment(false); fail("must reject missing certificate"); } catch (Exception expected) { }
     }
-    @Test public void bluetoothProxyClientAllowlistStillContainsOnlyTheTwoCarPlayPackages() {
-        assertTrue(Android9Backend.supportedPackage("com.shihab.diplay"));
-        assertTrue(Android9Backend.supportedPackage("com.shihab.diplay.hudtest"));
-        assertFalse(Android9Backend.supportedPackage("com.shihab.diplay.evil"));
+    @Test public void bluetoothProxyAcceptsOnlyTheUnifiedCarPlayPackage() {
+        assertTrue(Android9Backend.supportedPackage("com.preface.carplay"));
+        assertFalse(Android9Backend.supportedPackage("com.shihab.diplay"));
+        assertFalse(Android9Backend.supportedPackage("com.shihab.diplay.hudtest"));
+        assertFalse(Android9Backend.supportedPackage("com.preface.carplay.evil"));
+        assertFalse(Android9Backend.supportedPackage("com.shilapi.xcertplay"));
         assertFalse(Android9Backend.supportedPackage(null));
     }
 }

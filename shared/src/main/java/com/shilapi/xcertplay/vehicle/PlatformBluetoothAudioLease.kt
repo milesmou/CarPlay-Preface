@@ -60,7 +60,7 @@ internal class PlatformBluetoothAudioLease(context: Context, private val peer: S
     override fun start() {
         if (closed || bound) return
         if (!BluetoothAdapter.checkBluetoothAddress(peer) || !available()) {
-            fail("compatible authorization component 10 is required for session A2DP handoff"); return
+            fail("compatible authorization component 11 is required for session A2DP handoff"); return
         }
         try {
             // Set before binding: a synchronous local callback must also be able to unbind.
@@ -83,7 +83,7 @@ internal class PlatformBluetoothAudioLease(context: Context, private val peer: S
         fun certificate(info: android.content.pm.PackageInfo) = info.signatures?.singleOrNull()?.let {
             MessageDigest.getInstance("SHA-256").digest(it.toByteArray()).joinToString("") { byte -> "%02x".format(byte.toInt() and 255) }
         }
-        Build.VERSION.SDK_INT == 28 && component.longVersionCode >= 10 &&
+        Build.VERSION.SDK_INT == 28 && component.longVersionCode >= 11 &&
             component.sharedUserId == "android.uid.system" && application.uid % 100000 == 1000 &&
             application.uid / 100000 == android.os.Process.myUid() / 100000 &&
             component.versionName == "preface-android9-${component.longVersionCode}" &&

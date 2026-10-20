@@ -16,10 +16,10 @@ class IphoneUsbAdbGrantTest {
         assertEquals(
             "CLASSPATH='/data/app/it'\"'\"'s/base.apk' app_process /system/bin " +
                 "com.shilapi.xcertplay.transport.IphoneUsbGrantTool " +
-                "com.shihab.diplay 1010001 1452 4776",
+                "com.preface.carplay 1010001 1452 4776",
             IphoneUsbAdbGrant.command(
                 "/data/app/it's/base.apk",
-                "com.shihab.diplay",
+                "com.preface.carplay",
                 1_010_001,
                 IphoneUsbMatcher.APPLE_VENDOR_ID,
                 0x12a8,
@@ -45,17 +45,17 @@ class IphoneUsbAdbGrantTest {
 
     @Test fun packageMustBelongToTheExactApplicationUid() {
         assertTrue(IphoneUsbAdbGrant.packageMatchesUid(
-            "com.shihab.diplay", 10_001, arrayOf("com.shihab.diplay"),
+            "com.preface.carplay", 10_001, arrayOf("com.preface.carplay"),
         ))
         assertTrue(IphoneUsbAdbGrant.packageMatchesUid(
-            "com.shihab.diplay", 1_010_001, arrayOf("shared.uid.peer", "com.shihab.diplay"),
+            "com.preface.carplay", 1_010_001, arrayOf("shared.uid.peer", "com.preface.carplay"),
         ))
         assertFalse(IphoneUsbAdbGrant.packageMatchesUid(
-            "com.shihab.diplay", 1_010_001, arrayOf("different.package"),
+            "com.preface.carplay", 1_010_001, arrayOf("different.package"),
         ))
-        assertFalse(IphoneUsbAdbGrant.packageMatchesUid("com.shihab.diplay", 1_010_001, null))
+        assertFalse(IphoneUsbAdbGrant.packageMatchesUid("com.preface.carplay", 1_010_001, null))
         assertFalse(IphoneUsbAdbGrant.packageMatchesUid(
-            "com.shihab.diplay", 9_999, arrayOf("com.shihab.diplay"),
+            "com.preface.carplay", 9_999, arrayOf("com.preface.carplay"),
         ))
     }
 }

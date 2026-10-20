@@ -10,20 +10,17 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shihab.diplay"
+        applicationId = "com.preface.carplay"
         minSdk = 25
         targetSdk = 37
-        versionCode = 100
-        versionName = "0.1.1"
+        versionCode = 1202
+        versionName = "0.2.0"
 
     }
 
 
 
     buildTypes {
-        debug {
-            applicationIdSuffix = ".hudtest"
-        }
         release {
             optimization {
                 enable = false

@@ -97,9 +97,9 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val EXTRA_AUTO_CONNECT = "com.shihab.diplay.AUTO_CONNECT_SELECTED_PHONE"
-        internal const val EXTRA_PHONE_ADDRESS = "com.shihab.diplay.AUTO_CONNECT_PHONE_ADDRESS"
-        internal const val EXTRA_WAKE_ELAPSED = "com.shihab.diplay.AUTO_CONNECT_WAKE_ELAPSED"
+        const val EXTRA_AUTO_CONNECT = "com.preface.carplay.AUTO_CONNECT_SELECTED_PHONE"
+        internal const val EXTRA_PHONE_ADDRESS = "com.preface.carplay.AUTO_CONNECT_PHONE_ADDRESS"
+        internal const val EXTRA_WAKE_ELAPSED = "com.preface.carplay.AUTO_CONNECT_WAKE_ELAPSED"
         internal val ACTIONS = mapOf(
             BluetoothDevice.ACTION_ACL_CONNECTED to "acl",
             BluetoothDevice.ACTION_ACL_DISCONNECTED to "acl-disconnected",

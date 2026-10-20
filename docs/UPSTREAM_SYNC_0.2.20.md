@@ -36,7 +36,7 @@
 
 ## 保留与排除
 
-保留本地固定协商分辨率：隐藏导航栏为 1920×720，否则 1760×720；百分比／旧画布缩放停用，临时窗口变化不重连。保留 [Bonjour 清理修复](WIRELESS_TEARDOWN_RECOVERY.md)、[USB 原始 NCM 诊断边界](USB_NCM_FRAME_DIAGNOSTICS.md)、临时热点／手动车机热点二选一、媒体／导航默认流 3／12、原厂媒体与方控接入。
+保留本地固定协商分辨率：隐藏导航栏为 1920×720，否则 1760×720；百分比／旧画布缩放停用，临时窗口变化不重连。保留 [Bonjour 清理修复](WIRELESS_TEARDOWN_RECOVERY.md)、[后续 USB NCM＋VPN 恢复](USB_VPN_RESTORE_0.2.20.md)、临时热点／手动车机热点二选一、媒体／导航默认流 3／12、原厂媒体与方控接入。
 
 不引入其他车型仪表、HUD、氛围灯、Siri 双键或麦克风 source 分支；不引入 Wi-Fi Direct、局域网、VPN/TUN、应用 TCP/IP 栈、导航增益滑块、手机／平板独立扬声器开关、Android 17／Pi 专属路径、CH341 新入口、设置向导／Overview、上游整体界面及版本号。认证资料和 APK 签名保持本仓库配置。
 

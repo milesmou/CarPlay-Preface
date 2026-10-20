@@ -13,8 +13,8 @@ import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 /** USB has priority until the driver explicitly chooses wireless after a failed wired attempt. */
 internal object UsbAutoConnect {
     private var priority = UsbConnectionPriority()
-    private const val EXTRA_MANUAL = "com.shihab.diplay.MANUAL_CONNECTION_REQUEST"
-    private const val EXTRA_AUTOMATIC = "com.shihab.diplay.AUTOMATIC_CONNECTION_REQUEST"
+    private const val EXTRA_MANUAL = "com.preface.carplay.MANUAL_CONNECTION_REQUEST"
+    private const val EXTRA_AUTOMATIC = "com.preface.carplay.AUTOMATIC_CONNECTION_REQUEST"
     fun markManualRequest(intent: Intent): Intent = intent.putExtra(EXTRA_MANUAL, true)
     fun markAutomaticRequest(intent: Intent): Intent = intent.putExtra(EXTRA_AUTOMATIC, true)
     fun isManualRequest(intent: Intent): Boolean = intent.getBooleanExtra(EXTRA_MANUAL, false)
@@ -22,7 +22,7 @@ internal object UsbAutoConnect {
         !isManualRequest(intent) && !DiPlayPreferences.autoConnect(context) &&
             (intent.action == UsbManager.ACTION_USB_DEVICE_ATTACHED || intent.getBooleanExtra(EXTRA_AUTOMATIC, false))
 
-    private const val EXTRA_GENERATION = "com.shihab.diplay.USB_REQUEST_GENERATION"
+    private const val EXTRA_GENERATION = "com.preface.carplay.USB_REQUEST_GENERATION"
     val generation get() = priority.generation
 
     fun attached(context: Context): UsbDevice? = runCatching {

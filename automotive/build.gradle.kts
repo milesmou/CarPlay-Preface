@@ -10,11 +10,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shilapi.xcertplay"
+        applicationId = "com.preface.carplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1201
-        versionName = "0.1.1"
+        versionCode = 1202
+        versionName = "0.2.0"
 
     }
 

@@ -1,6 +1,6 @@
 # 自动连接与开机自启
 
-当前源码 **0.1.1 / 96（未打包）**：自动连接卡片位于“连接”页面第一位，在无线连接、连接状态和 USB 设置之前。只调整卡片顺序，两个开关、默认值和连接行为不变。最近测试包 0.1.1 / 95 已核验并覆盖安装到模拟器，见 [构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md)，不包含本次排序修改。
+自动连接卡片位于“连接”页面第一位，在无线连接、连接状态和 USB 设置之前。
 
 ## 两个选项
 
@@ -19,14 +19,6 @@
 - 通知／VPN／无线权限结果和旧连接关闭后的回调在启动前复核开关及取消状态。手动“重试”仍有效，权限仍由用户正常授予。
 - 从连接等待页返回主页继续取消本次 USB／无线重连，不因默认自动连接开启而拉回。当前进程需明确手动连接、重新启用自动连接或重新插线后开始新请求；旧代际仍失效。有效临时热点预约和原清理屏障保留。
 
-## 验证范围
+## 验证边界
 
-本次排序调整 10 项定向检查通过，覆盖完整／紧凑／RTL 横屏的卡片顺序、设置分组和两个开关。源码及测试预览不等于已安装 APK，未运行完整 CI、构建或安装。记录在 agent_docs/auto-connect-first/results.json。以下为此前连接逻辑的历史验证范围。
-
-最终 **261 项定向测试通过（16 个测试类，含 API 参数化执行）**。覆盖两开关与默认值、已连接手机选择、仅配对不启动、USB 优先、关闭后的系统入口和迟到授权、手动重试、开机启动独立性、备份键清理、返回主页取消及已有会话保护。日志与分项结果位于本机忽略目录 `agent_docs/unified-auto-connect/final-tests.log` 和 `results.json`。当时未运行全量 CI；后续构建与安装状态以上方记录为准。
-
-1920×720 横屏大字体预览在 `agent_docs/screenshots/automatic-connection/`：默认星瑞界面为 160 dpi、150% 字体；紧凑场景为 320 dpi、100% 界面大小；另含 Arabic RTL 文本夹具。均为 Robolectric/API28 原生测试渲染，不是安装 APK 或实车截图。
-
-首次检查发现历史 `CarHotspotSwitchTest` 的 setup 仍反射调用此前已移除的 `renderHotspotAdbControls`，本次修改前的源码也没有该方法。保留历史夹具，不将其失败算作本轮通过项；当前开机开关的独立性由 `AutomaticConnectionTest` 和 `StartupDiagnosticSnapshotTest` 验证。未运行完整 CI。
-
-不新增固件接口，也不将 `startActivity()` 返回描述为车机已经显示应用或连接成功。参考固件仍为 IHU519G / FS11A1 / Android 9 API28 / 构建 327，来源 SHA-256 为 `f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01`，见 `PREFACE_FIRMWARE_REFERENCE.md`。开机投递、后台打开应用、蓝牙和 USB/TUN 建链需实车验证。
+源码定向检查覆盖两个开关、在线设备选择、USB 优先、取消代际及已有会话保护。开机广播投递、后台打开应用、蓝牙和 USB/TUN 建链仍需对应车机实测；`startActivity()` 返回不等于已显示应用或连接成功。参考固件与运行设备的区别见 [固件资料](PREFACE_FIRMWARE_REFERENCE.md)。

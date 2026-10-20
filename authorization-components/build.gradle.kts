@@ -7,8 +7,8 @@ android {
         applicationId = "com.android.vpndialogs"
         minSdk = 28
         targetSdk = 28
-        versionCode = 10
-        versionName = "preface-android9-10"
+        versionCode = 11
+        versionName = "preface-android9-11"
     }
     // Firmware repair for API 28, distributed locally; this is not a Google Play application.
     lint { disable += "ExpiredTargetSdkVersion" }

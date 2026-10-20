@@ -234,7 +234,7 @@ class WheelKeyServiceTest {
 
     @Test
     fun theAllowedListKeepsOtherServicesAndRebindsAListedButStoppedService() {
-        val ours = "com.shihab.diplay/com.shilapi.xcertplay.WheelKeyService"
+        val ours = "com.preface.carplay/com.shilapi.xcertplay.WheelKeyService"
         val car = "com.byd.airconditioning/.gesture.AcGestureService:com.android.systemui/.custom.StatusBarAccessibilityService"
         assertEquals(null to "$car:$ours", WheelKeyService.allowedServices("$car\n", ours))
         assertEquals(car to "$car:$ours", WheelKeyService.allowedServices("$ours:$car", ours))

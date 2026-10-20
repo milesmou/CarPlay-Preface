@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config;
 @Config(sdk = 28, shadows = NativeAppOpsManagerShadow.class)
 public class AppOpsStateReaderTest {
     private static final int UID = 10123;
-    private static final String PACKAGE = "com.shihab.diplay.hudtest";
+    private static final String PACKAGE = "com.preface.carplay";
     private static final int WRITE = 23;
 
     private Object op(int operation, int mode) throws Exception {

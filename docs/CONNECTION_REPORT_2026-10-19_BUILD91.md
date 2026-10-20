@@ -51,6 +51,6 @@
 
 静态参考仍为 IHU519G / FS11A1 / Android 9 / 构建 327，OTA SHA-256 `f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01`。`services.vdex` SHA-256 `5d19a5aa3f1c4f8b7f90ea18ee44b52e1e3b32ef748d6d9af5c86a1546506571`：requestKeysInterception／dispatcherAllEvent／dispatcherMediaKey 偏移为 4701750／4705458／4705772；它登记并多路分发观察者，不是第三方独占成功凭证。原始证据 `agent_docs/firmware/ihu519g-327/input-dispatch-evidence.txt`，复核命令 `python agent_docs/firmware/inspect_input_methods.py`。这些不是 IHU353G 的服务实现或运行验证。
 
-厂商准入的局部实现参照[用户提供的 OpenAPI 服务端](NETEASE_TRACK_SERVICE_REFERENCE.md)：输入 SHA-256 `8e0e8b76f53f10a9c0d49d5efbd99b24f946223ebecfc9d9ecf42b3460f6aa23`，`ak.java:53–82` 区分无授权与服务未就绪，`f/f.java:124–163,225–233` 核对实际调用身份及 license；该 APK 也未提供本次服务端实时失败原因。
+厂商准入的局部实现参照用户提供的 OpenAPI 服务端（分析文档已清理）：输入 SHA-256 `8e0e8b76f53f10a9c0d49d5efbd99b24f946223ebecfc9d9ecf42b3460f6aa23`，`ak.java:53–82` 区分无授权与服务未就绪，`f/f.java:124–163,225–233` 核对实际调用身份及 license；该 APK 也未提供本次服务端实时失败原因。
 
 本轮只复核日志、对应源码及本地固件／APK 缓存，更新诊断文档和事实索引；没有修改运行逻辑，没有运行 Gradle、测试、打包、签名、安装或系统授权，也没有取得新的车机运行记录。不能将定位到的阶段描述为两项故障已经修复。

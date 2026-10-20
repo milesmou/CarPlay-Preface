@@ -22,12 +22,12 @@ import java.util.List;
 class Android9Backend implements AuthorizationBackend {
     static final String PLATFORM_CERT = "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8";
     static final String CARPLAY_CERT = "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8";
-    static final String[] PACKAGES = {"com.shihab.diplay", "com.shihab.diplay.hudtest"};
+    static final String[] PACKAGES = {"com.preface.carplay"};
     private final Context context;
     Android9Backend(Context context) { this.context = context; }
 
     static boolean supportedPackage(String name) {
-        // The Bluetooth music proxy remains restricted to the existing CarPlay clients.
+        // Release and debug use the same package; the service also verifies the caller certificate.
         return Arrays.asList(PACKAGES).contains(name);
     }
 
