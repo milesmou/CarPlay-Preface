@@ -19,6 +19,8 @@
 - [源码构建](docs/BUILD.md) · [认证资源](docs/CARPLAY_AUTH_RESOURCES.md) · [签名说明](signing/README.md)
 - [完整文档](docs/README.md) · [固件资料](docs/PREFACE_FIRMWARE_REFERENCE.md) · [来源与许可证](docs/THIRD_PARTY_NOTICES.md)
 
+> **注意**：若车机没有原生设置，请先在应用的 **设置 → 授权** 页面点击“保存授权 APK”，通过文件管理器手动安装授权组件，再返回该页面进行 **创建 VPN** 授权。
+
 反馈问题时，请提供车机固件、iPhone／iOS 版本、连接方式和复现步骤。
 
 ## 支持与联系
