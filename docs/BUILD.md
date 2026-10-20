@@ -22,7 +22,7 @@ JAVA_HOME 指向 JDK，ANDROID_HOME 指向 SDK；或在 Git 忽略的 local.prop
 CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 ```
 
-本次发布 versionName 为 0.2.0、versionCode 为 1202；mobile／automotive 统一版本和包名，避免同包名变体版本倒退。升级构建号必须递增。其他按需任务：
+本次发布版本为 0.2.1／1204，上一发布版本为 0.2.0／1202。mobile／automotive 统一版本和包名，避免同包名变体版本倒退。升级构建号必须递增。其他按需任务：
 
 | 目的 | Gradle 任务 |
 | --- | --- |

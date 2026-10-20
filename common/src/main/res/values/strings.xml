@@ -325,7 +325,7 @@
     <string name="settings_display">Display</string>
     <string name="settings_navigation">Navigation</string>
     <string name="settings_vehicle">Vehicle</string>
-    <string name="settings_advanced">Experimental</string>
+    <string name="settings_advanced">Advanced</string>
     <string name="settings_advanced_subtitle">Enable as needed; turn off if problems occur.</string>
     <string name="settings_advanced_caution_title">Change with care</string>
     <string name="settings_advanced_caution_description">Some features depend on firmware or permissions and may affect sound, video or connection.</string>
@@ -498,9 +498,9 @@
     <string name="phone_audio_route_apps_description">Use car call audio for other apps’ calls, excluding voice messages. Also enables the wheel accessibility service. Off by default.</string>
     <string name="smooth_video">Smooth video (experimental)</string>
     <string name="smooth_video_description">Smooth video with added touch delay. Picture adjustments are unavailable. Reconnects CarPlay.</string>
-    <string name="settings_mtk_decoder_tuning">MTK decoder low latency (experimental)</string>
+    <string name="settings_mtk_decoder_tuning">MTK decoder low latency</string>
     <string name="settings_mtk_decoder_tuning_description">Try lower video latency with automatic fallback on failure. Turn off if video stutters. Applies at the next connection.</string>
-    <string name="settings_direct_video_output">Direct video output (experimental)</string>
+    <string name="settings_direct_video_output">Direct video output</string>
     <string name="settings_direct_video_output_description">Reduce video latency. Picture adjustments are unavailable. Reconnects CarPlay.</string>
     <string name="settings_low_latency_decoder">Low-latency decoding (experimental)</string>
     <string name="settings_low_latency_decoder_description">Reduce decode latency. Turn off if video corrupts or freezes. Applies at the next connection.</string>

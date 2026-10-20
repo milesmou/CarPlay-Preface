@@ -48,6 +48,107 @@ import org.robolectric.util.ReflectionHelpers
 @Config(sdk = [29], qualifiers = "en-w600dp-h700dp")
 class AdaptiveSettingsUiTest {
     @Test
+    @Config(sdk = [28])
+    fun requestedVideoDefaultsKeepSavedOffChoicesAndOtherExperimentsOff() {
+        assertTrue(AirPlayPersistence.loadHevcEnabled(context))
+        assertTrue(AirPlayPersistence.loadDirectVideoOutput(context))
+        assertTrue(AirPlayPersistence.loadMtkDecoderTuning(context))
+        assertFalse(AirPlayPersistence.loadHevcSoftwareDecoderEnabled(context))
+        assertFalse(AirPlayPersistence.loadLowLatencyDecoder(context))
+        assertFalse(AirPlayPersistence.loadSmoothVideo(context))
+
+        AirPlayPersistence.saveHevcEnabled(context, false)
+        AirPlayPersistence.saveDirectVideoOutput(context, false)
+        AirPlayPersistence.saveMtkDecoderTuning(context, false)
+        assertFalse(AirPlayPersistence.loadHevcEnabled(context))
+        assertFalse(AirPlayPersistence.loadDirectVideoOutput(context))
+        assertFalse(AirPlayPersistence.loadMtkDecoderTuning(context))
+    }
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun fullAdvancedGroupsLargeFontScreenshot() = captureAdvancedGroups("full")
+
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w640dp-h240dp-land-xxhdpi")
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun compactAdvancedGroupsLargeFontScreenshot() = captureAdvancedGroups("compact")
+
+    private fun captureAdvancedGroups(size: String) {
+        context.resources.updateConfiguration(android.content.res.Configuration(context.resources.configuration).apply {
+            fontScale = 1.5f
+        }, context.resources.displayMetrics)
+        if (size == "compact") InterfaceSize.save(context, 100)
+        val screen = openSettings()
+        screen.selectedMtkDecoderName = { mime ->
+            if (mime == android.media.MediaFormat.MIMETYPE_VIDEO_HEVC) "OMX.MTK.VIDEO.DECODER.HEVC"
+            else "OMX.MTK.VIDEO.DECODER.AVC"
+        }
+        ReflectionHelpers.callInstanceMethod<Unit>(screen, "openSettingsCategory",
+            ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.EXPERIMENTAL))
+        val frame = screen.findViewById<ViewGroup>(android.R.id.content)
+        repeat(3) {
+            descendants(frame).forEach { it.forceLayout() }
+            frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY))
+            frame.layout(0, 0, 1920, 720)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertEquals("高级", screen.getString(R.string.settings_advanced))
+        assertEquals(if (size == "compact") 480 else 160, screen.resources.displayMetrics.densityDpi)
+        assertEquals(1.5f, screen.resources.configuration.fontScale)
+        assertEquals(android.content.res.Configuration.ORIENTATION_LANDSCAPE, screen.resources.configuration.orientation)
+        val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
+        val rows = descendants(scroll).filterIsInstance<Switch>().toList()
+        for ((id, title) in listOf(R.string.settings_direct_video_output to "直接视频输出",
+            R.string.settings_mtk_decoder_tuning to "MTK 解码器低延迟")) {
+            assertEquals(title, screen.getString(id))
+            assertTrue(rows.any { it.contentDescription == title })
+        }
+        for (id in listOf(R.string.efficient_video, R.string.settings_direct_video_output,
+            R.string.settings_mtk_decoder_tuning)) {
+            assertTrue(rows.single { it.contentDescription == screen.getString(id) }.isChecked)
+        }
+        assertEquals("低延迟解码（实验性）", screen.getString(R.string.settings_low_latency_decoder))
+        val firstExperimental = rows.indexOfFirst { it.contentDescription.toString().endsWith("（实验性）") }
+        assertTrue("Advanced must contain regular options before the experimental group", firstExperimental > 0)
+        rows.take(firstExperimental).forEach {
+            assertFalse(it.contentDescription.toString().endsWith("（实验性）"))
+        }
+        rows.drop(firstExperimental).forEach {
+            assertTrue("Experimental options stay together at the bottom: ${it.contentDescription}",
+                it.contentDescription.toString().endsWith("（实验性）"))
+        }
+        val directory = java.io.File("../agent_docs/screenshots/advanced-video-defaults-20261020").apply { mkdirs() }
+        val directOutput = rows.single { it.contentDescription == screen.getString(R.string.settings_direct_video_output) }
+        for ((part, target) in listOf("top" to null, "video" to (directOutput.parent as View),
+            "experimental" to (rows[firstExperimental].parent as View))) {
+            if (target != null) {
+                val rect = android.graphics.Rect(0, 0, target.width, target.height)
+                scroll.offsetDescendantRectToMyCoords(target, rect)
+                scroll.scrollTo(0, rect.top)
+                shadowOf(Looper.getMainLooper()).idle()
+            }
+            val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
+            frame.draw(android.graphics.Canvas(bitmap))
+            java.io.File(directory, "$size-$part-font150.png").outputStream().use {
+                assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+            }
+            bitmap.recycle()
+        }
+        java.io.File(directory, "$size-font150.json").writeText(org.json.JSONObject()
+            .put("source", "Robolectric/API28 native test render; not an installed APK or vehicle screenshot")
+            .put("width", 1920).put("height", 720).put("fontScale", 1.5)
+            .put("densityDpi", screen.resources.displayMetrics.densityDpi)
+            .put("interfaceSize", InterfaceSize.preference(screen))
+            .put("locale", screen.resources.configuration.locales[0].toLanguageTag())
+            .put("applicationVersion", "0.2.1 source after build1203; unbuilt")
+            .put("decoderSelection", "UI test stub: MTK HEVC/AVC per selected codec; not a hardware verification")
+            .put("systemBars", "Robolectric content rendering; no real device system bars").toString(2))
+    }
+
+    @Test
     @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun fullSettingsWithoutSearchLargeFontScreenshot() = captureSettingsWithoutSearch("full")

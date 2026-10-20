@@ -31,12 +31,6 @@ internal class AudioSettingsControls(
     }
 
     fun audioFocusControls(parent: LinearLayout) = with(ui) {
-        toggle(parent, getString(R.string.settings_disable_media_key_audio_focus),
-            getString(R.string.settings_disable_media_key_audio_focus_description),
-            AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)) {
-            AirPlayPersistence.saveDisableMediaKeyAudioFocus(context, it)
-            markReconnectNeeded()
-        }
         val enabled = AirPlayPersistence.loadAudioFocusEnabled(context)
         val dependent = column().apply { visibility = if (enabled) View.VISIBLE else View.GONE }
         toggle(parent, getString(R.string.contrib_audio_home_toggle_audio_focus),
@@ -51,6 +45,13 @@ internal class AudioSettingsControls(
             markReconnectNeeded()
         }
         parent.addView(dependent)
+        parent.addView(space(blockGapDp))
+        toggle(parent, getString(R.string.settings_disable_media_key_audio_focus),
+            getString(R.string.settings_disable_media_key_audio_focus_description),
+            AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)) {
+            AirPlayPersistence.saveDisableMediaKeyAudioFocus(context, it)
+            markReconnectNeeded()
+        }
     }
 
     fun musicBufferChoice(card: LinearLayout, wireless: Boolean) = with(ui) {

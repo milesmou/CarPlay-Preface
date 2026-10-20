@@ -32,6 +32,7 @@
 | USB 当前方案 | [官方 v0.2.20 NCM＋本地 VPN/TUN](USB_VPN_RESTORE_0.2.20.md)、[VPN 固件证据](PREFACE_VPN_FIRMWARE_ANALYSIS_2026-10-16.md) |
 | 授权组件、系统 UID、平台签名 | [组件说明与当前构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md)、[系统授权](SYSTEM_AUTHORIZATION.md)、[原生设置对照](NATIVE_SETTINGS_AUTHORIZATION_REFERENCE_2026-10-19.md) |
 | 显示、快捷操作、桌面 | [固定协商像素](PREFACE_FIXED_RESOLUTION.md)、[快捷操作](QUICK_ACTIONS_UI.md)、[主页导航](CARPLAY_HOME_NAVIGATION.md)、[桌面集成](LAUNCHER_INTEGRATION.md) |
+| 无线画质与流畅度优化 | [固件证据与默认设置](PREFACE_WIRELESS_VIDEO_2026-10-20.md)：HEVC、直出及 MTK 低延迟未保存时默认开启，保留已保存选择、能力检查与回退，已纳入 0.2.1／1204 正式包；用户明确实测未见异常的是 MTK 专用选项。延迟改善尚无对照统计，无重排桥接未证实。 |
 
 ## 当前结论
 

@@ -13,8 +13,8 @@ android {
         applicationId = "com.preface.carplay"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1202
-        versionName = "0.2.0"
+        versionCode = 1204
+        versionName = "0.2.1"
 
     }
 

@@ -474,9 +474,9 @@
     <string name="phone_audio_route_apps_description">其他应用通话也使用原车电话音频，不影响语音留言。会同时开启方控无障碍服务。默认关闭。</string>
     <string name="smooth_video">流畅视频（实验性）</string>
     <string name="smooth_video_description">让画面更平稳，但触摸延迟更高且不支持画面调节。会重新连接 CarPlay。</string>
-    <string name="settings_mtk_decoder_tuning">MTK 解码器低延迟（实验性）</string>
+    <string name="settings_mtk_decoder_tuning">MTK 解码器低延迟</string>
     <string name="settings_mtk_decoder_tuning_description">尝试降低画面延迟，失败时自动回退；卡顿时请关闭。下次连接生效。</string>
-    <string name="settings_direct_video_output">直接视频输出（实验性）</string>
+    <string name="settings_direct_video_output">直接视频输出</string>
     <string name="settings_direct_video_output_description">减少画面延迟，但不支持画面调节。会重新连接 CarPlay。</string>
     <string name="settings_low_latency_decoder">低延迟解码（实验性）</string>
     <string name="settings_low_latency_decoder_description">减少解码延迟；花屏或卡住时请关闭。下次连接生效。</string>

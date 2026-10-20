@@ -57,6 +57,26 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
+## 0.2.1 正式包构建核验
+
+2026-10-20，按用户要求发布 0.2.1，执行 `:mobile:assembleRelease` 成功，正式包为 `CarPlay-Preface-0.2.1-1204.apk`，包名 `com.preface.carplay`，非调试包，使用仓库原有主证书。内置授权组件 11 的字节、元数据、包名、版本、平台证书和系统共享 UID 均已核对，与本次生成 assets 一致；主包的媒体授权输入和已批准配件认证资产校验通过，包内无媒体助手或额外签名材料。
+
+主 APK SHA-256：`f1ac1bf47bc173621e7a475e8b25382298c91fc9d2a023d4e17f736d287a01bd`。
+
+组件 11 SHA-256：`fd5f2f991ca39ad68b57250eacaa6b6af6051b14bd7bd8a64e33eb6060aaa453`。
+
+正式包包含高级设置分类、直接输出与 MTK 去标识，以及三项视频选项未保存时默认开启；保留已保存选择与能力回退。发布构建前相关 17 项定向验证通过，未运行完整 CI。构建后对在线模拟器 `emulator-5558` 执行 `adb install -r` 成功，安装版本确认 0.2.1／1204，保留数据，没有单独安装授权组件或修改授权。构建、签名、安装和发布记录在本机忽略目录 `agent_docs/release-0.2.1-20261020/`；该正式包的车机结果尚待反馈。
+
+## 0.2.1 测试包构建核验
+
+2026-10-20，用户要求构建测试 APK，仅执行 `:mobile:assembleDebug`，没有追加单元测试、Lint 或完整 CI。测试包为 `CarPlay-Preface-0.2.1-1203-debug.apk`，包名 `com.preface.carplay`，主证书保持原值；内置授权组件 11 的字节、元数据、包名、版本、平台证书和系统共享 UID 均已核对，与本次生成 assets 一致。QQ 媒体输入和已批准的配件认证资产核验通过，无媒体助手或签名材料入包。
+
+主 APK SHA-256：`f3784fbde351b24c66e7f13dd5bedf54beb94137de22222d0797fa7b7c3aebde`。
+
+组件 11 SHA-256：`fd5f2f991ca39ad68b57250eacaa6b6af6051b14bd7bd8a64e33eb6060aaa453`。
+
+命名后的主 APK 已通过 `adb install -r` 安装到在线模拟器 `emulator-5558`，安装后确认 0.2.1／1203，保留数据；未单独安装授权组件或变更授权。该包包含高级分类重命名与实验功能下移，MTK 低延迟实现和默认值未变。构建及校验记录位于本机忽略目录 `agent_docs/build1203-20261020/`；本次包的车机运行结果待用户反馈。
+
 ## 0.2.0 构建核验
 
 `:mobile:assembleRelease` 成功，正式包为 `CarPlay-Preface-0.2.0-1202.apk`，包名 `com.preface.carplay`。主证书保持原值，内置组件 11 的包名、版本、平台证书、系统 UID 和 SHA-256 均已核对；包内无媒体助手资产或运行实现。已安装到在线模拟器 `emulator-5558`，没有安装独立组件或清除旧应用数据。包名与授权相关 114 项定向测试通过，未运行完整 CI；新包名的车机准入及实车功能仍待复核。

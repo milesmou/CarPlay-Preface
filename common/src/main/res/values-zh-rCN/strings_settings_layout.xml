@@ -5,7 +5,7 @@
     <string name="settings_display">显示</string>
     <string name="settings_navigation">导航</string>
     <string name="settings_vehicle">车辆</string>
-    <string name="settings_advanced">实验性</string>
+    <string name="settings_advanced">高级</string>
     <string name="settings_advanced_subtitle">按需开启，异常时关闭。</string>
     <string name="settings_advanced_caution_title">请谨慎更改</string>
     <string name="settings_advanced_caution_description">部分功能依赖车机固件或授权，可能影响声音、画面或连接。</string>
