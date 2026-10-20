@@ -19,15 +19,23 @@
 - [源码构建](docs/BUILD.md) · [认证资源](docs/CARPLAY_AUTH_RESOURCES.md) · [签名说明](signing/README.md)
 - [完整文档](docs/README.md) · [固件资料](docs/PREFACE_FIRMWARE_REFERENCE.md) · [来源与许可证](docs/THIRD_PARTY_NOTICES.md)
 
-> **注意**：若车机没有原生设置，请先在应用的 **设置 → 授权** 页面点击“保存授权 APK”，通过文件管理器手动安装授权组件，再返回该页面进行 **创建 VPN** 授权。
-
 反馈问题时，请提供车机固件、iPhone／iOS 版本、连接方式和复现步骤。
+
+## 常见问题
+
+1. **CarPlay 音频模式无法切歌**
+
+   请进入 **设置 → 授权**，点击“保存授权 APK”，通过文件管理器手动安装或更新授权组件，然后重新连接 CarPlay。
+
+2. **有线连接失败**
+
+   请在 **设置 → 授权** 页面保存并手动安装或更新授权组件，再返回该页面点击 **创建 VPN**，按系统提示允许授权，然后重试有线连接。
 
 ## 支持与联系
 
 | 赞助开发者一杯咖啡 ☕ | 联系开发者 |
 | :---: | :---: |
 | 如果这个项目对你有帮助，欢迎扫码赞助。 | 有问题可以扫码添加微信，联系开发者。 |
-| <a href="docs/images/wechat-donate.jpg"><img src="docs/images/wechat-donate.jpg" alt="微信赞助收款码" width="280"></a> | <a href="docs/images/wechat-contact.jpg"><img src="docs/images/wechat-contact.jpg" alt="开发者微信联系二维码" width="280"></a> |
+| <a href="docs/images/wechat-donate.png"><img src="docs/images/wechat-donate.png" alt="微信赞助收款码" width="280"></a> | <a href="docs/images/wechat-contact.png"><img src="docs/images/wechat-contact.png" alt="开发者微信联系二维码" width="280"></a> |
 
 点击图片可查看原图。
