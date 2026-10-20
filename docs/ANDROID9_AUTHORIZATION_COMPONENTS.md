@@ -1,8 +1,8 @@
 # Android 9 授权组件
 
-当前交付：CarPlay **0.1.1 / 95**，内置组件 **preface-android9-7 / 7**。组件包名 `com.android.vpndialogs`，与主应用独立签名；只适用于 API 28、平台证书匹配且实际权限可授予的系统。
+当前交付：CarPlay **0.1.1 / 97**，内置组件 **preface-android9-8 / 8**。组件包名 `com.android.vpndialogs`，与主应用独立签名；只适用于 API 28、平台证书匹配且实际权限可授予的系统。
 
-当前源码：CarPlay **0.1.1 / 97**、组件 **preface-android9-8 / 8**，尚未构建、签名或安装。按用户 2026-10-19 最新要求，现有六项授权扩展到当前用户下符合条件的其他已安装应用，下表描述组件 8 的源码行为，不表示已交付组件 7 具有新行为。
+当前源码已构建：CarPlay **0.1.1 / 97**、组件 **preface-android9-8 / 8**。主应用已覆盖安装到 API 34 模拟器；内置组件仅核对打包与身份，不在该模拟器安装或授权。按用户 2026-10-19 要求，现有六项授权扩展到当前用户下符合条件的其他已安装应用，下表描述组件 8 的实现；实际授权效果仍待 API 28 目标设备验证。
 
 ## 使用与升级
 
@@ -72,3 +72,23 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 完整核验记录为 `agent_docs/build-95/verification.json`。源码阶段的组件定向测试和大字体／紧凑／RTL 渲染不等于车机运行验证。
 
 用户在构建 92 交付后确认“授权功能已经正常了”，记为用户实车反馈；未逐项说明所有授权，不能外推为 USB/TUN、方控或蓝牙已修复。原生设置对照见 [授权参考](NATIVE_SETTINGS_AUTHORIZATION_REFERENCE_2026-10-19.md)，蓝牙和方控见 [后续修正](BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md)。
+
+
+## 2026-10-20 构建 97 交付核验
+
+仅执行 `:mobile:assembleDebug --offline --console=plain`，自动依赖组件 Release 构建、独立签名和生成 assets；没有追加单元测试、Lint 或完整 CI。
+
+| 项目 | 结果 |
+| --- | --- |
+| 主包 | `CarPlay-Preface-0.1.1-97-debug.apk，25,579,210 字节` |
+| 包名 | `com.shihab.diplay.hudtest` |
+| 主包 SHA-256 | `6539c43c328716550d9abc2a682856b40c0c0aff54cbfadabe878ca12f3475eb` |
+| 主包证书 SHA-256 | `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8` |
+| 内置组件 | `com.android.vpndialogs，preface-android9-8 / 8` |
+| 内置组件 SHA-256 | `a31300f258cb1712053fb540d19e9d1cb59f8326465857f15b3e51fc0e5331ed` |
+| 组件平台证书 SHA-256 | `c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8` |
+| 共享 UID | `android.uid.system` |
+
+主 APK 含 `assets/authorization/authorization.apk` 与 `manifest.json`；内置字节与本次生成组件完全一致，包名、版本、签名及 SHA-256 与元数据匹配。未将公开主签名材料或平台签名输入放入 APK assets。
+
+构建后检测到 `emulator-5558`（API 34），使用命名后的 APK 执行 `adb install -r` 成功，保留数据；安装后包信息为 0.1.1 / 97。未安装内置 Android 9 组件，未授权或启动 VPN，无星瑞实车连接验证。产物及本地核验记录位于 `mobile/build/outputs/apk/debug/` 和 `agent_docs/build-97/`。

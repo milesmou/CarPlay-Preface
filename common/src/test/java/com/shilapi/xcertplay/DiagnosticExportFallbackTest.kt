@@ -37,7 +37,7 @@ class DiagnosticExportFallbackTest {
     }
 
     @Test fun androidNineSavesUtf8WithoutAPickerOrStoragePermission() {
-        val report = "DiPlay · تقرير\nUSB: waiting\n"
+        val report = "DiPlay · 诊断报告\nUSB: waiting\n"
         val saved = DiagnosticExportStore.saveWithoutPicker(context, "DiPlay-test.txt", report)
         assertFalse(saved.savedInApp)
         val file = reports.listFiles()!!.single()

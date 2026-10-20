@@ -41,13 +41,11 @@ import com.shilapi.xcertplay.network.CarPlayBonjour
 import com.shilapi.xcertplay.network.diagnosticSummary
 import com.shilapi.xcertplay.network.CarPlaySocketService
 import com.shilapi.xcertplay.network.CarPlayVpnService
-import com.shilapi.xcertplay.network.LocalOnlyHotspotManager
 import com.shilapi.xcertplay.network.TemporaryHotspotReservationStore
 import com.shilapi.xcertplay.network.HotspotAddressPolicy
 import com.shilapi.xcertplay.network.HotspotAddressRecovery
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
-import com.shilapi.xcertplay.network.WirelessHotspotManager
 import com.shilapi.xcertplay.network.WirelessInterfaceDiagnostics
 import com.shilapi.xcertplay.network.WirelessReceiveDiagnostics
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
@@ -56,7 +54,6 @@ import com.shilapi.xcertplay.network.WirelessStartupFailure
 import com.shilapi.xcertplay.network.WirelessStartupDiagnostics
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import com.shilapi.xcertplay.transport.BluetoothLinkCheck
-import com.shilapi.xcertplay.transport.BluetoothRadioCheck
 import com.shilapi.xcertplay.transport.BluetoothRfcommDuplexStream
 import com.shilapi.xcertplay.transport.Ch341DeviceMatcher
 import com.shilapi.xcertplay.transport.Ch341I2cTransport
@@ -242,13 +239,17 @@ class CarPlayController(
     fun sendVideoMessage(streamId: Long, message: Map<String, Any?>): Boolean =
         activeSession?.sendRemoteControlMessage(streamId, message) ?: false
 
-    @Volatile private var hotspot: WirelessHotspotManager? = null
-    @Volatile private var retainedHotspotInfo: WirelessHotspotInfo? = null
+    private val hotspot get() = hotspotLease.currentManager
+    private val retainedHotspotInfo get() = hotspotLease.retainedInfo
     private var retainTemporaryHotspotOnClose = false
     @Volatile private var wirelessSessionEstablished = false
     private val wirelessStartupRetryPending = AtomicBoolean(false)
     @Volatile private var bonjour: CarPlayBonjour? = null
     private val wirelessResourceLock = Any()
+    private val hotspotLease = WirelessHotspotLease(
+        appContext, config, wirelessResourceLock, ::isStaleWirelessRun,
+        { bluetoothAdapter != null }, { bluetoothAdapter?.isEnabled == true }, ::debugLog, ::closeBestEffort,
+    )
     private val wirelessFailureReported = AtomicBoolean(false)
     @Volatile private var instantBluetoothLink: InstantBluetoothLink? = null
     @Volatile private var firstTcpWatchdog: FirstTcpWatchdog? = null
@@ -2398,75 +2399,7 @@ class CarPlayController(
         type.equals("disableBluetooth", ignoreCase = true) ||
             type.equals("disable-bluetooth", ignoreCase = true)
 
-    private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
-        BluetoothRadioCheck.blocker(bluetoothAdapter != null, bluetoothAdapter?.isEnabled == true)
-            ?.let { throw IOException(it) }
-        if (config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT && Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            throw WirelessStartupException(WirelessStartupFailure.HOTSPOT_CONFIGURATION,
-                "This Android version cannot create a temporary hotspot; use wired CarPlay")
-        }
-        synchronized(wirelessResourceLock) {
-            if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot startup cancelled")
-            if (hotspot == null && config.wirelessHotspotMode == WirelessHotspotMode.LOCAL_ONLY_HOTSPOT) {
-                TemporaryHotspotReservationStore.take()?.let { retained ->
-                    retained.manager.updateDiagnosticListener(::debugLog)
-                    hotspot = retained.manager
-                    retainedHotspotInfo = retained.info
-                    debugLog("wireless manual reconnect acquired retained application hotspot reservation")
-                }
-            }
-            val current = hotspot
-            val info = retainedHotspotInfo
-            if (current != null && info != null) {
-                try {
-                    current.validateReady()
-                    debugLog("wireless startup reusing temporary hotspot reservation; credentials unchanged")
-                    return info
-                } catch (error: IOException) {
-                    debugLog("wireless retained hotspot no longer ready failureClass=${error.javaClass.simpleName} reason=${error.message}; recreating reservation")
-                    hotspot = null
-                    retainedHotspotInfo = null
-                    closeBestEffort("invalid temporary hotspot") { current.close() }
-                }
-            }
-        }
-        val manager: WirelessHotspotManager = when (config.wirelessHotspotMode) {
-            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT -> LocalOnlyHotspotManager(appContext, ::debugLog)
-            WirelessHotspotMode.MANUAL -> com.shilapi.xcertplay.network.ManualHotspotManager(
-                context = appContext,
-                ssid = config.manualHotspotSsid.orEmpty(),
-                passphrase = config.manualHotspotPassphrase.orEmpty(),
-                band = config.manualHotspotBand,
-                channel = config.manualHotspotChannel,
-                security = config.manualHotspotSecurity,
-                onDiagnostic = ::debugLog,
-                isCancelled = { isStaleWirelessRun(generation) },
-            )
-        }
-        synchronized(wirelessResourceLock) {
-            if (isStaleWirelessRun(generation)) {
-                manager.close()
-                throw java.io.InterruptedIOException("Hotspot startup cancelled")
-            }
-            hotspot = manager
-        }
-        return try {
-            val info = manager.start(HOTSPOT_START_TIMEOUT_MILLIS)
-            synchronized(wirelessResourceLock) {
-                if (isStaleWirelessRun(generation)) throw java.io.InterruptedIOException("Hotspot startup cancelled")
-                retainedHotspotInfo = info
-            }
-            info
-        } catch (failure: Exception) {
-            synchronized(wirelessResourceLock) {
-                if (hotspot === manager) { hotspot = null; retainedHotspotInfo = null }
-            }
-            closeBestEffort("wireless hotspot manager") { manager.close() }
-            if (isStaleWirelessRun(generation)) throw failure
-            if (failure is WirelessStartupException) throw failure
-            throw IOException("Could not create temporary hotspot: " + (failure.message ?: failure.javaClass.simpleName), failure)
-        }
-    }
+    private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo = hotspotLease.start(generation)
 
     private fun isStaleWirelessRun(generation: Int): Boolean =
         closed || phase != Phase.WIRELESS || generation != wirelessGeneration.get() || wirelessFailureReported.get()
@@ -2678,25 +2611,7 @@ class CarPlayController(
             bonjour = null
             if (activeBonjour != null) closeBestEffort("Bonjour") { activeBonjour.close() }
 
-            if (!keepHotspot || closed) {
-                val activeHotspot = hotspot
-                val activeInfo = retainedHotspotInfo
-                hotspot = null
-                retainedHotspotInfo = null
-                if (activeHotspot != null) closeBestEffort("wireless hotspot") {
-                    val retained = closed && retainTemporaryHotspotOnClose && activeInfo != null &&
-                        activeHotspot is LocalOnlyHotspotManager &&
-                        runCatching { activeHotspot.validateReady() }.isSuccess &&
-                        TemporaryHotspotReservationStore.retain(activeHotspot, activeInfo)
-                    if (retained) {
-                        debugLog("wireless manual disconnect retained application hotspot reservation; credentials unchanged")
-                    } else {
-                        activeHotspot.close()
-                    }
-                }
-            } else if (hotspot != null) {
-                debugLog("wireless startup transport cleanup retained temporary hotspot reservation")
-            }
+            hotspotLease.release(keepHotspot, closed, retainTemporaryHotspotOnClose)
             wirelessRuntimeIdentification = null
             wirelessAirPlayEndpoint = null
             wirelessPublishedAddress = null
@@ -3096,7 +3011,6 @@ class CarPlayController(
         // BluetoothProfile.A2DP_SINK and HEADSET_CLIENT, hidden from the public SDK.
         private const val PROFILE_A2DP_SINK = 11
         private const val PROFILE_HEADSET_CLIENT = 16
-        private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L
         private const val PAIR_TIMEOUT_MILLIS = 5 * 60_000L
         private const val WIRELESS_PREFS = "diplay_wireless"
         private const val HOTSPOT_FAMILY_PREFERENCE_KEY = "hotspot_address_family"

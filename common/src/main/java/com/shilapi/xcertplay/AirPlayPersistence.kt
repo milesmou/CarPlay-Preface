@@ -28,7 +28,6 @@ object AirPlayPersistence {
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
 
     /** Live overlay changes are observed by the current projection host. */
-    @Volatile var overlaySettingsListener: (() -> Unit)? = null
 
     fun loadAmbientDelaySeconds(context: Context): Int =
         DisplaySettingsStore.loadAmbientDelaySeconds(context)

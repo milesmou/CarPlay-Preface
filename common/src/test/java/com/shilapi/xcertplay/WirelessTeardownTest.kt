@@ -76,7 +76,7 @@ class WirelessTeardownTest {
         }.`when`(dns).close()
         val hotspotClosed = AtomicBoolean()
         ReflectionHelpers.setField(controller, "bonjour", bonjour(dns, lines))
-        ReflectionHelpers.setField(controller, "hotspot", object : WirelessHotspotManager {
+        ReflectionHelpers.setField(ReflectionHelpers.getField<Any>(controller, "hotspotLease"), "currentManager", object : WirelessHotspotManager {
             override fun start(timeoutMillis: Long): WirelessHotspotInfo = error("not started")
             override fun close() { hotspotClosed.set(true) }
         })

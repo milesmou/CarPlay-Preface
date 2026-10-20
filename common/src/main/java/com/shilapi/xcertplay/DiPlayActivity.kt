@@ -36,7 +36,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
-import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.doOnLayout
 import androidx.core.view.WindowCompat
 import androidx.core.view.ViewCompat
@@ -109,12 +108,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var page = "home"
     private var settingsCategory = SettingsCategory.CONNECTION
     private var writeAuthorizationUnavailable = false
-    private var authorizationExportPending = false
-    private var authorizationExportFailed = false
-    private var authorizationExportSavedPath: String? = null
-    private var authorizationExportAlreadySaved = false
-    private var authorizationFolderUnavailable = false
-    private var authorizationStorageDenied = false
     private var additionalAuthorizationUnavailable = false
     internal var authorizationOpenDownloads: () -> Boolean = { AuthorizationComponentExport.openDownloads(::startActivity) }
     internal var authorizationExportWorker: (Runnable) -> Unit = { Thread(it, "diplay-authorization-export").start() }
@@ -128,12 +121,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val authorizationStoragePermission = activityResultRegistry.register(
         "authorization_export_storage", this, ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        authorizationExportPending = false
-        if (granted) exportAuthorizationComponent() else {
-            authorizationStorageDenied = true
-            render()
-        }
+        authorizationExport.permissionResult(granted)
     }
+
     private var vpnAuthorizationResult = SystemAuthorization.Result.UNKNOWN
     // A stable key keeps existing permission launchers' saved result keys unchanged on upgrade.
     private val vpnAuthorization = activityResultRegistry.register(
@@ -187,14 +177,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var settingsRailScroll: ScrollView? = null
     private var reconnectBar: View? = null
     private var readinessCard: LinearLayout? = null
-    private var searchIndexSink: MutableList<String>? = null
-    private var settingsSearchBox: EditText? = null
-    private var settingsSearchPopup: PopupWindow? = null
-    private var settingsSearchIndex: List<SettingsSearchResult>? = null
-    private var settingsSearchQuery = ""
-    private var settingsSearchExpanded = false
-    private var settingsSearchIndexing = false
-    private var settingsSearchRestoreFocus = false
     private var renderedReadiness: SettingsReadiness? = null
     private var renderedPage: String? = null
     private var renderedSettingsCategory: SettingsCategory? = null
@@ -559,9 +541,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     override fun onDestroy() {
+        authorizationExport.close()
         hotspotCredentialsDialog?.dismiss()
         hotspotCredentialsDialog = null
-        settingsSearchPopup?.dismiss()
         appearanceObserverRemoval?.invoke()
         appearanceObserverRemoval = null
         handler.removeCallbacks(appearancePoll)
@@ -662,13 +644,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val restoreRailFocus = keepRailPosition &&
             (pendingRailFocus || settingsRailScroll?.hasFocus() == true)
         settingsRailScroll = null
-        // The results hang off the old header; the new header reopens them if the search continues.
-        settingsSearchPopup?.dismiss()
-        settingsSearchPopup = null
-        settingsSearchRestoreFocus = settingsSearchRestoreFocus ||
-            (settingsSearchExpanded && settingsSearchBox?.hasFocus() == true)
-        settingsSearchBox = null
-        if (page != "settings") clearSettingsSearchState()
         status = null; homePhoneList = null; renderedPhoneState = null; disconnectButton = null; lastRunning = null; carButtonCard = null
         reconnectBar = null
         readinessCard = null
@@ -813,11 +788,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun navigateBack() {
-        // Back closes an open search first, like a system search bar.
-        if (page == "settings" && settingsSearchExpanded) {
-            closeSettingsSearch()
-            return
-        }
         val returnCategory = connectionSettingsReturnCategory
         when {
             page == "backup" -> {
@@ -846,7 +816,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun settingsHeader(compact: Boolean): LinearLayout = row().apply {
         val controlHeight = dp(if (compact) 44 else 52)
-        val iconOnlySearch = compact || resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         gravity = Gravity.CENTER_VERTICAL
         addView(headerButton(getString(R.string.back), R.drawable.ic_dp_back, compact, ::navigateBack),
             LinearLayout.LayoutParams(-2, if (compact) dp(44) else dp(52)))
@@ -857,50 +826,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
         // Reserve the action buttons first; only the title may shrink in a narrow header.
-        addView(settingsTitle, LinearLayout.LayoutParams(
-            if (settingsSearchExpanded) -2 else 0, controlHeight,
-            if (settingsSearchExpanded) 0f else 1f,
-        ))
-        val searchGap = dp(if (compact) SETTINGS_HEADER_COMPACT_GAP_DP else SETTINGS_HEADER_GAP_DP)
-        if (settingsSearchExpanded) {
-            val searchField = settingsSearchField(compact)
-            addView(searchField, LinearLayout.LayoutParams(0, controlHeight, 1f).apply {
-                marginEnd = searchGap
-            })
-            searchField.doOnLayout {
-                // Give a squeezed editor the title's space, using the current locale and font scale.
-                val hintWidth = searchField.paint.measureText(searchField.hint.toString())
-                val requiredWidth = hintWidth + searchField.compoundPaddingLeft + searchField.compoundPaddingRight
-                if (searchField.width < requiredWidth) {
-                    settingsTitle.visibility = View.GONE
-                    searchField.layoutParams = (searchField.layoutParams as LinearLayout.LayoutParams).apply {
-                        marginStart = searchGap
-                    }
-                }
-            }
-        } else {
-            val openSearch = {
-                // Indexing rebuilds the settings widgets. Do it before focusing an editor,
-                // so the first keystroke never replaces the IME's input connection.
-                settingsSearchIndex = buildSettingsSearchIndex()
-                settingsSearchExpanded = true
-                settingsSearchRestoreFocus = true
-                render()
-            }
-            val searchButton = if (iconOnlySearch) {
-                iconButton(R.drawable.ic_dp_search, getString(R.string.settings_search), openSearch).apply {
-                    imageTintList = ColorStateList.valueOf(TEXT)
-                }
-            } else {
-                headerButton(getString(R.string.settings_search_hint), R.drawable.ic_dp_search, compact, openSearch)
-            }.apply {
-                tag = SETTINGS_SEARCH_BUTTON_TAG
-                contentDescription = getString(R.string.settings_search)
-            }
-            addView(searchButton, LinearLayout.LayoutParams(if (iconOnlySearch) controlHeight else -2, controlHeight).apply {
-                marginEnd = searchGap
-            })
-        }
+        addView(settingsTitle, LinearLayout.LayoutParams(0, controlHeight, 1f))
         addView(appearanceButton(), LinearLayout.LayoutParams(controlHeight, controlHeight))
     }
 
@@ -1239,8 +1165,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun openSettingsCategory(category: SettingsCategory) {
-        setSearchKeyboard(settingsSearchBox, false)
-        clearSettingsSearchState()
         settingsCategory = category
         render()
     }
@@ -1321,275 +1245,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.DIAGNOSTICS))
     }
 
-    internal data class SettingsSearchResult(val title: String, val category: SettingsCategory)
-
-    // Renders every category into a detached view and records what the builders label.
-    // render() afterwards replaces every widget reference those detached builds assigned.
-    // ponytail: indexes the default state only; controls behind an expander (vehicle data) are not found.
-    private fun buildSettingsSearchIndex(): List<SettingsSearchResult> {
-        val selected = settingsCategory
-        // Category names first, so a card that only links to a category cannot claim its name.
-        val index = SettingsCategory.entries.associateByTo(linkedMapOf(), ::settingsCategoryTitle)
-        try {
-            for (category in SettingsCategory.entries) {
-                settingsCategory = category
-                val titles = mutableListOf(settingsCategoryTitle(category))
-                searchIndexSink = titles
-                settingsCategoryContent(column())
-                titles.forEach { index.putIfAbsent(it, category) }
-            }
-        } finally {
-            searchIndexSink = null
-            settingsCategory = selected
-        }
-        render()
-        return index.map { SettingsSearchResult(it.key, it.value) }
-    }
-
-    private fun searchSettings(index: List<SettingsSearchResult>, query: String): List<SettingsSearchResult> {
-        val words = query.trim().lowercase(Locale.getDefault()).split(Regex("\\s+")).filter(String::isNotEmpty)
-        if (words.isEmpty()) return emptyList()
-        return index.filter { result ->
-            val haystack = "${result.title} ${settingsCategoryTitle(result.category)}".lowercase(Locale.getDefault())
-            words.all(haystack::contains)
-        }
-    }
-
-    private fun openSearchResult(result: SettingsSearchResult) {
-        setSearchKeyboard(settingsSearchBox, false)
-        clearSettingsSearchState()
-        openSettingsCategory(result.category)
-        val scroll = rootScroll ?: return
-        val match = descendants(scroll).filterIsInstance<TextView>().firstOrNull {
-            it.text.toString() == result.title || it.text.startsWith(result.title + VALUE_SEPARATOR)
-        } ?: return
-        val target = generateSequence<View>(match) { it.parent as? View }.firstOrNull { it.isClickable } ?: match
-        scroll.doOnLayout {
-            var top = 0
-            var view: View? = target
-            while (view != null && view !== scroll) { top += view.top; view = view.parent as? View }
-            scroll.smoothScrollTo(0, (top - dp(24)).coerceAtLeast(0))
-            target.requestFocus()
-            target.isPressed = true
-            handler.postDelayed({ target.isPressed = false }, SEARCH_HIGHLIGHT_MILLIS)
-        }
-    }
-
     private fun descendants(view: View): Sequence<View> = sequence {
         yield(view)
         if (view is ViewGroup) for (i in 0 until view.childCount) yieldAll(descendants(view.getChildAt(i)))
     }
 
-    /**
-     * The settings header search box; matches drop down under it as the driver types.
-     * The index is built before expanding the field, so typing keeps the same editor
-     * and keyboard input connection.
-     */
-    private fun settingsSearchField(compact: Boolean): EditText = SettingsSearchEditText(this).apply {
-        settingsSearchBox = this
-        setSingleLine()
-        hint = getString(R.string.settings_search_hint)
-        contentDescription = getString(R.string.settings_search)
-        textSize = if (compact) 16f else 18f
-        setTextColor(TEXT)
-        setHintTextColor(MUTED)
-        // The editor scrolls long text sideways and its drawing canvas scrolls with it, but Android
-        // draws the background unscrolled. The icon and focus ring live there, so they stay put
-        // without compensating for scroll or for the text's vertical centring.
-        val iconSize = headerIconSize(compact)
-        val icon = getDrawable(R.drawable.ic_dp_search)?.mutate()?.apply { setTint(MUTED) }
-        background = android.graphics.drawable.LayerDrawable(
-            listOfNotNull(buttonShape(BUTTON, BORDER), icon, buttonFocusRing()).toTypedArray(),
-        ).apply {
-            if (icon != null) {
-                setLayerGravity(1, Gravity.START or Gravity.CENTER_VERTICAL)
-                setLayerSize(1, iconSize, iconSize)
-                setLayerInsetRelative(1, dp(16), 0, 0, 0)
-            }
-        }
-        gravity = Gravity.CENTER_VERTICAL or Gravity.START
-        includeFontPadding = false
-        setPaddingRelative(dp(16) + if (icon != null) iconSize + dp(10) else 0, 0, dp(16), 0)
-        inputType = android.text.InputType.TYPE_CLASS_TEXT
-        // Landscape head units would otherwise cover the results with a full-screen editor.
-        imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or
-            android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
-        // Touch focus waits for a tap, so opening settings never focuses the box or raises the keyboard.
-        isFocusableInTouchMode = settingsSearchRestoreFocus
-        setText(settingsSearchQuery)
-        setSelection(text.length)
-        setOnClickListener {
-            if (!isFocusableInTouchMode) {
-                isFocusableInTouchMode = true
-                requestFocus()
-                setSearchKeyboard(this, true)
-            }
-            showSettingsSearchResults()
-        }
-        setOnFocusChangeListener { _, focused -> if (focused) showSettingsSearchResults() }
-        setOnEditorActionListener { _, actionId, event ->
-            val search = actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH ||
-                event?.keyCode == KeyEvent.KEYCODE_ENTER
-            if (!search) return@setOnEditorActionListener false
-            if (event == null || event.action == KeyEvent.ACTION_DOWN) settingsSearchResults().firstOrNull()?.let(::openSearchResult)
-            true
-        }
-        doAfterTextChanged { onSettingsSearchChanged(this) }
-        // The keyboard resizes the window, not this field, so follow window layouts. A listener added
-        // here would join the window's observer and outlive every rebuilt field; register it only
-        // while this field is attached.
-        val followWindow = android.view.ViewTreeObserver.OnGlobalLayoutListener {
-            if (settingsSearchBox === this && settingsSearchPopup?.isShowing == true) {
-                positionSettingsSearchResults(this, settingsSearchPopup!!)
-            }
-        }
-        addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(view: View) = view.viewTreeObserver.addOnGlobalLayoutListener(followWindow)
-            override fun onViewDetachedFromWindow(view: View) = view.viewTreeObserver.removeOnGlobalLayoutListener(followWindow)
-        })
-        if (settingsSearchRestoreFocus) {
-            settingsSearchRestoreFocus = false
-            post {
-                if (settingsSearchBox !== this) return@post
-                requestFocus()
-                setSearchKeyboard(this, true)
-                showSettingsSearchResults()
-            }
-        }
-    }
-
-    private fun onSettingsSearchChanged(box: EditText) {
-        if (box !== settingsSearchBox) return
-        settingsSearchQuery = box.text.toString()
-        if (settingsSearchQuery.isEmpty()) {
-            // Keep this search's index when the query is cleared. Closing search invalidates it.
-            settingsSearchPopup?.dismiss()
-            return
-        }
-        if (settingsSearchIndex != null) {
-            showSettingsSearchResults()
-            return
-        }
-        if (settingsSearchIndexing) return
-        settingsSearchIndexing = true
-        // Not from inside the text watcher: indexing replaces this box.
-        handler.post {
-            settingsSearchIndexing = false
-            if (page != "settings" || settingsSearchQuery.isEmpty() || settingsSearchIndex != null) return@post
-            settingsSearchRestoreFocus = true
-            settingsSearchIndex = buildSettingsSearchIndex()
-        }
-    }
-
-    private fun settingsSearchResults(): List<SettingsSearchResult> =
-        settingsSearchIndex?.let { searchSettings(it, settingsSearchQuery) }.orEmpty()
-
-    private fun showSettingsSearchResults() {
-        val box = settingsSearchBox ?: return
-        if (settingsSearchIndex == null || settingsSearchQuery.isBlank() || !box.isAttachedToWindow) {
-            settingsSearchPopup?.dismiss()
-            return
-        }
-        val results = settingsSearchResults()
-        val list = column().apply { setPadding(dp(8), dp(8), dp(8), dp(8)) }
-        if (results.isEmpty()) {
-            list.addView(label(getString(R.string.settings_search_empty), 15, MUTED).apply {
-                setPadding(dp(12), dp(12), dp(12), dp(12))
-            })
-        }
-        results.forEach { list.addView(settingsSearchRow(it)) }
-        val existing = settingsSearchPopup?.takeIf { it.isShowing }
-        val scroll = (existing?.contentView as? ScrollView) ?: ScrollView(this)
-        scroll.removeAllViews()
-        scroll.addView(list)
-        if (existing != null) {
-            positionSettingsSearchResults(box, existing)
-            return
-        }
-        settingsSearchPopup = PopupWindow(scroll, box.width, 0, false).apply {
-            setBackgroundDrawable(rounded(SURFACE, BORDER))
-            elevation = dp(8).toFloat()
-            // Tapping elsewhere closes the list and keeps the query; tapping the box reopens it.
-            isOutsideTouchable = true
-            inputMethodMode = PopupWindow.INPUT_METHOD_NEEDED
-            if (Build.VERSION.SDK_INT >= 29) setIsLaidOutInScreen(true)
-            else runCatching {
-                PopupWindow::class.java.getMethod("setLayoutInScreenEnabled", Boolean::class.javaPrimitiveType)
-                    .invoke(this, true)
-            }
-            positionSettingsSearchResults(box, this)
-        }
-    }
-
-    private fun positionSettingsSearchResults(box: EditText, popup: PopupWindow) {
-        val visible = android.graphics.Rect()
-        box.getWindowVisibleDisplayFrame(visible)
-        val location = IntArray(2)
-        box.getLocationOnScreen(location)
-        val top = location[1] + box.height + dp(SETTINGS_SEARCH_RESULTS_GAP_DP)
-        val width = minOf(box.width, visible.width())
-        val maxHeight = minOf(
-            visible.bottom - top,
-            dp(if (resources.configuration.screenHeightDp < 600)
-                SETTINGS_SEARCH_RESULTS_SHORT_HEIGHT_DP else SETTINGS_SEARCH_RESULTS_HEIGHT_DP),
-        )
-        // Never let Android flip the list above its anchor and cover the field.
-        if (width <= 0 || maxHeight <= 0) {
-            popup.dismiss()
-            return
-        }
-        val left = location[0].coerceIn(visible.left, visible.right - width)
-        val content = popup.contentView
-        content.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(maxHeight, View.MeasureSpec.AT_MOST))
-        val height = content.measuredHeight.coerceIn(1, maxHeight)
-        if (popup.isShowing) {
-            popup.update(left, top, width, height)
-        } else {
-            popup.width = width
-            popup.height = height
-            popup.showAtLocation(box.rootView, Gravity.TOP or Gravity.LEFT, left, top)
-        }
-    }
-
-    private fun settingsSearchRow(result: SettingsSearchResult): View = column().apply {
-        val category = settingsCategoryTitle(result.category)
-        isClickable = true
-        isFocusable = true
-        contentDescription = "${result.title}, $category"
-        foreground = android.graphics.drawable.LayerDrawable(arrayOf<android.graphics.drawable.Drawable>(
-            android.graphics.drawable.RippleDrawable(ColorStateList.valueOf(RIPPLE), null, null), focusRing(12)))
-        minimumHeight = dp(56)
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(12), dp(8), dp(12), dp(8))
-        addView(label(result.title, 17, TEXT, true))
-        addView(label(category, 13, MUTED))
-        setOnClickListener { openSearchResult(result) }
-    }
-
-    private fun closeSettingsSearch() {
-        val box = settingsSearchBox
-        setSearchKeyboard(box, false)
-        clearSettingsSearchState()
-        box?.clearFocus()
-        render()
-        descendants(window.decorView).firstOrNull { it.tag == SETTINGS_SEARCH_BUTTON_TAG }?.requestFocus()
-    }
-
-    private fun clearSettingsSearchState() {
-        settingsSearchQuery = ""
-        settingsSearchExpanded = false
-        settingsSearchIndex = null
-        settingsSearchRestoreFocus = false
-        settingsSearchPopup?.dismiss()
-    }
-
-    private fun setSearchKeyboard(view: View?, show: Boolean) {
-        view ?: return
-        val keyboard = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        if (show) keyboard.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-        else keyboard.hideSoftInputFromWindow(view.windowToken, 0)
-    }
 
     private fun authorizationSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_authorization), getString(R.string.settings_authorization_summary))
@@ -1604,45 +1264,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun systemAuthorization(): SystemAuthorization = SystemAuthorization(this,
         openSettings = { startActivity(it) }, openVpnConsent = { vpnAuthorization.launch(it) })
 
-    private fun exportAuthorizationComponent() {
-        if (authorizationExportPending) return
-        val componentState = authorizationComponentState()
-        if (!AuthorizationComponentInstaller.canExport(componentState)) {
-            toast(getString(authorizationComponentMessage(componentState)))
-            return
-        }
-        authorizationStorageDenied = false
-        if (DiagnosticExportStore.needsStoragePermission(this)) {
-            authorizationExportPending = true
-            runCatching { authorizationStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) }.onFailure {
-                authorizationExportPending = false
-                authorizationStorageDenied = true
-                render()
-            }
-            return
-        }
-        authorizationExportPending = true
-        authorizationExportFailed = false
-        authorizationFolderUnavailable = false
-        render()
-        authorizationExportWorker(Runnable {
-            val prepared = runCatching { authorizationPrepareExport() }
-            runOnUiThread {
-                authorizationExportPending = false
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                authorizationExportFailed = prepared.fold({ saved ->
-                    authorizationExportSavedPath = saved.path
-                    authorizationExportAlreadySaved = saved.alreadySaved
-                    authorizationFolderUnavailable = if (saved.alreadySaved) {
-                        toast(getString(R.string.settings_authorization_component_already_saved, saved.path))
-                        false
-                    } else !authorizationOpenFolder(saved)
-                    false
-                }, { true })
-                render()
-            }
-        })
+    private val authorizationExport: AuthorizationExportCoordinator by lazy {
+        AuthorizationExportCoordinator(
+            componentState = { authorizationComponentState() },
+            unavailable = { toast(getString(authorizationComponentMessage(it))) },
+            needsPermission = { DiagnosticExportStore.needsStoragePermission(this) },
+            requestPermission = { authorizationStoragePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) },
+            worker = { authorizationExportWorker(it) },
+            prepare = { authorizationPrepareExport() },
+            onUi = { action -> runOnUiThread { if (!isFinishing && !isDestroyed) action() } },
+            openFolder = { authorizationOpenFolder(it) },
+            alreadySavedNotice = { toast(getString(R.string.settings_authorization_component_already_saved, it)) },
+            changed = ::render,
+        )
     }
+
+    private fun exportAuthorizationComponent() = authorizationExport.export()
 
     private fun requestWriteSettingsAuthorization() {
         writeAuthorizationUnavailable = systemAuthorization().requestWriteSettings() == SystemAuthorization.Result.UNAVAILABLE
@@ -1700,15 +1337,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             getString(R.string.settings_authorization_system), R.drawable.ic_dp_permissions) { card ->
             authorizationSettings.render(card, AuthorizationCardState(
                 componentMessage = authorizationComponentMessage(authorizationComponentState()),
-                exportPending = authorizationExportPending, exportFailed = authorizationExportFailed,
-                storageDenied = authorizationStorageDenied, savedPath = authorizationExportSavedPath,
-                alreadySaved = authorizationExportAlreadySaved, folderUnavailable = authorizationFolderUnavailable,
+                exportPending = authorizationExport.pending, exportFailed = authorizationExport.failed,
+                storageDenied = authorizationExport.storageDenied, savedPath = authorizationExport.savedPath,
+                alreadySaved = authorizationExport.alreadySaved, folderUnavailable = authorizationExport.folderUnavailable,
                 canWriteSettings = systemAuthorization().canWriteSettings(), writeUnavailable = writeAuthorizationUnavailable,
                 vpnValue = vpnAuthorizationValue(), vpnResult = vpnAuthorizationResult,
                 canDrawOverlays = systemAuthorization().canDrawOverlays(), additionalUnavailable = additionalAuthorizationUnavailable,
             ), AuthorizationCardActions(
                 export = ::exportAuthorizationComponent,
-                openDownloads = { authorizationFolderUnavailable = !authorizationOpenDownloads(); render() },
+                openDownloads = { authorizationExport.folderUnavailable = !authorizationOpenDownloads(); render() },
                 writeSettings = ::requestWriteSettingsAuthorization, vpn = ::requestVpnAuthorization,
                 overlay = { additionalAuthorizationUnavailable = systemAuthorization().requestOverlay() == SystemAuthorization.Result.UNAVAILABLE; render() },
             ))
@@ -1760,7 +1397,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         filteredSection(content, SettingsSection.HOTSPOT_AUTOMATION,
             getString(R.string.settings_wireless_hotspot), R.drawable.ic_dp_connection) { card ->
             wirelessLinkControls(card)
-            if (AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL || searchIndexSink != null) {
+            if (AirPlayPersistence.loadWirelessHotspotMode(this) == WirelessHotspotMode.MANUAL) {
                 manualHotspotControls(card)
             }
         }
@@ -3475,7 +3112,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
     private fun version() = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
     private fun section(parent: LinearLayout, title: String, icon: Int? = null, build: (LinearLayout) -> Unit) {
-        searchIndexSink?.add(title)
         val card = card()
         val heading = row().apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, 0, 0, dp(16)) }
         if (icon != null) heading.addView(ImageView(this).apply {
@@ -3524,7 +3160,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
 
     private fun toggle(parent: LinearLayout, title: String, description: String, value: Boolean, enabled: Boolean = true, save: (Boolean) -> Unit): Switch {
-        searchIndexSink?.add(title)
         val result = SettingsWidgets.createSwitchRow(
             context = this,
             label = title,
@@ -3565,54 +3200,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun card() = column().apply { background = rounded(SURFACE, BORDER); setPadding(dp(24), dp(24), dp(24), dp(24)) }
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }
     private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = LinearLayout.LayoutParams(-1, -2) }
-    private class SettingsSearchEditText(context: android.content.Context) : EditText(context) {
-        private val glyphBounds = android.graphics.Rect()
-        private var measuredHint: String? = null
-        private var measuredHintHeight = -1
-        private var measuredHintTextSize = -1f
-        private var measuredHintBaseline = 0
-
-        override fun onDraw(canvas: android.graphics.Canvas) {
-            val value: CharSequence = if (text.isNullOrEmpty()) hint ?: "" else text
-            val drawingBaseline = if (text.isNullOrEmpty() && value.isNotEmpty()) hintBaseline(value) else baseline
-            val offset = if (baseline >= 0) {
-                val contentCentre = paddingTop + (height - paddingTop - paddingBottom) / 2f
-                contentCentre - alignedTextCentreY(this, value, glyphBounds, drawingBaseline)
-            } else 0f
-            // Text, selection and cursor move together.
-            val checkpoint = canvas.save()
-            canvas.translate(0f, offset)
-            super.onDraw(canvas)
-            canvas.restoreToCount(checkpoint)
-        }
-
-        /**
-         * TextView.baseline describes the editable layout, even while it draws a hint, and a hint in
-         * a fallback font can sit differently. Measured once per hint, height and text size rather
-         * than on every frame of the blinking cursor.
-         */
-        private fun hintBaseline(value: CharSequence): Int {
-            if (value.toString() != measuredHint || height != measuredHintHeight || paint.textSize != measuredHintTextSize) {
-                // The editor scrolls horizontally rather than wrapping: lay the hint out on one line.
-                val hintWidth = maxOf(
-                    (width - compoundPaddingLeft - compoundPaddingRight).coerceAtLeast(1),
-                    kotlin.math.ceil(android.text.Layout.getDesiredWidth(value, paint).toDouble()).toInt(),
-                )
-                val hintLayout = android.text.StaticLayout.Builder.obtain(value, 0, value.length, paint, hintWidth)
-                    .setMaxLines(1).setIncludePad(includeFontPadding).apply {
-                        if (Build.VERSION.SDK_INT >= 28) setUseLineSpacingFromFallbacks(isFallbackLineSpacing)
-                    }.build()
-                measuredHintBaseline = extendedPaddingTop +
-                    ((height - extendedPaddingTop - extendedPaddingBottom - hintLayout.height).coerceAtLeast(0) / 2) +
-                    hintLayout.getLineBaseline(0)
-                measuredHint = value.toString()
-                measuredHintHeight = height
-                measuredHintTextSize = paint.textSize
-            }
-            return measuredHintBaseline
-        }
-    }
-
     private class HeaderTitleView(context: android.content.Context) : TextView(context) {
         private val glyphBounds = android.graphics.Rect()
 
@@ -3687,7 +3274,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         compoundDrawablePadding = dp(12)
         foreground = buttonFocusRing()
         text = title
-        searchIndexSink?.add(title.substringBefore(VALUE_SEPARATOR))
         setOnClickListener { click() }
         doOnLayout {
             val shape = buttonShape(if (primary) ACCENT else BUTTON, if (primary) ACCENT else BORDER, height)
@@ -3909,13 +3495,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
         private const val APPEARANCE_POLL_MILLIS = 2_000L
         private const val APPEARANCE_BUTTON_TAG = "app_appearance_button"
-        private const val SETTINGS_SEARCH_BUTTON_TAG = "settings_search_button"
-        private const val SETTINGS_HEADER_COMPACT_GAP_DP = 8
-        private const val SETTINGS_HEADER_GAP_DP = 12
-        private const val SETTINGS_SEARCH_RESULTS_GAP_DP = 6
-        private const val SETTINGS_SEARCH_RESULTS_SHORT_HEIGHT_DP = 200
-        private const val SETTINGS_SEARCH_RESULTS_HEIGHT_DP = 380
-        private const val SEARCH_HIGHLIGHT_MILLIS = 900L
         private const val SPACER = "spacer"
         private const val BACKUP_QR_MAX_DP = 240
         private const val BACKUP_QR_MIN_DP = 96

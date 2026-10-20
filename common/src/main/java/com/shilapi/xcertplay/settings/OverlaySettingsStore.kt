@@ -6,7 +6,6 @@ import com.shilapi.xcertplay.airplay.ClusterSpeedometerOverlay
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 import com.shilapi.xcertplay.airplay.SafeAreaCodec
 import com.shilapi.xcertplay.airplay.SafeAreaRect
-import com.shilapi.xcertplay.AirPlayPersistence
 import com.shilapi.xcertplay.settings.AirPlayPreferenceKeys.PREFS
 import com.shilapi.xcertplay.settings.AirPlayPreferenceKeys.KEY_CLUSTER_MAP_SCALE
 import com.shilapi.xcertplay.settings.AirPlayPreferenceKeys.KEY_CLUSTER_CONTENT
@@ -94,7 +93,7 @@ internal object OverlaySettingsStore {
 
     fun saveClusterContent(context: Context, content: CarPlayClusterDisplay.Content) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CLUSTER_CONTENT, content.name).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterTurnCardOverlaySizePercent(context: Context): Int {
@@ -118,7 +117,7 @@ internal object OverlaySettingsStore {
                 KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE_PERCENT,
                 ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.sizePercents),
             ).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterTurnCardOpacityPercent(context: Context): Int =
@@ -216,20 +215,17 @@ internal object OverlaySettingsStore {
     fun saveClusterSmallWindowCardTheme(context: Context, theme: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_SMALL_WINDOW_CARD_THEME, theme.coerceIn(0, 2)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     /**
      * The custom turn card keeps a second rect for the small window: x/y/size, panel percents. Its
-     * defaults sit right of centre and smaller, where the small navi window is. Until the driver sets
-     * the small-window card, a full-screen card value the driver chose still applies, as it did before.
+     * defaults are independent of the full-screen card; saved small-window values always win.
      */
     fun loadClusterSmallWindowCardSizePercent(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val size = when {
             prefs.contains(KEY_CLUSTER_SMALL_WINDOW_CARD_SIZE) -> prefs.getInt(KEY_CLUSTER_SMALL_WINDOW_CARD_SIZE, 40)
-            prefs.contains(KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE_PERCENT) || prefs.contains(KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE) ->
-                loadClusterTurnCardOverlaySizePercent(context)
             else -> 40
         }
         return ClusterTurnCardOverlay.snap(size, ClusterTurnCardOverlay.sizePercents)
@@ -238,15 +234,13 @@ internal object OverlaySettingsStore {
     fun saveClusterSmallWindowCardSizePercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_SMALL_WINDOW_CARD_SIZE, ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.sizePercents)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterSmallWindowCardXPercent(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val x = when {
             prefs.contains(KEY_CLUSTER_SMALL_WINDOW_CARD_X) -> prefs.getInt(KEY_CLUSTER_SMALL_WINDOW_CARD_X, 80)
-            prefs.contains(KEY_CLUSTER_TURN_CARD_OVERLAY_X) || prefs.contains(KEY_CLUSTER_TURN_CARD_OVERLAY_POSITION) ->
-                loadClusterTurnCardOverlayXPercent(context)
             else -> 80
         }
         return ClusterTurnCardOverlay.snap(x, ClusterTurnCardOverlay.smallWindowXPercents)
@@ -255,14 +249,13 @@ internal object OverlaySettingsStore {
     fun saveClusterSmallWindowCardXPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_SMALL_WINDOW_CARD_X, ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.smallWindowXPercents)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterSmallWindowCardYPercent(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val y = when {
             prefs.contains(KEY_CLUSTER_SMALL_WINDOW_CARD_Y) -> prefs.getInt(KEY_CLUSTER_SMALL_WINDOW_CARD_Y, 25)
-            prefs.contains(KEY_CLUSTER_TURN_CARD_OVERLAY_Y) -> loadClusterTurnCardOverlayYPercent(context)
             else -> 25
         }
         return ClusterTurnCardOverlay.snap(y, ClusterTurnCardOverlay.smallWindowYPercents)
@@ -271,7 +264,7 @@ internal object OverlaySettingsStore {
     fun saveClusterSmallWindowCardYPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_SMALL_WINDOW_CARD_Y, ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.smallWindowYPercents)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     /** The small-window card falls back to the shared opacity until it gets its own value. */
@@ -286,7 +279,7 @@ internal object OverlaySettingsStore {
     fun saveClusterSmallWindowCardOpacityPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_SMALL_WINDOW_CARD_OPACITY, percent.coerceIn(20, 100)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     /** Turn-card glass theme: 0 follow the head unit, 1 always day, 2 always night. */
@@ -297,13 +290,13 @@ internal object OverlaySettingsStore {
     fun saveClusterTurnCardTheme(context: Context, theme: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_TURN_CARD_THEME, theme.coerceIn(0, 2)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun saveClusterTurnCardOpacityPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_CLUSTER_TURN_CARD_OPACITY, percent.coerceIn(20, 100)).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterTurnCardOverlayXPercent(context: Context): Int {
@@ -324,7 +317,7 @@ internal object OverlaySettingsStore {
                 KEY_CLUSTER_TURN_CARD_OVERLAY_X,
                 ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.xPercents),
             ).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterTurnCardOverlayYPercent(context: Context): Int {
@@ -344,7 +337,7 @@ internal object OverlaySettingsStore {
                 KEY_CLUSTER_TURN_CARD_OVERLAY_Y,
                 ClusterTurnCardOverlay.snap(percent, ClusterTurnCardOverlay.yPercents),
             ).apply()
-        AirPlayPersistence.overlaySettingsListener?.invoke()
+        OverlaySettingsChanges.notifyChanged()
     }
 
     fun loadClusterMapScalePercent(context: Context): Int = CarPlayClusterDisplay.STREAM_SCALE_PERCENT.let { default ->

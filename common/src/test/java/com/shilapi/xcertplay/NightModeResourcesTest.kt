@@ -20,7 +20,7 @@ class NightModeResourcesTest {
     }
 
     @Test fun customSettingsStayChineseWithEverySystemLocale() {
-        val expected = listOf("en", "zh-CN", "zh-TW", "ar", "ru", "es", "uk").associateWith { "切换延迟" }
+        val expected = listOf("en", "zh-CN", "zh-TW", "ru", "es", "uk").associateWith { "切换延迟" }
         for ((tag, title) in expected) {
             val c = context(tag)
             assertEquals(tag, title, c.getString(R.string.ambient_delay_title))

@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.widget.LinearLayout
 import com.shilapi.xcertplay.host.R
 
-/** Immutable page data; rendering and search never prepare a VPN or start authorization. */
+/** Immutable page data; rendering never prepares a VPN or starts authorization. */
 internal data class AuthorizationCardState(
     val componentMessage: Int,
     val exportPending: Boolean,

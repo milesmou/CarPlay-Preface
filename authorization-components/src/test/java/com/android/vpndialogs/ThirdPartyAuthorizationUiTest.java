@@ -43,17 +43,15 @@ public class ThirdPartyAuthorizationUiTest {
             return new SpecialAccessBackend(this) { @Override public void checkEnvironment(boolean vpn) { } };
         }
     }
-    @Test public void fullLandscapeLargeFont() throws Exception { capture("full-font150", 160, false); }
+    @Test public void fullLandscapeLargeFont() throws Exception { capture("full-font150", 160); }
     @Test @Config(qualifiers = "zh-rCN-w640dp-h240dp-land-xxhdpi")
-    public void compactLandscapeLargeFont() throws Exception { capture("compact-font150", 480, false); }
-    @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    public void rtlLandscapeLargeFont() throws Exception { capture("rtl-font150", 160, true); }
+    public void compactLandscapeLargeFont() throws Exception { capture("compact-font150", 480); }
 
-    private void capture(String name, int density, boolean rtl) throws Exception {
+    private void capture(String name, int density) throws Exception {
         android.app.Application app = RuntimeEnvironment.getApplication();
         Configuration configuration = new Configuration(app.getResources().getConfiguration());
         configuration.fontScale = 1.5f;
-        if (rtl) configuration.setLocale(new Locale("ar"));
+
         app.getResources().updateConfiguration(configuration, app.getResources().getDisplayMetrics());
         PackageInfo info = new PackageInfo(); info.packageName = PACKAGE; info.versionCode = 1;
         info.signatures = new Signature[]{new Signature("1234")};
@@ -70,11 +68,11 @@ public class ThirdPartyAuthorizationUiTest {
                 TestActivity activity = controller.get();
                 Button select = awaitButton(activity, LABEL + "\n" + PACKAGE);
                 assertTrue(select.getFilterTouchesWhenObscured());
-                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-list-" + name, rtl);
+                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-list-" + name);
                 select.performClick();
                 Button allow = AuthorizationConsentTest.button(activity.getWindow().getDecorView(), "允许");
                 assertNotNull(allow);
-                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-confirm-" + name, rtl);
+                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-confirm-" + name);
                 Button cancel = AuthorizationConsentTest.button(activity.getWindow().getDecorView(), "取消");
                 assertNotNull(cancel); assertEquals(allow.getHeight(), cancel.getHeight());
                 assertTrue(allow.getHeight() >= Math.round(64 * density / 160f));
@@ -84,7 +82,7 @@ public class ThirdPartyAuthorizationUiTest {
                     int[] position = new int[2]; button.getLocationOnScreen(position);
                     assertTrue("Confirmation actions must remain reachable", position[1] >= 0 && position[1] + button.getHeight() <= 720);
                 }
-                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-actions-" + name, rtl);
+                render(activity, kind.name().toLowerCase(Locale.ROOT) + "-actions-" + name);
                 SpecialAccessBackend backend = (SpecialAccessBackend) activity.backend;
                 SpecialAccessBackend.Entry entry = backend.entries(kind, PACKAGE).get(0);
                 boolean beforeCancel = backend.allowed(kind, entry);
@@ -95,7 +93,7 @@ public class ThirdPartyAuthorizationUiTest {
         }
         Files.write(new File(OUTPUT, name + ".json").toPath(),
             ("{\"source\":\"Robolectric/API28 test render; not installed APK\",\"width\":1920,\"height\":720," +
-                "\"densityDpi\":" + density + ",\"fontScale\":1.5,\"rtl\":" + rtl + "}").getBytes(StandardCharsets.UTF_8));
+                "\"densityDpi\":" + density + ",\"fontScale\":1.5}").getBytes(StandardCharsets.UTF_8));
     }
     private Button awaitButton(Activity activity, String text) throws Exception {
         for (int attempt = 0; attempt < 300; attempt++) {
@@ -106,9 +104,9 @@ public class ThirdPartyAuthorizationUiTest {
         }
         throw new AssertionError("Application selector did not load");
     }
-    private void render(Activity activity, String name, boolean rtl) throws Exception {
+    private void render(Activity activity, String name) throws Exception {
         View decor = activity.getWindow().getDecorView();
-        decor.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        decor.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         decor.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY));
         decor.layout(0, 0, 1920, 720);
         Bitmap bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888);

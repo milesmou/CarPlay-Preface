@@ -32,8 +32,6 @@ class PrefaceSetupUiTest {
     @Test @Config(qualifiers = "zh-rCN-w1280dp-h800dp-land-xhdpi")
     fun fullHomeAndSettingsWithLargeText() = verifyHomeAndSettings("full", 1280, 800)
 
-    @Test @Config(qualifiers = "ar-w1280dp-h800dp-land-xhdpi")
-    fun arabicSystemStillShowsChineseWithLargeText() = verifyHomeAndSettings("arabic", 1280, 800)
 
     private fun verifyHomeAndSettings(name: String, widthDp: Int, heightDp: Int) {
         val app = RuntimeEnvironment.getApplication()

@@ -9,7 +9,6 @@
     <string name="settings_advanced_subtitle">按需开启，异常时关闭。</string>
     <string name="settings_advanced_caution_title">请谨慎更改</string>
     <string name="settings_advanced_caution_description">部分功能依赖车机固件或授权，可能影响声音、画面或连接。</string>
-    <string name="settings_search">搜索</string>
     <string name="settings_open_category">打开%1$s设置</string>
     <string name="settings_ready_connected">CarPlay 正在运行。需要重新连接的更改会特别说明。</string>
     <string name="settings_connection_summary">手机、有线、无线及自动连接</string>
@@ -22,8 +21,6 @@
     <string name="settings_diagnostics_summary">排查连接问题时保存本地报告</string>
     <string name="settings_reconnect_pending">已保存。部分更改将在 CarPlay 重新连接后生效。</string>
     <string name="settings_reconnect_now">立即重新连接</string>
-    <string name="settings_search_hint">搜索设置</string>
-    <string name="settings_search_empty">没有匹配的设置。请换个词试试。</string>
     <string name="settings_ready_wireless">无线 CarPlay 将连接到 %1$s。</string>
     <string name="settings_ready_usb">使用 USB 数据线连接 iPhone 以启动 CarPlay。</string>
     <string name="settings_connecting_description">CarPlay 正在与你的 iPhone 启动 CarPlay。</string>

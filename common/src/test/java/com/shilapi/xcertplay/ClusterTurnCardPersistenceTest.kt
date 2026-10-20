@@ -16,7 +16,6 @@ class ClusterTurnCardPersistenceTest {
 
     @Before fun clearPreferences() {
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().apply()
-        AirPlayPersistence.overlaySettingsListener = null
     }
 
     @Test fun overlayDefaultsToRightOfCentre() {
@@ -58,10 +57,12 @@ class ClusterTurnCardPersistenceTest {
 
     @Test fun overlaySaveNotifiesTheHostWithoutReconnecting() {
         var noticed = 0
-        AirPlayPersistence.overlaySettingsListener = { noticed++ }
+        val subscription = com.shilapi.xcertplay.settings.OverlaySettingsChanges.subscribe { noticed++ }
         AirPlayPersistence.saveClusterTurnCardOverlayXPercent(context, 20)
         AirPlayPersistence.saveClusterTurnCardOverlayYPercent(context, 50)
         AirPlayPersistence.saveClusterTurnCardOverlaySizePercent(context, 90)
+        subscription.close()
+        AirPlayPersistence.saveClusterTurnCardOverlayXPercent(context, 30)
         assertEquals(3, noticed)
     }
 }

@@ -33,7 +33,7 @@ Windows 使用 gradlew.bat。SDK 配置和组件签名输入见 [构建说明](B
 
 所有车机图片固定 1920×720 横屏，默认“星瑞 12.3 英寸”应用逻辑密度 160 dpi；记录设备、版本、系统／应用密度、字体和可用窗口，像素不能当作 dp。
 
-布局修改补充完整、紧凑窗口及大字体；触及行对齐时增加阿拉伯文 RTL。优先已安装 APK 原始截图，可用 scripts/capture_ui_preview.py。Robolectric、示例设备或设计稿必须标注来源，不作为实际连接和实车效果的证明。详见 [屏幕基准](PREFACE_SCREEN_LAYOUT.md)。
+应用仅支持中文。布局修改补充中文完整、紧凑窗口、高密度及大字体；不再增加阿拉伯语／RTL 验证。优先已安装 APK 原始截图，可用 scripts/capture_ui_preview.py。Robolectric、示例设备或设计稿必须标注来源，不作为实际连接和实车效果的证明。详见 [屏幕基准](PREFACE_SCREEN_LAYOUT.md)。
 
 ## 记录与已知限制
 

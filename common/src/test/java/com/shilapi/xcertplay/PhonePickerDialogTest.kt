@@ -42,7 +42,6 @@ class PhonePickerDialogTest {
         val app = RuntimeEnvironment.getApplication()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         previousFlags = app.applicationInfo.flags
-        app.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
         owner = Robolectric.buildActivity(DiPlayActivity::class.java).setup().get()
     }
 
@@ -141,9 +140,6 @@ class PhonePickerDialogTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun highDensityLandscapeLargeFontScreenshot() = screenshot("high-density", DiPlayPalette.DARK)
 
-    @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun rtlLandscapeLargeFontScreenshot() = screenshot("rtl", DiPlayPalette.DARK)
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun lightLandscapeLargeFontScreenshot() = screenshot("light", DiPlayPalette.LIGHT)
@@ -157,20 +153,6 @@ class PhonePickerDialogTest {
         }
         val picker = show(choices, palette)
         val decor = picker.window!!.decorView
-        if (name == "rtl") {
-            // The product pins Chinese. Arabic fixtures exercise RTL text and row geometry.
-            views(decor).forEach { it.layoutDirection = View.LAYOUT_DIRECTION_RTL }
-            views(decor).filterIsInstance<TextView>().forEach {
-                it.text = when {
-                    it.text == owner.getString(R.string.choose_your_iphone) -> "اختيار iPhone"
-                    it.text == owner.getString(R.string.phone_picker_hint) -> "اختر جهاز iPhone من الأجهزة المقترنة. يسري التغيير عند الاتصال التالي."
-                    it.text == owner.getString(R.string.pair_another) -> "إقران جهاز آخر"
-                    it.text == owner.getString(R.string.cancel) -> "إلغاء"
-                    it.tag is String -> "iPhone العائلة · ${(it.tag as String).takeLast(5)}${if (it.isSelected) " ✓" else ""}"
-                    else -> it.text
-                }
-            }
-        }
         repeat(3) {
             views(decor).forEach { it.forceLayout() }
             decor.measure(View.MeasureSpec.makeMeasureSpec(picker.window!!.attributes.width, View.MeasureSpec.EXACTLY),
@@ -184,7 +166,7 @@ class PhonePickerDialogTest {
         val pairing = footerButtons.first()
         val cancel = footerButtons.last()
         assertEquals(pairing.height, cancel.height)
-        if (name == "rtl") assertTrue("RTL action order must mirror", pairing.left > cancel.left)
+
         val scroll = views(decor).filterIsInstance<ScrollView>().single()
         val row = views(scroll).filterIsInstance<Button>().first()
         assertTrue("At least one complete device row must fit: list=${scroll.height} row=${row.height}", scroll.height >= row.height)

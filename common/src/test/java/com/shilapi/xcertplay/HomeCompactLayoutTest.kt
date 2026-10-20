@@ -31,8 +31,6 @@ class HomeCompactLayoutTest {
     @Test @Config(qualifiers = "zh-rCN-w480dp-h180dp-land-xxxhdpi")
     fun narrowAvailableWindowLargeFont() = capture("narrow-font150", 1.5f)
 
-    @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    fun landscapeRightToLeftLargeFont() = capture("rtl-font150", 1.5f)
 
     private fun views(view: View): Sequence<View> = sequence {
         yield(view)
@@ -48,7 +46,7 @@ class HomeCompactLayoutTest {
         // Keep an explicit system-size profile for the constrained-window layout at 1920x720.
         if (name.startsWith("narrow")) InterfaceSize.save(app, 100)
         val previousFlags = app.applicationInfo.flags
-        if (name.startsWith("rtl")) app.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
+
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
         try {
             val activity = controller.get()
@@ -59,15 +57,10 @@ class HomeCompactLayoutTest {
                     ConnectedPhone("12:34:56:78:90:AC", "驾驶员的 iPhone"))))
             activity.resources.updateConfiguration(Configuration(activity.resources.configuration).apply {
                 this.fontScale = fontScale
-                if (name.startsWith("rtl")) setLocale(java.util.Locale("ar"))
+
             }, activity.resources.displayMetrics)
             ReflectionHelpers.callInstanceMethod<Unit>(activity, "render")
             val decor = activity.window.decorView
-            if (name.startsWith("rtl")) {
-                // The product currently pins Chinese; exercise RTL geometry independently.
-                views(decor).forEach { it.layoutDirection = View.LAYOUT_DIRECTION_RTL }
-                assertEquals(View.LAYOUT_DIRECTION_RTL, decor.layoutDirection)
-            }
             val width = 1920
             val height = 720
             assertEquals(Configuration.ORIENTATION_LANDSCAPE, activity.resources.configuration.orientation)

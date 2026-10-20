@@ -47,3 +47,6 @@ python scripts/capture_ui_preview.py --serial emulator-5558 `
 产物：`CarPlay-Preface-0.1.1-78-debug.apk`，SHA-256：`a20582f58036cceeb989a05eba789f59eaa37a2c5507b9858d932c1ff20dcefd`。原生截图及参数、测试结果在本地 `agent_docs/preface-screen-78/`，布局测试图在 `agent_docs/screenshots/authorization-test-renders/`。
 
 屏幕尺寸来源为用户说明；本次模拟器运行不代表已在实车确认字体观感、触摸手感或所有固件的显示行为。
+
+
+2026-10-20 验证范围更新：按用户要求移除阿拉伯语／RTL 专项验证，后续只验证中文界面的宽屏、紧凑、高密度和大字体场景。上文 RTL 记录仅为历史验证结果。

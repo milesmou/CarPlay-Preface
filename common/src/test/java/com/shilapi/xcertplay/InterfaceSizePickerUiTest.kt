@@ -29,15 +29,12 @@ class InterfaceSizePickerUiTest {
     @Test fun fullLargeFont() = capture("full")
     @Test @Config(qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     fun compactLargeFont() = capture("compact")
-    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
-    fun rtlLargeFont() = capture("rtl")
 
     private fun capture(profile: String) {
         val app = RuntimeEnvironment.getApplication()
-        val flags = app.applicationInfo.flags
         app.resources.updateConfiguration(Configuration(app.resources.configuration).apply { fontScale = 1.5f }, app.resources.displayMetrics)
         InterfaceSize.save(app, if (profile == "compact") 100 else InterfaceSize.PREFACE_12_3)
-        if (profile == "rtl") app.applicationInfo.flags = flags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
+
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java).setup()
         var dialog: AlertDialog? = null
         try {
@@ -45,26 +42,6 @@ class InterfaceSizePickerUiTest {
             InterfaceSize.showPicker(activity)
             dialog = ShadowAlertDialog.getLatestAlertDialog()
             val decor = dialog.window!!.decorView
-            if (profile == "rtl") {
-                val fixtures = mapOf(
-                    activity.getString(R.string.settings_interface_size) to "حجم الواجهة",
-                    activity.getString(R.string.settings_interface_size_preface_12_3) to "ستار راي 12.3 بوصة",
-                    activity.getString(R.string.language_apply) to "تطبيق",
-                    activity.getString(R.string.common_cancel) to "إلغاء",
-                )
-                views(decor).forEach { it.layoutDirection = View.LAYOUT_DIRECTION_RTL }
-                views(decor).filterIsInstance<TextView>().forEach { text -> fixtures[text.text.toString()]?.let { text.text = it } }
-                // List rows are created by the adapter during measurement, after the other fixtures.
-                dialog.listView.setOnHierarchyChangeListener(object : ViewGroup.OnHierarchyChangeListener {
-                    override fun onChildViewAdded(parent: View?, child: View?) {
-                        child ?: return
-                        views(child).filterIsInstance<TextView>().forEach { text ->
-                            fixtures[text.text.toString()]?.let { text.text = it }
-                        }
-                    }
-                    override fun onChildViewRemoved(parent: View?, child: View?) = Unit
-                })
-            }
             repeat(3) {
                 views(decor).forEach { it.forceLayout() }
                 decor.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.AT_MOST),
@@ -86,7 +63,7 @@ class InterfaceSizePickerUiTest {
             val cancel = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
             assertEquals(apply.height, cancel.height)
             assertTrue(apply.height > 0 && dialog.listView.height > 0)
-            if (profile == "rtl") assertTrue("RTL actions mirror", apply.left < cancel.left)
+
             val bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             canvas.drawColor(Color.rgb(12, 17, 26))
@@ -104,7 +81,6 @@ class InterfaceSizePickerUiTest {
         } finally {
             dialog?.dismiss()
             controller.pause().stop().destroy()
-            app.applicationInfo.flags = flags
             InterfaceSize.save(app, InterfaceSize.PREFACE_12_3)
             AppAppearanceRuntime.resetForTest()
         }

@@ -188,13 +188,9 @@ class CarPlayHostSettingsTest {
     @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun narrowGestureMenuLargeFontScreenshot() = captureGestureMenuHome("narrow")
 
-    @Test
-    @Config(sdk = [28], qualifiers = "ar-rEG-w960dp-h360dp-land-xhdpi")
-    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun rtlGestureMenuHomeLargeFontScreenshot() = captureGestureMenuHome("rtl")
 
     private fun captureGestureMenuHome(name: String) {
-        InterfaceSize.save(activity, if (name == "compact" || name == "rtl") 100 else InterfaceSize.PREFACE_12_3)
+        InterfaceSize.save(activity, if (name == "compact") 100 else InterfaceSize.PREFACE_12_3)
         val audio = mock(android.media.AudioManager::class.java)
         `when`(audio.getStreamMaxVolume(org.mockito.ArgumentMatchers.anyInt())).thenReturn(20)
         `when`(audio.getStreamVolume(3)).thenReturn(7)
@@ -205,20 +201,10 @@ class CarPlayHostSettingsTest {
             .setSystemService(android.content.Context.AUDIO_SERVICE, audio)
         val config = android.content.res.Configuration(activity.resources.configuration).apply {
             fontScale = if (name == "standard") 1f else 1.5f
-            if (name == "rtl") {
-                val locale = java.util.Locale.forLanguageTag("ar-EG")
-                setLocale(locale)
-                setLayoutDirection(locale)
-            }
         }
         activity.resources.updateConfiguration(config, activity.resources.displayMetrics)
-        if (name == "rtl") {
-            // This library's test manifest does not inherit the mobile app's supportsRtl flag.
-            activity.applicationInfo.flags = activity.applicationInfo.flags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
-            activity.applicationInfo.targetSdkVersion = maxOf(17, activity.applicationInfo.targetSdkVersion)
-        }
         val root = invoke("buildContentView") as View
-        root.layoutDirection = if (name == "rtl") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        root.layoutDirection = View.LAYOUT_DIRECTION_LTR
         attachController()
         setField("activeAirPlaySession", mock(AirPlaySession::class.java))
         invoke("openSettingsMenu")
@@ -230,22 +216,6 @@ class CarPlayHostSettingsTest {
         }
         (field("connectionPanel") as View).visibility = View.GONE
         views(root).forEach { it.layoutDirection = root.layoutDirection }
-        // Test-only Arabic copy stresses shaping and row alignment; the product keeps its locales.
-        val arabicCopy = if (name == "rtl") mapOf(
-            R.string.settings_return_to_home to "العودة إلى الرئيسية",
-            R.string.settings_all_settings to "كل الإعدادات",
-            R.string.picture_adjustments to "ضبط الصورة",
-            R.string.exit_application to "الخروج من التطبيق",
-            R.string.settings_quick_volume to "مستوى الصوت",
-            R.string.settings_navigation_volume to "صوت الملاحة",
-            R.string.settings_media_volume to "صوت الوسائط",
-        ).mapKeys { activity.getString(it.key) } else emptyMap()
-        if (name == "rtl") {
-            assertEquals(View.LAYOUT_DIRECTION_RTL, root.layoutDirection)
-            views(menu()).filterIsInstance<TextView>().forEach { view ->
-                arabicCopy[view.text.toString()]?.let { view.text = it }
-            }
-        }
         repeat(3) {
             views(root).forEach { it.forceLayout() }
             root.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
@@ -282,7 +252,7 @@ class CarPlayHostSettingsTest {
             .put("menuDensityDpi", menu().resources.displayMetrics.densityDpi)
             .put("interfaceSize", InterfaceSize.preference(activity))
             .put("fontScale", menu().resources.configuration.fontScale.toDouble())
-            .put("arabicTestCopy", name == "rtl").toString(2))
+            .toString(2))
         bitmap.recycle()
     }
 

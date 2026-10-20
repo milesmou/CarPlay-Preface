@@ -282,9 +282,6 @@ class AuthorizationSettingsUiTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun compactLargeFontScreenshot() = capture("compact")
 
-    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun rtlLargeFontScreenshot() = capture("rtl", rtl = true)
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun migrationNoticeFullLargeFontScreenshot() = capture("full", reinstall = true)
@@ -293,9 +290,6 @@ class AuthorizationSettingsUiTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun migrationNoticeCompactLargeFontScreenshot() = capture("compact", reinstall = true)
 
-    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun migrationNoticeRtlLargeFontScreenshot() = capture("rtl", rtl = true, reinstall = true)
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun installedComponentFullLargeFontScreenshot() = capture("full", installed = true)
@@ -304,15 +298,12 @@ class AuthorizationSettingsUiTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun installedComponentCompactLargeFontScreenshot() = capture("compact", installed = true)
 
-    @Test @Config(qualifiers = "ar-w1280dp-h480dp-land-hdpi")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun installedComponentRtlLargeFontScreenshot() = capture("rtl", rtl = true, installed = true)
 
-    private fun capture(size: String, rtl: Boolean = false, fontScale: Float = 1.5f, reinstall: Boolean = false, installed: Boolean = false) {
+    private fun capture(size: String, fontScale: Float = 1.5f, reinstall: Boolean = false, installed: Boolean = false) {
         context.resources.updateConfiguration(Configuration(context.resources.configuration).apply { this.fontScale = fontScale }, context.resources.displayMetrics)
         // Explicit system-size choice exercises the short available dp window while keeping 1920x720.
         InterfaceSize.save(context, if (size == "compact") 100 else InterfaceSize.PREFACE_12_3)
-        if (rtl) context.applicationInfo.flags = previousFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
+
         val screen = openAuthorization()
         screen.authorizationComponentState = {
             if (reinstall) AuthorizationComponentInstaller.State.REINSTALL_REQUIRED
@@ -328,27 +319,6 @@ class AuthorizationSettingsUiTest {
         val migrationNotice = if (reinstall) texts(screen).single {
             it.text.toString() == screen.getString(R.string.settings_authorization_component_reinstall_required)
         } else null
-        if (rtl) {
-            // Production pins Chinese; Arabic fixtures verify actual RTL row and text geometry.
-            descendants(frame).forEach { it.layoutDirection = View.LAYOUT_DIRECTION_RTL }
-            val fixtures = mapOf(
-                R.string.settings_authorization to "الأذونات",
-                R.string.settings_authorization_summary to "إدارة أذونات النظام لهذا التطبيق.",
-                R.string.settings_authorization_native_title to "مكوّن أذونات النظام",
-                R.string.settings_authorization_native_description to "تتضمن هذه الحزمة مكوّن أذونات Android 9. احفظه في التنزيلات وثبّته يدوياً عبر مدير الملفات، ثم امنح كل إذن على حدة.",
-                R.string.settings_authorization_system to "أذونات النظام",
-                R.string.settings_authorization_component_reinstall_required to "يستخدم المكوّن الجديد هوية النظام ولا يمكنه استبدال المكوّن القديم مباشرة. احفظ ملف APK أولاً، ثم أزل مكوّن الأذونات القديم يدوياً وثبّت الملف المحفوظ عبر مدير الملفات. احتفظ بتطبيق CarPlay الرئيسي.",
-                R.string.settings_authorization_component_install to "حفظ مكوّن الأذونات بصيغة APK",
-                R.string.settings_authorization_component_ready to "مكوّن الأذونات مثبّت. استخدم خيارات الأذونات أدناه.",
-                R.string.settings_authorization_open_downloads to "فتح مجلد الحفظ",
-                R.string.settings_authorization_write_description to "افتح صفحة أذونات التطبيق للسماح بتعديل إعدادات النظام.",
-                R.string.settings_authorization_vpn_description to "تحقق من إذن VPN واطلبه. يمنح الإذن فقط دون إنشاء اتصال.",
-            ).mapKeys { screen.getString(it.key) }
-            texts(screen).forEach { view -> fixtures[view.text.toString()]?.let { view.text = it } }
-            write.text = "تعديل إعدادات النظام · غير مسموح"
-            vpn.text = "إنشاء VPN · تحقق وامنح الإذن"
-            overlay.text = "العرض فوق التطبيقات · غير مسموح"
-        }
         repeat(3) {
             descendants(frame).forEach { it.forceLayout() }
             frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
@@ -375,13 +345,8 @@ class AuthorizationSettingsUiTest {
             assertEquals(60, write.height)
             assertEquals(240, ReflectionHelpers.getField<ScrollView>(screen, "settingsRailScroll").width)
         }
-        if (rtl) {
-            assertEquals(View.LAYOUT_DIRECTION_RTL, write.layoutDirection)
-            assertNotNull("RTL row has its chevron on the left", write.compoundDrawables[0])
-            assertTrue("RTL actions follow reading order", save.left >= downloads.right)
-        } else {
-            assertTrue("Actions follow reading order", downloads.left >= save.right)
-        }
+        assertTrue("Actions follow reading order", downloads.left >= save.right)
+
         for (view in texts(screen)) {
             val layout = view.layout ?: continue
             for (line in 0 until layout.lineCount) assertEquals("Truncated: ${view.text}", 0, layout.getEllipsisCount(line))

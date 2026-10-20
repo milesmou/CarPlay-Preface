@@ -108,8 +108,8 @@ class ClusterMusicTest {
         assertEquals(150, ClusterMusicSettings.size(context))
     }
 
-    @Test fun rendersRealSettingsCompactFullAndRtlWithLargeFontsAndClusterCard() {
-        for ((locale, width) in listOf("es" to 600, "es" to 1280, "ar" to 600)) {
+    @Test fun rendersRealSettingsCompactAndFullWithLargeFontsAndClusterCard() {
+        for ((locale, width) in listOf("zh-rCN" to 600, "zh-rCN" to 1280)) {
             RuntimeEnvironment.setQualifiers("$locale-w${width}dp-h960dp")
             val old = Configuration(context.resources.configuration)
             context.resources.updateConfiguration(Configuration(old).apply { fontScale = 1.5f }, context.resources.displayMetrics)
@@ -117,11 +117,10 @@ class ClusterMusicTest {
             val controller = Robolectric.buildActivity(DiPlayActivity::class.java,
                 Intent(context, DiPlayActivity::class.java).putExtra("page", "settings")).setup()
             val activity = controller.get()
-            activity.applicationInfo.flags = activity.applicationInfo.flags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
             val card = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 setBackgroundColor(Color.rgb(20, 27, 38))
-                layoutDirection = if (locale == "ar") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+                layoutDirection = View.LAYOUT_DIRECTION_LTR
             }
             ReflectionHelpers.callInstanceMethod<Unit>(activity, "clusterMusicControls",
                 ReflectionHelpers.ClassParameter(LinearLayout::class.java, card))

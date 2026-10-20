@@ -153,12 +153,6 @@ class InterfaceSizeActivityTest {
             assertEquals(1, texts(activity.findViewById(android.R.id.content)).count {
                 it.text.startsWith(activity.getString(R.string.settings_interface_size) + " · ")
             })
-            val index = ReflectionHelpers.callInstanceMethod<List<DiPlayActivity.SettingsSearchResult>>(
-                activity, "buildSettingsSearchIndex")
-            assertTrue(index.any {
-                it.title == activity.getString(R.string.settings_interface_size) &&
-                    it.category == SettingsCategory.DISPLAY
-            })
         } finally {
             controller.pause().stop().destroy()
         }
@@ -210,9 +204,9 @@ class InterfaceSizeActivityTest {
             (if (root is ViewGroup) (0 until root.childCount).flatMap { texts(root.getChildAt(it)) } else emptyList())
 
     @Test
-    fun scaledSettingsStayChineseWithALegacyArabicPreference() {
+    fun scaledSettingsStayChineseWithALegacyLanguagePreference() {
         CarPlayBackgroundSession.clear()
-        RuntimeEnvironment.getApplication().getSharedPreferences("diplay", 0).edit().putString("app_language", "ar").commit()
+        RuntimeEnvironment.getApplication().getSharedPreferences("diplay", 0).edit().putString("app_language", "en").commit()
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java)
         val activity = controller.get()
         activity.setTheme(android.R.style.Theme_Material_NoActionBar)

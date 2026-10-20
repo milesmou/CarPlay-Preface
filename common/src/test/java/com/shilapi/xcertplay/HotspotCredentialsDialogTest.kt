@@ -40,12 +40,14 @@ class HotspotCredentialsDialogTest {
     @Before fun setup() {
         val app = RuntimeEnvironment.getApplication()
         originalFlags = app.applicationInfo.flags
-        app.applicationInfo.flags = originalFlags or android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL
+        // Preserve the high-density compact profile instead of applying the default 160 dpi override.
+        InterfaceSize.save(app, if (app.resources.configuration.densityDpi >= 320) 100 else InterfaceSize.PREFACE_12_3)
         owner = Robolectric.buildActivity(DiPlayActivity::class.java).setup().get()
     }
     @After fun cleanup() {
         dialog?.dismiss(); owner.finish()
         RuntimeEnvironment.getApplication().applicationInfo.flags = originalFlags
+        InterfaceSize.save(RuntimeEnvironment.getApplication(), InterfaceSize.PREFACE_12_3)
         AppAppearanceRuntime.resetForTest()
     }
 
@@ -114,9 +116,6 @@ class HotspotCredentialsDialogTest {
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun lightLandscapeLargeFontScreenshot() = screenshot("light", DiPlayPalette.LIGHT)
 
-    @Test @Config(qualifiers = "ar-w960dp-h360dp-land-xhdpi")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun rtlLandscapeLargeFontScreenshot() = screenshot("rtl", DiPlayPalette.DARK)
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun keyboardVisibleAreaKeepsActionsReachableScreenshot() = screenshot("keyboard", DiPlayPalette.DARK)
@@ -132,20 +131,7 @@ class HotspotCredentialsDialogTest {
         owner.resources.updateConfiguration(Configuration(owner.resources.configuration).apply { fontScale = 1.5f }, owner.resources.displayMetrics)
         val picker = show(palette = palette)
         val decor = picker.window!!.decorView
-        if (name == "rtl") views(decor).forEach {
-            it.layoutDirection = View.LAYOUT_DIRECTION_RTL
-            if (it is TextView && it !is EditText) it.text = when (it.text.toString()) {
-                owner.getString(R.string.car_hotspot_details) -> "إعداد نقطة الاتصال"
-                owner.getString(R.string.settings_hotspot_dialog_hint) -> "أدخل اسم الشبكة وكلمة المرور كما في إعدادات السيارة. يسري التغيير عند الاتصال التالي."
-                owner.getString(R.string.hotspot_name) -> "اسم الشبكة"
-                owner.getString(R.string.settings_hotspot_password) -> "كلمة المرور"
-                owner.getString(R.string.cancel) -> "إلغاء"
-                owner.getString(R.string.save_details) -> "حفظ التفاصيل"
-                owner.getString(R.string.hide_keyboard) -> "إخفاء لوحة المفاتيح"
-                owner.getString(R.string.show_password) -> "إظهار كلمة المرور"
-                else -> it.text
-            }
-        }
+
         val usableHeight = if (name.contains("keyboard")) 420 else 720
         if (name.contains("keyboard")) {
             picker.fitVisibleArea(1920, usableHeight)
@@ -167,7 +153,7 @@ class HotspotCredentialsDialogTest {
         val rectangle = Rect(0, 0, save.width, save.height)
         (decor as ViewGroup).offsetDescendantRectToMyCoords(save, rectangle)
         assertTrue("Actions must stay above keyboard", rectangle.bottom <= usableHeight)
-        if (name == "rtl") assertTrue("RTL footer must mirror", footer.getChildAt(0).left > save.left)
+
         val scroll = views(decor).filterIsInstance<ScrollView>().single()
         assertTrue(scroll.height > 0)
         if (name in listOf("compact", "keyboard", "compact-keyboard")) assertTrue(scroll.getChildAt(0).height > scroll.height)

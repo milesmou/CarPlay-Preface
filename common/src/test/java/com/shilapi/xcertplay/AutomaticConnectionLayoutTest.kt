@@ -1,7 +1,6 @@
 package com.shilapi.xcertplay
 
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -33,18 +32,15 @@ class AutomaticConnectionLayoutTest {
     @Test fun fullLargeFont() = capture("full")
     @Test @Config(qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
     fun compactLargeFont() = capture("compact")
-    @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    fun arabicLargeFont() = capture("rtl")
 
     private fun capture(profile: String) {
         val app = RuntimeEnvironment.getApplication()
-        val flags = app.applicationInfo.flags
         app.getSharedPreferences("diplay", 0).edit().clear().commit()
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
         CarPlayBackgroundSession.clear()
         UsbAutoConnect.resetForTest()
         if (profile == "compact") InterfaceSize.save(app, 100)
-        if (profile == "rtl") app.applicationInfo.flags = flags or ApplicationInfo.FLAG_SUPPORTS_RTL
+
         val controller = Robolectric.buildActivity(DiPlayActivity::class.java,
             Intent(app, DiPlayActivity::class.java).putExtra("page", "settings")).create()
         try {
@@ -68,19 +64,6 @@ class AutomaticConnectionLayoutTest {
             }
             val readiness = ReflectionHelpers.getField<View>(screen, "readinessCard")
             assertTrue("Auto-connect must precede connection status", cards.indexOfChild(firstCard) < cards.indexOfChild(readiness))
-            if (profile == "rtl") {
-                val fixture = mapOf(
-                    screen.getString(R.string.automatic_connection) to "الاتصال التلقائي",
-                    screen.getString(R.string.settings_auto_connect) to "الاتصال التلقائي",
-                    screen.getString(R.string.settings_auto_connect_hint) to "اتصل بالهاتف عند اتصال البلوتوث أو توصيل USB.",
-                    screen.getString(R.string.settings_start_on_boot) to "البدء عند التشغيل",
-                    screen.getString(R.string.settings_start_on_boot_hint) to "افتح التطبيق عند تشغيل السيارة، حسب إعدادات النظام."
-                )
-                descendants(frame).forEach {
-                    it.layoutDirection = View.LAYOUT_DIRECTION_RTL
-                    if (it is TextView) fixture[it.text.toString()]?.let { value -> it.text = value }
-                }
-            }
             repeat(3) {
                 descendants(frame).forEach { it.forceLayout() }
                 frame.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
@@ -109,12 +92,11 @@ class AutomaticConnectionLayoutTest {
                     put("densityDpi", screen.resources.displayMetrics.densityDpi)
                     put("fontScale", screen.resources.configuration.fontScale)
                     put("interfaceSize", if (profile == "compact") "100%" else "星瑞12.3英寸")
-                    put("rtlArabicFixture", profile == "rtl")
+
                 }.toString(2))
             }
         } finally {
             controller.destroy()
-            app.applicationInfo.flags = flags
             app.getSharedPreferences("diplay", 0).edit().clear().commit()
             app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
             AppAppearanceRuntime.resetForTest()

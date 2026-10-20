@@ -13,7 +13,6 @@ import android.widget.Button;
 import android.widget.ScrollView;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -28,16 +27,14 @@ import org.robolectric.annotation.GraphicsMode;
 @Config(sdk = 28, qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AuthorizationLayoutTest {
-    @Test public void fullLandscapeLargeFont() throws Exception { capture("full-font150", 160, false); }
+    @Test public void fullLandscapeLargeFont() throws Exception { capture("full-font150", 160); }
     @Test @Config(qualifiers = "zh-rCN-w640dp-h240dp-land-xxhdpi")
-    public void compactLandscapeLargeFont() throws Exception { capture("compact-font150", 480, false); }
-    @Test @Config(qualifiers = "ar-w1920dp-h720dp-land-mdpi")
-    public void rtlLandscapeLargeFont() throws Exception { capture("rtl-font150", 160, true); }
-    private void capture(String name, int density, boolean rtl) throws Exception {
+    public void compactLandscapeLargeFont() throws Exception { capture("compact-font150", 480); }
+    private void capture(String name, int density) throws Exception {
         android.app.Application app = RuntimeEnvironment.getApplication();
         Configuration config = new Configuration(app.getResources().getConfiguration());
         config.fontScale = 1.5f;
-        if (rtl) config.setLocale(new Locale("ar"));
+
         app.getResources().updateConfiguration(config, app.getResources().getDisplayMetrics());
         AuthorizationConsentTest.fake = new AuthorizationConsentTest.FakeBackend();
         AuthorizationConsentTest.caller = "com.shihab.diplay.hudtest";
@@ -52,14 +49,14 @@ public class AuthorizationLayoutTest {
                 : Robolectric.buildActivity(AdditionalAuthorizationTest.TestActivity.class, request).setup();
             try {
                 View decor = controller.get().getWindow().getDecorView();
-                decor.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+                decor.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
                 decor.measure(View.MeasureSpec.makeMeasureSpec(1920, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(720, View.MeasureSpec.EXACTLY));
                 decor.layout(0, 0, 1920, 720);
                 Button allow = AuthorizationConsentTest.button(decor, "允许");
                 Button cancel = AuthorizationConsentTest.button(decor, "取消");
                 assertNotNull(page + " allow", allow); assertNotNull(page + " cancel", cancel);
-                assertEquals(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR, allow.getLayoutDirection());
+                assertEquals(View.LAYOUT_DIRECTION_LTR, allow.getLayoutDirection());
                 assertTrue(allow.getWidth() > 0); assertTrue(allow.getHeight() >= Math.round(64 * density / 160f));
                 assertEquals(allow.getHeight(), cancel.getHeight());
                 assertTrue(allow.getMeasuredHeight() >= allow.getLayout().getHeight() + allow.getCompoundPaddingTop() + allow.getCompoundPaddingBottom());

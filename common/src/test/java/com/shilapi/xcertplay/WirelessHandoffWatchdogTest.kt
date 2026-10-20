@@ -65,7 +65,7 @@ class WirelessHandoffWatchdogTest {
         proofCall("activate", 0, session)
         bootstrap = mock(BluetoothSocket::class.java)
         ReflectionHelpers.setField(controller, "bluetoothSocket", bootstrap)
-        ReflectionHelpers.setField(controller, "hotspot", object : WirelessHotspotManager {
+        ReflectionHelpers.setField(ReflectionHelpers.getField<Any>(controller, "hotspotLease"), "currentManager", object : WirelessHotspotManager {
             override fun start(timeoutMillis: Long): WirelessHotspotInfo = error("Not started")
             override fun close() { hotspotCloses++ }
         })

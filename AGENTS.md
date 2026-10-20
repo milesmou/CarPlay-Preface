@@ -20,7 +20,7 @@ Instructions for coding agents that work on CarPlay-Preface.
 1. 后续所有车机界面设计、效果图和预览统一以 **2023 款星瑞的 12.3 英寸中控屏、1920×720 像素、横屏**为基准，按该屏幕校准文字、按钮和间距。交付原始 1920×720 图片，不将其他尺寸的图片拉伸后作为适配预览。
 2. 标准效果预览使用应用默认的 **“星瑞 12.3 英寸”**界面大小，并核对实际运行的密度、字体比例、系统栏和可用窗口。1920×720 是像素尺寸，不能直接当作 dp，也不能仅凭输出图片的分辨率就声称与安装后的效果一致。
 3. 安装后效果优先使用当前 APK 在匹配条件下的原始运行截图，并记录版本和显示参数；设计稿或单元测试渲染图须明确标明来源，不作为实际安装效果交付。
-4. 大字体、高密度、紧凑窗口和 RTL 作为补充验证，图片仍保持 1920×720 横屏，并注明与标准预览的参数差异。
+4. 应用仅支持中文。大字体、高密度、紧凑窗口作为补充验证，图片仍保持 1920×720 横屏，并注明与标准预览的参数差异。
 
 ## Checks
 
@@ -135,7 +135,7 @@ Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(э
 6. Add each new string to `common/src/main/res/values/` and to every `values-xx` locale folder.
    New Settings copy SHOULD use the `settings_` prefix. `SettingsTranslationsTest` fails when a `settings_*` string has no translation.
 7. A control that opens a choice uses `button()` with the text `"Title · Value"`.
-   That form renders as a setting row with the value and a chevron, and Search indexes the title.
+   That form renders as a setting row with the value and a chevron. Settings search has been removed.
 8. When you move a control between categories, update `AdaptiveSettingsUiTest.settingsLiveWhereDriversLookForThem`.
 
 ### Settings entry
@@ -164,4 +164,4 @@ Spacing, size and shape in the Settings screen MUST come from one place.
 4. Every `SettingsCategory` MUST have a destination in the rail and compact category strip.
    `AdaptiveSettingsUiTest.settingsLinksToEveryCategory` checks this.
 5. A layout change MUST include compact and full screenshots with a large font scale.
-   Add an Arabic (right-to-left) screenshot when the change touches row alignment.
+   Validate Chinese row alignment only; do not add Arabic or RTL fixtures or screenshots.

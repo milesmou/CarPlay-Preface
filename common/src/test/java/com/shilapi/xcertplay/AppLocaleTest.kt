@@ -25,7 +25,7 @@ class AppLocaleTest {
     }
 
     @Test fun everySystemLanguageAndLegacyChoiceUsesSimplifiedChinese() {
-        for (tag in listOf("en", "ar", "es", "ja", "zh-TW")) {
+        for (tag in listOf("en", "es", "ja", "zh-TW")) {
             context.getSharedPreferences("diplay", Context.MODE_PRIVATE).edit().putString("app_language", tag).commit()
             val system = context.createConfigurationContext(Configuration(context.resources.configuration).apply {
                 setLocale(Locale.forLanguageTag(tag))
@@ -46,7 +46,7 @@ class AppLocaleTest {
     @Test @Config(sdk = [33])
     fun anExistingAndroidAppLanguageCannotChangeTheWrappedUi() {
         val manager = context.getSystemService(LocaleManager::class.java)
-        manager.applicationLocales = LocaleList.forLanguageTags("ar")
+        manager.applicationLocales = LocaleList.forLanguageTags("en")
         try {
             val wrapped = AppLocale.wrap(context)
             assertEquals("zh-CN", wrapped.resources.configuration.locales.toLanguageTags())
@@ -56,8 +56,8 @@ class AppLocaleTest {
 
     @Test fun headUnitConfigurationResetIsCorrectedWithoutChangingFontOrDensity() {
         val reset = context.createConfigurationContext(Configuration(context.resources.configuration).apply {
-            setLocale(Locale("ar"))
-            setLayoutDirection(Locale("ar"))
+            setLocale(Locale("en"))
+            setLayoutDirection(Locale("en"))
             fontScale = 1.4f
             densityDpi = 480
         })
