@@ -13,6 +13,9 @@
         android:resizeableActivity="true"
         android:theme="@style/Theme.Xcertplay">
 
+        <meta-data android:name="eCarX_OpenAPI_AppId" android:value="${ecarxMediaAppId}" />
+        <meta-data android:name="eCarX_OpenAPI_AppKey" android:value="${ecarxMediaAppKey}" />
+
         <meta-data
             android:name="android.allow_multiple_resumed_activities"
             android:value="true" />

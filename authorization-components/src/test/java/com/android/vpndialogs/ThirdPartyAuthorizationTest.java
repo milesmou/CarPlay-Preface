@@ -103,7 +103,7 @@ public class ThirdPartyAuthorizationTest {
         assertThrows(SecurityException.class, () -> overlay.setOverlayAllowed(selected, true));
         assertFalse(overlay.overlayAllowed(selected));
     }
-    @Test public void thirdPartyVpnRequiresAnEnabledExportedProtectedService() throws Exception {
+    @Test public void thirdPartyVpnRequiresAnEnabledProtectedServiceWithoutRequiringExport() throws Exception {
         assertThrows(SecurityException.class, () -> backend.target(PACKAGE, true));
         ServiceInfo service = new ServiceInfo(); service.packageName = PACKAGE; service.name = PACKAGE + ".Vpn";
         service.enabled = true; service.exported = true; service.permission = Manifest.permission.BIND_VPN_SERVICE;
@@ -112,9 +112,24 @@ public class ThirdPartyAuthorizationTest {
         service.permission = null; install();
         assertThrows(SecurityException.class, () -> backend.target(PACKAGE, true));
         service.permission = Manifest.permission.BIND_VPN_SERVICE; service.exported = false; install();
+        assertEquals(PACKAGE, backend.target(PACKAGE, true).packageName);
+        service.enabled = false; install();
         assertThrows(SecurityException.class, () -> backend.target(PACKAGE, true));
-        service.exported = true; service.enabled = false; install();
-        assertThrows(SecurityException.class, () -> backend.target(PACKAGE, true));
+    }
+    @Test public void disabledPrivateVpnServiceCannotBeAuthorized() throws Exception {
+        ServiceInfo service = new ServiceInfo(); service.packageName = PACKAGE; service.name = PACKAGE + ".Vpn";
+        service.enabled = true; service.exported = false; service.permission = Manifest.permission.BIND_VPN_SERVICE;
+        info.services = new ServiceInfo[]{service}; install();
+        android.content.ComponentName component = new android.content.ComponentName(PACKAGE, service.name);
+        for (int state : new int[]{PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED}) {
+            context.getPackageManager().setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP);
+            assertThrows(SecurityException.class, () -> backend.target(PACKAGE, true));
+        }
+        context.getPackageManager().setComponentEnabledSetting(component,
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
+        assertEquals(PACKAGE, backend.target(PACKAGE, true).packageName);
     }
     @Test public void lateSystemPolicyBlocksBothDirectAndSelectorWrites() throws Exception {
         AuthorizationBackend.Target target = backend.target(PACKAGE, false);

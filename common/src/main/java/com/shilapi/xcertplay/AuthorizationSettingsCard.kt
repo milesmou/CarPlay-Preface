@@ -33,6 +33,7 @@ internal class AuthorizationSettingsCard(private val ui: SettingsCardUi) {
     private fun getString(id: Int, vararg args: Any): String = ui.context.getString(id, *args)
 
     fun render(card: LinearLayout, state: AuthorizationCardState, actions: AuthorizationCardActions) = with(ui) {
+        card.addView(label(getString(R.string.settings_authorization_native_description), 14, muted))
         card.addView(label(getString(state.componentMessage), 14, muted))
         val componentActions = mutableListOf<SettingButton>()
         componentActions += button(getString(if (state.exportPending) R.string.settings_authorization_component_preparing

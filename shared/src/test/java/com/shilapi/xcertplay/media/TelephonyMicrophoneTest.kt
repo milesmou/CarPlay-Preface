@@ -76,7 +76,7 @@ class TelephonyMicrophoneTest {
         ShadowAudioRecord.clearSource()
     }
 
-    @Test fun telephonyEnablesEffectsOnItsRecorderAndRestoresThePreviousMode() {
+    @Test fun telephonyEnablesEffectsOnItsRecorderAndReleasesItsModeRequest() {
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony"))
         val record = awaitCapture()
@@ -92,7 +92,7 @@ class TelephonyMicrophoneTest {
         }
 
         sink.onMicrophoneStopped(telephony)
-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
         assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
     }
@@ -153,7 +153,7 @@ class TelephonyMicrophoneTest {
         assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
     }
 
-    @Test fun diagnosticCallbackFailureDoesNotStopCallCaptureOrChangeModeRestoration() {
+    @Test fun diagnosticCallbackFailureDoesNotStopCallCaptureOrPreventModeRelease() {
         sink.close()
         sink = AndroidMediaSink(context = context, onAudioDiagnostic = { throw IllegalStateException("diagnostic callback failed") })
         manager.mode = AudioManager.MODE_RINGTONE
@@ -164,7 +164,7 @@ class TelephonyMicrophoneTest {
         assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
         assertEquals(2, ShadowAudioEffect.getAudioEffects().size)
         sink.onMicrophoneStopped(telephony)
-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
@@ -186,20 +186,84 @@ class TelephonyMicrophoneTest {
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
-    @Test fun duplicateStartDoesNotOverwriteTheOriginalModeOrCreateMoreEffects() {
+    @Test
+    @Config(sdk = [28], shadows = [ModeOwnerAudioManager::class])
+    fun endingCarPlayCaptureAfterTheSystemCallEndsReleasesCommunicationMode() {
+        val modes = Shadow.extract<ModeOwnerAudioManager>(manager)
+        modes.systemMode = AudioManager.MODE_IN_CALL
+        sink.onMicrophoneStarted(telephony, config("telephony"))
+        awaitCapture()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
+
+        // HFP/Telecom ends first; our own mode request remains until capture stops.
+        modes.systemMode = AudioManager.MODE_NORMAL
+        sink.onMicrophoneStopped(telephony)
+
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+        assertEquals(listOf(AudioManager.MODE_IN_COMMUNICATION, AudioManager.MODE_NORMAL), modes.requests)
+    }
+
+    @Test
+    @Config(sdk = [28], shadows = [ModeOwnerAudioManager::class])
+    fun endingCarPlayCaptureLeavesAnOngoingSystemCallInControl() {
+        val modes = Shadow.extract<ModeOwnerAudioManager>(manager)
+        modes.systemMode = AudioManager.MODE_IN_CALL
+        sink.onMicrophoneStarted(telephony, config("telephony"))
+        awaitCapture()
+
+        sink.onMicrophoneStopped(telephony)
+        assertEquals(AudioManager.MODE_IN_CALL, manager.mode)
+        assertEquals(listOf(AudioManager.MODE_IN_COMMUNICATION, AudioManager.MODE_NORMAL), modes.requests)
+        modes.systemMode = AudioManager.MODE_NORMAL
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+    }
+
+    @Test
+    @Config(sdk = [28], shadows = [ModeOwnerAudioManager::class])
+    fun closingAfterTheSystemCallEndsReleasesOnlyOurModeRequestOnce() {
+        val modes = Shadow.extract<ModeOwnerAudioManager>(manager)
+        modes.systemMode = AudioManager.MODE_IN_CALL
+        sink.onMicrophoneStarted(telephony, config("telephony"))
+        awaitCapture()
+        modes.systemMode = AudioManager.MODE_NORMAL
+        sink.onMicrophoneStopped(speechRecognition)
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, manager.mode)
+
+        sink.close()
+        sink.onMicrophoneStopped(telephony)
+        sink.close()
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+        assertEquals(listOf(AudioManager.MODE_IN_COMMUNICATION, AudioManager.MODE_NORMAL), modes.requests)
+    }
+
+    @Test
+    @Config(sdk = [28], shadows = [ModeOwnerAudioManager::class])
+    fun failedCaptureDoesNotRetainOurModeAfterTheSystemCallEnds() {
+        val modes = Shadow.extract<ModeOwnerAudioManager>(manager)
+        modes.systemMode = AudioManager.MODE_IN_CALL
+        sink.onMicrophoneStarted(telephony, config("telephony").copy(sampleRate = 1))
+        assertNull(recorder.get())
+        assertEquals(AudioManager.MODE_IN_CALL, manager.mode)
+
+        modes.systemMode = AudioManager.MODE_NORMAL
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
+        assertEquals(listOf(AudioManager.MODE_IN_COMMUNICATION, AudioManager.MODE_NORMAL), modes.requests)
+    }
+
+    @Test fun duplicateStartDoesNotCreateMoreEffectsAndStillReleasesItsMode() {
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony"))
         awaitCapture()
         sink.onMicrophoneStarted(telephony, config("telephony"))
         assertEquals(microphoneLog(), 2, ShadowAudioEffect.getAudioEffects().size)
         sink.onMicrophoneStopped(telephony)
-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
     }
 
-    @Test fun failedRecorderInitializationRestoresThePreviousMode() {
+    @Test fun failedRecorderInitializationReleasesItsModeRequest() {
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony").copy(sampleRate = 1))
-        assertEquals(AudioManager.MODE_RINGTONE, manager.mode)
+        assertEquals(AudioManager.MODE_NORMAL, manager.mode)
         assertNull(recorder.get())
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
@@ -232,37 +296,37 @@ class TelephonyMicrophoneTest {
     }
 
     @Test
-    @Config(shadows = [FailingRestoreAudioManager::class])
-    fun failedModeRestoreStillReportsTheReadableCurrentMode() {
-        verifyRestoreFailure(failGetter = false)
+    @Config(shadows = [FailingReleaseAudioManager::class])
+    fun failedModeReleaseStillReportsTheReadableCurrentMode() {
+        verifyReleaseFailure(failGetter = false)
     }
 
     @Test
-    @Config(shadows = [FailingRestoreAudioManager::class])
-    fun failedModeRestoreAndModeGetterCannotEscapeMicrophoneTeardown() {
-        verifyRestoreFailure(failGetter = true)
+    @Config(shadows = [FailingReleaseAudioManager::class])
+    fun failedModeReleaseAndModeGetterCannotEscapeMicrophoneTeardown() {
+        verifyReleaseFailure(failGetter = true)
     }
 
-    private fun verifyRestoreFailure(failGetter: Boolean) {
+    private fun verifyReleaseFailure(failGetter: Boolean) {
         sink.close()
         val diagnostics = CopyOnWriteArrayList<String>()
         sink = AndroidMediaSink(context = context, onAudioDiagnostic = diagnostics::add)
         manager.mode = AudioManager.MODE_RINGTONE
         sink.onMicrophoneStarted(telephony, config("telephony"))
         val record = awaitCapture()
-        FailingRestoreAudioManager.failSetter = true
-        FailingRestoreAudioManager.failGetter = failGetter
+        FailingReleaseAudioManager.failSetter = true
+        FailingReleaseAudioManager.failGetter = failGetter
         try {
             sink.onMicrophoneStopped(telephony)
             assertEquals(AudioRecord.STATE_UNINITIALIZED, record.state)
             assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
-            val failure = diagnostics.single { it.startsWith("Audio: mode restore failed") }
+            val failure = diagnostics.single { it.startsWith("Audio: mode release failed") }
             val expectedMode = if (failGetter) "unknown" else AudioManager.MODE_IN_COMMUNICATION.toString()
-            assertTrue(failure, failure.contains("requested=${AudioManager.MODE_RINGTONE} now=$expectedMode"))
+            assertTrue(failure, failure.contains("requested=${AudioManager.MODE_NORMAL} now=$expectedMode"))
             assertTrue(failure, failure.contains("error=SecurityException"))
             sink.onMicrophoneStopped(telephony)
-            assertEquals(1, diagnostics.count { it.startsWith("Audio: mode restore failed") })
-        } finally { FailingRestoreAudioManager.resetFailures() }
+            assertEquals(1, diagnostics.count { it.startsWith("Audio: mode release failed") })
+        } finally { FailingReleaseAudioManager.resetFailures() }
     }
 
     @Test fun unavailableEffectsDoNotPreventRecording() {
@@ -525,9 +589,26 @@ class TelephonyMicrophoneTest {
     }
 
     @Implements(AudioManager::class)
-    class FailingRestoreAudioManager : ShadowAudioManager() {
+    class ModeOwnerAudioManager : ShadowAudioManager() {
+        var systemMode = AudioManager.MODE_NORMAL
+        private var applicationMode: Int? = null
+        val requests = mutableListOf<Int>()
+
+        @Implementation override fun getMode(): Int = applicationMode ?: systemMode
+
         @Implementation override fun setMode(mode: Int) {
-            if (failSetter) throw SecurityException("Mode restore denied")
+            requests += mode
+            // Android 9 silently rejects IN_CALL without MODIFY_PHONE_STATE. NORMAL removes
+            // this caller's request and exposes the remaining caller, rather than replacing it.
+            if (mode == AudioManager.MODE_IN_CALL) return
+            applicationMode = mode.takeUnless { it == AudioManager.MODE_NORMAL }
+        }
+    }
+
+    @Implements(AudioManager::class)
+    class FailingReleaseAudioManager : ShadowAudioManager() {
+        @Implementation override fun setMode(mode: Int) {
+            if (failSetter) throw SecurityException("Mode release denied")
             super.setMode(mode)
         }
         @Implementation override fun getMode(): Int {

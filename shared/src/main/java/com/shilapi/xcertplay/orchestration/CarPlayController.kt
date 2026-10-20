@@ -129,6 +129,7 @@ class CarPlayController(
     requestVpnAuthorization: ((Boolean) -> Unit) -> Unit = { it(false) },
     private val onNativeBluetoothPlaying: (Boolean) -> Unit = {},
     val managesPlaybackAudioFocus: Boolean = false,
+    private val onBluetoothHandoffReady: (Boolean) -> Unit = {},
 ) : Closeable {
     init {
         require(!config.locationReportingEnabled || locationProvider != null) {
@@ -144,12 +145,21 @@ class CarPlayController(
     private var bluetoothAudioHandoff: com.shilapi.xcertplay.vehicle.BluetoothAudioHandoff? = null
     private var bluetoothAudioSession: AirPlaySession? = null
     @Volatile private var wirelessPeerBluetoothAddress: String? = null
+    @Volatile var bluetoothHandoffReady: Boolean = true
+        private set
+    @Volatile var bluetoothHandoffListener: ((Boolean) -> Unit)? = null
+
+    private fun publishBluetoothHandoffReady(ready: Boolean) {
+        bluetoothHandoffReady = ready
+        onBluetoothHandoffReady(ready)
+        bluetoothHandoffListener?.invoke(ready)
+    }
 
     fun setBluetoothAudioOwnership(owned: Boolean) {
         mainHandler.post {
             if (!closed) {
                 bluetoothAudioOwnership = owned
-                bluetoothAudioHandoff?.setSuppressed(!usesCarBluetoothAudio && (owned || bluetoothAudioCommand))
+                bluetoothAudioHandoff?.setSuppressed(!usesCarBluetoothAudio)
             }
         }
     }
@@ -297,6 +307,7 @@ class CarPlayController(
                 }
             }
             activeSession = session
+            if (replacement) publishBluetoothHandoffReady(usesCarBluetoothAudio || wirelessPeerBluetoothAddress == null)
             wirelessPeerBluetoothAddress?.let { configureBluetoothAudioHandoff(session, it) }
 
             if (replacement) restoreDashboardContent(session)
@@ -2637,18 +2648,29 @@ class CarPlayController(
 
     private fun configureBluetoothAudioHandoff(session: AirPlaySession, address: String, force: Boolean = false) {
         if (!BluetoothAdapter.checkBluetoothAddress(address.uppercase(Locale.US))) return
+        if (!closed && activeSession === session && bluetoothAudioSession !== session && !usesCarBluetoothAudio)
+            publishBluetoothHandoffReady(false)
         mainHandler.post {
             if (closed || activeSession !== session) return@post
             if (bluetoothAudioSession === session) {
                 if (force) bluetoothAudioCommand = true
-                bluetoothAudioHandoff?.setSuppressed(!usesCarBluetoothAudio && (bluetoothAudioOwnership || bluetoothAudioCommand))
+                bluetoothAudioHandoff?.setSuppressed(!usesCarBluetoothAudio)
+                return@post
+            }
+            if (bluetoothAdapter == null || runCatching { bluetoothAdapter.isEnabled == false }.getOrDefault(false)) {
+                publishBluetoothHandoffReady(true)
+                debugLog("Audio: Bluetooth is disabled; no A2DP handoff is required")
                 return@post
             }
             val bonded = runCatching {
-                bluetoothAdapter?.bondedDevices?.any { it.address.equals(address, true) } == true
-            }.getOrDefault(false)
-            if (!bonded) {
-                debugLog("Audio: Bluetooth handoff unavailable: session peer is not bonded")
+                bluetoothAdapter.bondedDevices?.any { it.address.equals(address, true) } == true
+            }.getOrNull()
+            if (bonded != true) {
+                // USB works without Bluetooth pairing. A known unpaired peer has no paired
+                // A2DP route to suppress; a failed permission/query is still an unknown state.
+                publishBluetoothHandoffReady(bonded == false)
+                debugLog(if (bonded == false) "Audio: session peer is not Bluetooth bonded; no paired A2DP handoff"
+                    else "Audio: Bluetooth handoff unavailable: paired state could not be verified")
                 return@post
             }
             val previous = bluetoothAudioHandoff
@@ -2663,10 +2685,14 @@ class CarPlayController(
                     }
                 } else null,
                 nativeOutput = usesCarBluetoothAudio,
+                onHandoffReady = { ready ->
+                    if (!closed && activeSession === session && bluetoothAudioSession === session)
+                        publishBluetoothHandoffReady(ready)
+                },
             ).also {
                 // The existing Bluetooth setting is the single source of truth for E02.
                 // A phone's disableBluetooth request closes bootstrap RFCOMM, never native A2DP in this mode.
-                it.setSuppressed(!usesCarBluetoothAudio && (bluetoothAudioOwnership || force))
+                it.setSuppressed(!usesCarBluetoothAudio)
                 it.start()
             }
             previous?.close()
@@ -2679,6 +2705,7 @@ class CarPlayController(
         bluetoothAudioHandoff = null
         bluetoothAudioSession = null
         bluetoothAudioCommand = false
+        publishBluetoothHandoffReady(false)
         previous?.close()
         onNativeBluetoothPlaying(false)
     }

@@ -224,6 +224,7 @@ class CarPlayHostSettingsTest {
         }
         val bounds = android.graphics.Rect()
         for (button in views(menu()).filterIsInstance<Button>()) {
+            assertTrue(button.height >= (56 * menu().resources.displayMetrics.density).toInt())
             assertTrue(button.text.toString(), button.getGlobalVisibleRect(bounds))
             assertTrue(button.text.toString(), bounds.top >= 0 && bounds.bottom <= 720)
             assertEquals("${button.text}: bounds=$bounds parent=${(button.parent as View).height}", button.height, bounds.height())
@@ -231,16 +232,25 @@ class CarPlayHostSettingsTest {
             for (line in 0 until button.layout.lineCount) assertEquals(0, button.layout.getEllipsisCount(line))
         }
         for (slider in views(menu()).filterIsInstance<SeekBar>()) {
+            assertTrue(slider.height >= (56 * menu().resources.displayMetrics.density).toInt())
             assertTrue(slider.isEnabled)
             assertTrue(slider.contentDescription.toString(), slider.getGlobalVisibleRect(bounds))
             assertEquals(slider.height, bounds.height())
         }
+        val volumeHeading = views(menu()).filterIsInstance<TextView>()
+            .single { it.text == activity.getString(R.string.settings_quick_volume) }
+        val headingBounds = menuBounds(volumeHeading)
+        assertTrue(views(menu()).filterIsInstance<Button>().all { menuBounds(it).bottom < headingBounds.top })
+        val sliders = views(menu()).filterIsInstance<SeekBar>().toList()
+        assertTrue(sliders.all { it.width == (it.parent as View).width })
+        assertEquals(menuBounds(sliders.first()).left, menuBounds(sliders.last()).left)
+        assertEquals(menuBounds(sliders.first()).right, menuBounds(sliders.last()).right)
         val panel = (menu() as ViewGroup).getChildAt(0)
         assertTrue(panel.getGlobalVisibleRect(bounds))
         assertTrue("Menu panel should be vertically centered", kotlin.math.abs(bounds.top + bounds.bottom - 720) <= 4)
         val bitmap = android.graphics.Bitmap.createBitmap(1920, 720, android.graphics.Bitmap.Config.ARGB_8888)
         root.draw(android.graphics.Canvas(bitmap))
-        val directory = java.io.File("../agent_docs/screenshots/quick-menu-85-test-renders").apply { mkdirs() }
+        val directory = java.io.File("../agent_docs/screenshots/quick-menu-stacked-20261020-test-renders").apply { mkdirs() }
         val font = if (name == "standard") 100 else 150
         java.io.File(directory, "$name-font$font.png").outputStream().use {
             assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
@@ -389,13 +399,15 @@ class CarPlayHostSettingsTest {
 
     @Test fun menuPaddingAndTheGapBetweenActionsAndVolumeDismiss() {
         attachController()
-        for (target in listOf("padding", "panes")) {
+        for (target in listOf("padding", "sections")) {
             mountMenuForTouch()
             val home = menuBounds(homeButton())
-            val volume = menuBounds(views(menu()).filterIsInstance<SeekBar>().first())
-            val x = if (target == "padding") home.left - 8f else
-                (menuBounds(fullSettingsButton()).right + volume.left) / 2f
-            tapMenu(x, home.exactCenterY())
+            val heading = menuBounds(views(menu()).filterIsInstance<TextView>()
+                .single { it.text == activity.getString(R.string.settings_quick_volume) })
+            val actionsBottom = views(menu()).filterIsInstance<Button>().maxOf { menuBounds(it).bottom }
+            val x = if (target == "padding") home.left - 8f else home.exactCenterX()
+            val y = if (target == "padding") home.exactCenterY() else (actionsBottom + heading.top) / 2f
+            tapMenu(x, y)
             assertFalse(target, field("menuOpen") as Boolean)
         }
     }
@@ -409,8 +421,11 @@ class CarPlayHostSettingsTest {
         val slider = views(menu()).filterIsInstance<SeekBar>().first()
         slider.isEnabled = false
         val sliderBounds = menuBounds(slider)
-        tapMenu(sliderBounds.exactCenterX(), sliderBounds.exactCenterY())
-        assertTrue(field("menuOpen") as Boolean)
+        assertTrue(slider.height >= (56 * menu().resources.displayMetrics.density).toInt())
+        for (y in listOf(sliderBounds.top + 1f, sliderBounds.exactCenterY(), sliderBounds.bottom - 1f)) {
+            tapMenu(sliderBounds.exactCenterX(), y)
+            assertTrue(field("menuOpen") as Boolean)
+        }
         assertNull(shadowOf(activity).nextStartedActivity)
         val home = menuBounds(homeButton())
         tapMenu(home.exactCenterX(), home.exactCenterY())

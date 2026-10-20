@@ -14,7 +14,7 @@
     <string name="settings_authorization">Authorization</string>
     <string name="settings_authorization_summary">Manage system authorization for this app.</string>
     <string name="settings_authorization_native_title">System authorization component</string>
-    <string name="settings_authorization_native_description">Includes the Android 9 authorization component. If compatible, save to Downloads, install manually in the file manager, then grant each permission.</string>
+    <string name="settings_authorization_native_description">Includes the Android 9 authorization component. If compatible, save it to Downloads and install it manually in the file manager.</string>
     <string name="settings_authorization_component_available">Save to Download, then install manually in the file manager.</string>
     <string name="settings_authorization_component_update_available">An update is included. Save it and update manually in the file manager.</string>
     <string name="settings_authorization_component_reinstall_required">Save the APK first. Manually uninstall only the old Xingrui authorization component, then install the saved APK. Keep the CarPlay app.</string>
@@ -25,7 +25,7 @@
     <string name="settings_authorization_component_permission_missing">The component is installed but unavailable or missing system permissions. Check its status in system settings.</string>
     <string name="settings_authorization_component_unsupported">The bundled component does not match this system or is not included in this build. Use the available system authorization pages below.</string>
     <string name="settings_authorization_component_install_failed">Could not save the component. Check system compatibility and available Downloads storage, then try again.</string>
-    <string name="settings_authorization_component_saved">Saved to: %1$s. Open this file in your file manager to install it manually.</string>
+    <string name="settings_authorization_component_saved">Saved to: %1$s. Open the APK in your file manager to install it manually.</string>
     <string name="settings_authorization_component_already_saved">Authorization APK already saved to: %1$s. No need to save it again.</string>
     <string name="settings_authorization_component_folder_unavailable">If Downloads does not open, open the Download folder manually in your file manager. A saved APK remains at the path shown above.</string>
     <string name="settings_authorization_component_storage_denied">Storage permission was not granted. Allow storage access to save the component to Downloads.</string>

@@ -21,6 +21,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Xcertplay">
 
+        <meta-data android:name="eCarX_OpenAPI_AppId" android:value="${ecarxMediaAppId}" />
+        <meta-data android:name="eCarX_OpenAPI_AppKey" android:value="${ecarxMediaAppKey}" />
+
         <!-- It declares support for Android Automotive OS. -->
         <meta-data
             android:name="com.android.automotive"

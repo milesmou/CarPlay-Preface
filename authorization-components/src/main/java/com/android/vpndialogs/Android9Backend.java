@@ -84,7 +84,9 @@ class Android9Backend implements AuthorizationBackend {
         if (vpn) {
             boolean found = false;
             if (info.services != null) for (ServiceInfo service : info.services)
-                if (service.enabled && service.exported && Manifest.permission.BIND_VPN_SERVICE.equals(service.permission)) {
+                // Android 9 resolves and binds the explicit service as the system. It need not
+                // be exported to other apps (CarPlay deliberately keeps its local bridge private).
+                if (service.enabled && Manifest.permission.BIND_VPN_SERVICE.equals(service.permission)) {
                     int state = pm.getComponentEnabledSetting(new android.content.ComponentName(name, service.name));
                     if (state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED &&
                             state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER &&

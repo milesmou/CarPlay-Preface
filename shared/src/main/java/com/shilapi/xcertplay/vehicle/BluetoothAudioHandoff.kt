@@ -24,6 +24,11 @@ internal class BluetoothAudioHandoff(
     context: Context, address: String, private val report: (String) -> Unit,
     private val onPlaying: ((Boolean) -> Unit)? = null,
     private val nativeOutput: Boolean = false,
+    private val onHandoffReady: (Boolean) -> Unit = {},
+    private val platformLeaseFactory: (Context, String, (Boolean, String) -> Unit) -> BluetoothAudioLeaseClient =
+        { app, peer, callback -> PlatformBluetoothAudioLease(app, peer, callback) },
+    private val nativePreparationFactory: (Context, () -> Boolean, (String) -> Unit) -> NativeBluetoothAudioPreparation =
+        { app, eligible, diagnostic -> NativeBluetoothAudioPreparation(app, eligible, diagnostic) },
 ) : Closeable {
     private val app = context.applicationContext
     private val adapter = app.getSystemService(BluetoothManager::class.java)?.adapter
@@ -44,11 +49,15 @@ internal class BluetoothAudioHandoff(
     private var lastConnectAt: Long? = null
     private var platformConnector: PlatformBluetoothMusicConnector? = null
     private var platformConnectAttempted = false
+    private var platformLease: BluetoothAudioLeaseClient? = null
+    private var handoffReady: Boolean? = null
+    private var nativePreparation: NativeBluetoothAudioPreparation? = null
     private val playbackPoll = object : Runnable {
         override fun run() = synchronized(this@BluetoothAudioHandoff) {
             if (closed) return@synchronized
             refreshPlaying()
             if (suppressed) disconnectPeer()
+            else prepareNativeAudio()
             main.postDelayed(this, 1_000L)
         }
     }
@@ -78,13 +87,19 @@ internal class BluetoothAudioHandoff(
     @Synchronized fun setSuppressed(value: Boolean) {
         if (closed) return
         suppressed = value
-        if (value) cancelRestore()
+        if (value) {
+            cancelRestore()
+            nativePreparation?.close()
+        } else {
+            platformLease?.close(); platformLease = null
+        }
         val connected = proxy ?: return
         if (value) disconnectPeer() else restoreActive(connected)
     }
 
     @Synchronized fun start() {
         if (closed || held) return
+        if (suppressed) publishHandoffReady(false)
         if (Build.VERSION.SDK_INT >= 31 && app.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             report("Audio: Bluetooth music handoff unavailable: connection permission"); return
         }
@@ -146,10 +161,31 @@ internal class BluetoothAudioHandoff(
     }
 
     @Synchronized private fun disconnectPeer() {
-        if (closed || !suppressed || unavailable) return
-        // A2DP only: never operate HFP/SCO or change the adapter during a call.
-        if (audio?.mode in setOf(AudioManager.MODE_IN_CALL, AudioManager.MODE_IN_COMMUNICATION)) return
+        if (closed || !suppressed) return
+        if (runCatching { adapter?.isEnabled == false }.getOrDefault(false)) {
+            publishHandoffReady(true)
+            return
+        }
         val profile = proxy ?: return
+        val anotherPhone = runCatching {
+            profile.getDevicesMatchingConnectionStates(intArrayOf(BluetoothProfile.STATE_CONNECTED,
+                BluetoothProfile.STATE_CONNECTING, BluetoothProfile.STATE_DISCONNECTING)).any { !it.address.equals(peer, true) }
+        }.getOrDefault(true)
+        if (anotherPhone) {
+            publishHandoffReady(false)
+            if (!unavailable) report("Audio: Bluetooth music handoff skipped: another phone is connected; safe restoration is not assured")
+            unavailable = true
+            return
+        }
+        val selected = runCatching { adapter?.bondedDevices?.firstOrNull { it.address.equals(peer, true) } }.getOrNull()
+        if (selected != null && runCatching { profile.getConnectionState(selected) == BluetoothProfile.STATE_DISCONNECTED }.getOrDefault(false)) {
+            publishHandoffReady(true)
+            return
+        }
+        publishHandoffReady(false)
+        if (unavailable) return
+        // A2DP only: never operate HFP/SCO or change the adapter during a call.
+        if (audio?.mode != AudioManager.MODE_NORMAL) return
         try {
             val devices = profile.connectedDevices
             val device = devices.firstOrNull { it.address.equals(peer, true) && it.bondState == BluetoothDevice.BOND_BONDED } ?: return
@@ -175,8 +211,32 @@ internal class BluetoothAudioHandoff(
             }
         } catch (error: Exception) {
             unavailable = true
-            report("Audio: Bluetooth music handoff fallback: ${error.javaClass.simpleName}; keeping existing Bluetooth route")
+            report("Audio: Bluetooth music handoff fallback: ${error.javaClass.simpleName}; requesting platform session lease")
+            requestPlatformLease()
         }
+    }
+
+    private fun publishHandoffReady(value: Boolean) {
+        if (handoffReady == value) return
+        handoffReady = value
+        onHandoffReady(value)
+    }
+
+    private fun requestPlatformLease() {
+        if (closed || !suppressed || nativeOutput || platformLease != null) return
+        lateinit var next: BluetoothAudioLeaseClient
+        next = platformLeaseFactory(app, peer) { confirmed, reason ->
+            synchronized(this@BluetoothAudioHandoff) {
+                if (closed || !suppressed || platformLease !== next) return@synchronized
+                val device = runCatching { adapter?.getRemoteDevice(peer) }.getOrNull()
+                val disconnected = confirmed && device != null &&
+                    runCatching { proxy?.getConnectionState(device) == BluetoothProfile.STATE_DISCONNECTED }.getOrDefault(false)
+                publishHandoffReady(disconnected)
+                report("Audio: platform session A2DP handoff confirmed=$disconnected reason=$reason")
+            }
+        }
+        platformLease = next
+        next.start()
     }
 
     private fun restoreIfOwned(profile: BluetoothProfile): Boolean = synchronized(leases) {
@@ -195,6 +255,7 @@ internal class BluetoothAudioHandoff(
                     lease.disconnected = false
                     lastConnectAt = null
                     platformConnector?.close(); platformConnector = null
+                    prepareNativeAudio()
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (restoreUnavailable) return true
@@ -248,6 +309,21 @@ internal class BluetoothAudioHandoff(
         next.start()
     }
 
+    private fun nativePreparationEligible(): Boolean = runCatching {
+        if (closed || suppressed || !nativeOutput || adapter?.isEnabled != true ||
+            audio?.mode != AudioManager.MODE_NORMAL) return@runCatching false
+        val device = proxy?.connectedDevices?.singleOrNull() ?: return@runCatching false
+        device.address.equals(peer, true) && device.bondState == BluetoothDevice.BOND_BONDED
+    }.getOrDefault(false)
+
+    // One preparation per session, never on every play/pause tick or after switching to radio.
+    private fun prepareNativeAudio() {
+        if (nativePreparation != null || !nativePreparationEligible()) return
+        val next = nativePreparationFactory(app, ::nativePreparationEligible, report)
+        nativePreparation = next
+        next.start()
+    }
+
     // carlito | A disconnect may still be completing when focus is yielded.
     private fun restoreActive(profile: BluetoothProfile, deadline: Long = SystemClock.elapsedRealtime() + 5_000L) {
         if (closed || suppressed || proxy !== profile || restoreTask != null) return
@@ -285,6 +361,8 @@ internal class BluetoothAudioHandoff(
         closed = true
         main.removeCallbacks(playbackPoll)
         cancelRestore()
+        platformLease?.close(); platformLease = null
+        nativePreparation?.close(); nativePreparation = null
         publishPlaying(false)
         if (registered) runCatching { app.unregisterReceiver(receiver) }
         registered = false

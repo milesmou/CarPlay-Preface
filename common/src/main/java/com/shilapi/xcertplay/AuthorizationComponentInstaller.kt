@@ -92,7 +92,7 @@ internal class AuthorizationComponentInstaller(
         check(metadata.getString("packageName") == PACKAGE && metadata.getString("certificateSha256") == CERTIFICATE &&
             metadata.getString("sharedUserId") == SHARED_USER_ID)
         val directory = File(context.cacheDir, "update/authorization").apply { mkdirs() }
-        val file = File(directory, "Preface-Android9-Authorization-${metadata.getInt("versionCode")}.apk")
+        val file = File(directory, "Preface-Android9-Authorization.apk")
         try {
             context.assets.open("authorization/authorization.apk").use { input -> file.outputStream().use { output -> input.copyTo(output) } }
             check(file.inputStream().use { sha256(it.readBytes()) } == metadata.getString("sha256"))

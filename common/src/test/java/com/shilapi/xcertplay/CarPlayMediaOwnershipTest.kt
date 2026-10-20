@@ -197,6 +197,7 @@ class CarPlayMediaOwnershipTest {
     private fun attach(owner: Any? = null): CarPlayController {
         val controller = mock(CarPlayController::class.java).also(controllers::add)
         `when`(controller.nowPlayingSnapshot()).thenReturn(CarPlayNowPlaying())
+        `when`(controller.bluetoothHandoffReady).thenReturn(true)
         `when`(controller.sendMediaButton(anyInt())).thenReturn(true)
         CarPlayMediaKeys.attach(app, controller, mediaOwner = owner ?: controller) { true }
         return controller

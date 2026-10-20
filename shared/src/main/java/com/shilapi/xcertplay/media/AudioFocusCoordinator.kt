@@ -33,6 +33,7 @@ internal class AudioFocusCoordinator(
     private var closed = false
     private var focusHeld = false
     private var nativeBluetoothPlaying = false
+    private var bluetoothHandoffReady = true
     private var ownership = false
     private var focusGeneration = 0L
     private val mixer = CarPlayAudioMixer(report)
@@ -121,13 +122,20 @@ internal class AudioFocusCoordinator(
         val previous = mediaPlaying
         mediaPlaying = playing
         // A fresh play/resume can reclaim focus; repeated position updates cannot steal a source.
-        if (enabled && playing && previous != true && !focusHeld && requestedChannel == AudioChannel.MEDIA) {
+        if (enabled && bluetoothHandoffReady && playing && previous != true && !focusHeld && requestedChannel == AudioChannel.MEDIA) {
             if (manager?.mode in CALL_MODES) { refreshRequest(); return }
             val result = manager?.let { audio -> request?.request(audio) }
             focusHeld = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
             if (focusHeld) setMediaVolume(FULL_VOLUME)
             publishOwnership(focusHeld)
         }
+    }
+
+    @Synchronized fun setBluetoothHandoffReady(ready: Boolean) {
+        if (closed || bluetoothHandoffReady == ready) return
+        bluetoothHandoffReady = ready
+        refreshRequest()
+        runCatching { report("Audio: selected A2DP handoff ready=$ready; media focus follows confirmed state") }
     }
 
     @Synchronized
@@ -142,7 +150,7 @@ internal class AudioFocusCoordinator(
 
     private fun refreshRequest() {
         main.removeCallbacks(callCheck)
-        val primary = active.values.filter { it.channel != AudioChannel.MEDIA || mediaFocusEnabled && !nativeBluetoothPlaying }
+        val primary = active.values.filter { it.channel != AudioChannel.MEDIA || mediaFocusEnabled && !nativeBluetoothPlaying && bluetoothHandoffReady }
             .maxByOrNull { it.channel.focusPriority() }
         if (primary == null) {
             focusGeneration += 1
@@ -196,7 +204,7 @@ internal class AudioFocusCoordinator(
     }
 
     private fun setMediaVolume(volume: Float) {
-        mediaVolume = volume
+        mediaVolume = if (bluetoothHandoffReady) volume else 0f
         mixer.focus(mediaVolume)
     }
 

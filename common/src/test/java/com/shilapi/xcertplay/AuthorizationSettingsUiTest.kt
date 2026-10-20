@@ -54,16 +54,26 @@ class AuthorizationSettingsUiTest {
         context.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
     }
 
-    @Test fun pageHasNativeSettingsNoticeBeforeActionsAndNoAutomaticVpnRequest() {
+    @Test fun componentDescriptionIsUnderTheSystemHeadingWithoutASeparateNoticeCardOrAutomaticVpnRequest() {
         val screen = openAuthorization()
-        val content = texts(screen).map { it.text.toString() }.toList()
-        val notice = content.indexOf(screen.getString(R.string.settings_authorization_native_title))
-        val action = content.indexOfFirst { it.startsWith(screen.getString(R.string.settings_authorization_write) + " · ") }
-        assertTrue(notice >= 0 && action > notice)
+        assertMergedDescription(screen)
         assertEquals(0, AuthorizationVpnShadow.calls)
         assertNull(shadowOf(screen).nextStartedActivity)
         controller!!.pause().resume()
+        assertMergedDescription(screen)
         assertEquals(0, AuthorizationVpnShadow.calls)
+    }
+
+    private fun assertMergedDescription(screen: DiPlayActivity) {
+        val content = texts(screen).toList()
+        assertFalse(content.any { it.text == screen.getString(R.string.settings_authorization_native_title) })
+        val description = content.single { it.text == screen.getString(R.string.settings_authorization_native_description) }
+        val heading = content.single { it.text == screen.getString(R.string.settings_authorization_system) }
+        val card = description.parent as ViewGroup
+        assertSame(card, heading.parent.parent)
+        assertEquals("Description immediately follows the section heading", 1, card.indexOfChild(description))
+        assertSame(card, row(screen, R.string.settings_authorization_write).parent)
+        assertTrue(card.indexOfChild(description) < card.indexOfChild(row(screen, R.string.settings_authorization_write)))
     }
 
     @Test fun bundledComponentSavesThenOpensDownloadsAfterExplicitTapWithoutInstallingOrGrantingVpn() {
@@ -130,7 +140,7 @@ class AuthorizationSettingsUiTest {
         screen.authorizationExportWorker = { it.run() }
         var saves = 0
         var folderOpens = 0
-        val path = "Download/Preface-Android9-Authorization-7.apk"
+        val path = "Download/Preface-Android9-Authorization.apk"
         screen.authorizationPrepareExport = {
             AuthorizationComponentExport.Saved(path, context.cacheDir, alreadySaved = saves++ > 0)
         }
@@ -175,7 +185,7 @@ class AuthorizationSettingsUiTest {
         var exports = 0
         screen.authorizationPrepareExport = {
             exports++
-            AuthorizationComponentExport.Saved("Download/Preface-Android9-Authorization-7.apk", context.cacheDir)
+            AuthorizationComponentExport.Saved("Download/Preface-Android9-Authorization.apk", context.cacheDir)
         }
         screen.authorizationOpenFolder = { screen.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS)); true }
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
@@ -298,8 +308,16 @@ class AuthorizationSettingsUiTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun installedComponentCompactLargeFontScreenshot() = capture("compact", installed = true)
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun existingComponentFullLargeFontScreenshot() = capture("full", existing = true)
 
-    private fun capture(size: String, fontScale: Float = 1.5f, reinstall: Boolean = false, installed: Boolean = false) {
+    @Test @Config(qualifiers = "zh-rCN-w960dp-h360dp-land-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun existingComponentCompactLargeFontScreenshot() = capture("compact", existing = true)
+
+
+    private fun capture(size: String, fontScale: Float = 1.5f, reinstall: Boolean = false, installed: Boolean = false,
+        existing: Boolean = false) {
         context.resources.updateConfiguration(Configuration(context.resources.configuration).apply { this.fontScale = fontScale }, context.resources.displayMetrics)
         // Explicit system-size choice exercises the short available dp window while keeping 1920x720.
         InterfaceSize.save(context, if (size == "compact") 100 else InterfaceSize.PREFACE_12_3)
@@ -307,9 +325,11 @@ class AuthorizationSettingsUiTest {
         val screen = openAuthorization()
         screen.authorizationComponentState = {
             if (reinstall) AuthorizationComponentInstaller.State.REINSTALL_REQUIRED
-            else if (installed) AuthorizationComponentInstaller.State.READY else AuthorizationComponentInstaller.State.INSTALLABLE
+            else if (installed) AuthorizationComponentInstaller.State.READY
+            else if (existing) AuthorizationComponentInstaller.State.EXISTING else AuthorizationComponentInstaller.State.INSTALLABLE
         }
         ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+        assertMergedDescription(screen)
         val frame = screen.findViewById<ViewGroup>(android.R.id.content)
         val write = row(screen, R.string.settings_authorization_write)
         val vpn = row(screen, R.string.settings_authorization_vpn)
@@ -353,15 +373,21 @@ class AuthorizationSettingsUiTest {
         }
         val scroll = ReflectionHelpers.getField<ScrollView>(screen, "rootScroll")
         // These are unit-test renders, not installed-APK screenshots for user previews.
-        val directory = File("../agent_docs/screenshots/authorization-test-renders").apply { mkdirs() }
-        for (part in listOf("top") + (if (reinstall) listOf("migration-notice") else emptyList()) + listOf("component-actions", "vpn", "actions")) {
+        val directory = File("../agent_docs/screenshots/authorization-merged-description-20261020-test-renders").apply { mkdirs() }
+        for (part in listOf("top", "system-authorization") + (if (reinstall) listOf("migration-notice") else emptyList()) + listOf("component-actions", "vpn", "actions")) {
             // Descendant rects are already in the scroll view's content coordinates.
             val vpnOffset = android.graphics.Rect().also { vpn.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(vpn, it) }.top
             val componentOffset = android.graphics.Rect().also { save.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(save, it) }.top
+            val systemCard = texts(screen).single {
+                it.text == screen.getString(R.string.settings_authorization_native_description)
+            }.parent as View
+            val systemOffset = android.graphics.Rect().also {
+                systemCard.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(systemCard, it)
+            }.top
             val migrationOffset = migrationNotice?.let { note ->
                 android.graphics.Rect().also { note.getDrawingRect(it); scroll.offsetDescendantRectToMyCoords(note, it) }.top
             } ?: 0
-            scroll.scrollTo(0, when (part) { "top" -> 0; "migration-notice" -> migrationOffset; "component-actions" -> componentOffset; "vpn" -> vpnOffset; else -> scroll.getChildAt(0).height })
+            scroll.scrollTo(0, when (part) { "top" -> 0; "system-authorization" -> systemOffset; "migration-notice" -> migrationOffset; "component-actions" -> componentOffset; "vpn" -> vpnOffset; else -> scroll.getChildAt(0).height })
             shadowOf(Looper.getMainLooper()).idle()
             if (part == "migration-notice") {
                 val rect = android.graphics.Rect()
@@ -382,7 +408,7 @@ class AuthorizationSettingsUiTest {
             }
             val bitmap = Bitmap.createBitmap(1920, 720, Bitmap.Config.ARGB_8888)
             frame.draw(Canvas(bitmap))
-            val filename = "${if (reinstall) "migration-" else if (installed) "installed-" else ""}$size-$part-dpi${screen.resources.displayMetrics.densityDpi}-font${Math.round(fontScale * 100)}"
+            val filename = "${if (reinstall) "migration-" else if (installed) "installed-" else if (existing) "existing-" else ""}$size-$part-dpi${screen.resources.displayMetrics.densityDpi}-font${Math.round(fontScale * 100)}"
             File(directory, "$filename.png").outputStream().use {
                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }

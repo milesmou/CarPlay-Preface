@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Narrow platform-signed Android 9 bridge; no disconnect, pairing, HFP, or global setting calls. */
+/** Platform-signed Android 9 bridge: native connect and session-owned A2DP handoff only. */
 public final class BluetoothMusicService extends Service {
     private static final String ACTION = "com.android.vpndialogs.action.CONNECT_BLUETOOTH_MUSIC";
     private static final int CONNECT = 1, CANCEL = 2, REPLY = 3, A2DP_SINK = 11;
@@ -32,6 +32,20 @@ public final class BluetoothMusicService extends Service {
     private final Map<String, Request> requests = new HashMap<>();
     private final Messenger messenger = new Messenger(new Handler(Looper.getMainLooper(), this::receive));
     private boolean bound;
+    private final String restoreToken = java.util.UUID.randomUUID().toString();
+    private final BluetoothHandoffSessions handoffs = new BluetoothHandoffSessions(this, main, this::checkCaller,
+        () -> {
+            try { startService(new Intent(this, BluetoothMusicService.class).setAction("restore-owned-a2dp")
+                .putExtra("restore-token", restoreToken)); } catch (RuntimeException ignored) { }
+        }, this::stopSelf);
+
+    @Override public int onStartCommand(Intent intent, int flags, int id) {
+        // Started lifetime only protects restoration after our last authenticated client unbinds.
+        // External starts cannot acquire a lease or select a phone.
+        boolean internal = intent != null && restoreToken.equals(intent.getStringExtra("restore-token"));
+        if (!internal && !handoffs.hasWork()) stopSelf(id);
+        return START_NOT_STICKY;
+    }
 
     @Override public IBinder onBind(Intent intent) {
         if (intent == null || !ACTION.equals(intent.getAction())) return null;
@@ -41,7 +55,10 @@ public final class BluetoothMusicService extends Service {
 
     @Override public boolean onUnbind(Intent intent) { cancelAll(); bound = false; return false; }
     @Override public void onDestroy() { cancelAll(); bound = false; super.onDestroy(); }
-    private void cancelAll() { for (Request request : new ArrayList<>(requests.values())) request.close(); }
+    private void cancelAll() {
+        for (Request request : new ArrayList<>(requests.values())) request.close();
+        handoffs.cancelAll();
+    }
 
     private boolean receive(Message message) {
         if (!bound || message.replyTo == null) return true;
@@ -52,8 +69,15 @@ public final class BluetoothMusicService extends Service {
             if (nonce == null || nonce.length() != 36) return true;
             String key = message.sendingUid + ":" + nonce;
             if (message.what == CANCEL) {
+                handoffs.cancel(message.sendingUid, nonce, message.replyTo);
                 Request request = requests.get(key);
                 if (request != null && request.reply.getBinder().equals(message.replyTo.getBinder())) request.close();
+                return true;
+            }
+            if (message.what == 4) {
+                String address = data.getString("address");
+                if (address != null && BluetoothAdapter.checkBluetoothAddress(address))
+                    handoffs.acquire(message.sendingUid, nonce, address, message.replyTo);
                 return true;
             }
             if (message.what != CONNECT || requests.containsKey(key)) return true;

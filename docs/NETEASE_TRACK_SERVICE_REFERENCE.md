@@ -4,6 +4,8 @@
 
 用户确认：已安装在当前星瑞车机，网易云切歌正常。该实车观察单独记录；未读取车机实际安装 APK 的校验值，也未取得该服务的实时日志，不能据此认定本文件与当前进程字节完全一致，或所有客户端都已经获准接入。
 
+2026-10-20 再次收到 `网易云切歌服务(不可禁用多媒体) (1).apk`，大小及 SHA-256 与本页输入完全相同，复用缓存。与新提供 QQ 助手的角色区别、独立 CarPlay 助手的候选方案见 [辅助工具对照](MUSIC_HELPER_REFERENCE_2026-10-20.md)。
+
 ## 实际角色及参考价值
 
 Manifest 和资源确认：应用名 `XCOpenAPIService`，包名 `com.ecarx.sdk.openapi`，版本 `4.1.6 (26A7051)` / 40530001，声明 `android.uid.system`；`ServicePoolService` 导出服务 action `ecarx.intent.action.OpenAPIService`。它位于原厂 SDK 服务端，和 Linkco 的 MusicClient 客户端是不同层次，不能把它当成普通 APK 的切歌监听样例。

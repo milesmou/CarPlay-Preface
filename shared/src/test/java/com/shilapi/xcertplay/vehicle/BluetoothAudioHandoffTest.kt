@@ -267,7 +267,100 @@ class BluetoothAudioHandoffTest {
         assertFalse(log.any { it.contains("connection confirmed") })
     }
 
+    @Test fun nativePreparationWaitsForSoleSelectedPhoneAndNoCallThenRunsOnlyOnce() {
+        var preparations = 0
+        var prepares = 0
+        var closes = 0
+        lateinit var connection: NativeBluetoothAudioPreparation.Connection
+        val audio = context.getSystemService(AudioManager::class.java)
+        profile.states[other] = BluetoothProfile.STATE_CONNECTED
+        val handoff = BluetoothAudioHandoff(context, phone.address, log::add, nativeOutput = true,
+            nativePreparationFactory = { app, eligible, report ->
+                preparations++
+                NativeBluetoothAudioPreparation(app, eligible, report, { true }, { callback ->
+                    connection = callback
+                    object : NativeBluetoothAudioPreparation.Browser {
+                        override fun connect() { }
+                        override fun prepare() { prepares++ }
+                        override fun close() { closes++ }
+                    }
+                })
+            }).also { owners.add(it); it.setSuppressed(false); it.start() }
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, preparations)
+        profile.states[other] = BluetoothProfile.STATE_DISCONNECTED
+        audio.mode = AudioManager.MODE_IN_CALL
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertEquals(0, preparations)
+        audio.mode = AudioManager.MODE_NORMAL
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        assertEquals(1, preparations)
+        connection.connected()
+        assertEquals(1, prepares)
+        assertEquals(1, closes)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(10))
+        assertEquals(1, preparations)
+        assertTrue(profile.disconnected.isEmpty())
+        assertTrue(profile.connected.isEmpty())
+        handoff.close()
+    }
+
+    @Test fun carPlayAudioNeverPreparesTheNativeBluetoothPlayer() {
+        var preparations = 0
+        val handoff = BluetoothAudioHandoff(context, phone.address, log::add,
+            nativePreparationFactory = { _, _, _ -> preparations++; error("CarPlay audio must not prepare native audio") })
+            .also { owners.add(it); it.setSuppressed(false); it.start() }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3))
+        assertEquals(0, preparations)
+        handoff.close()
+    }
+
     // Reproduces build 85's IHU353G: disconnect is visible, connect cannot be resolved.
+    @Test fun hiddenConnectUsesASessionLeaseAndRechecksActualDisconnectionBeforeMusicIsReady() {
+        shadowOf(adapter).setProfileProxy(11, DisconnectOnlyProfile(profile))
+        val states = mutableListOf<Boolean>()
+        lateinit var changed: (Boolean, String) -> Unit
+        var released = 0
+        val handoff = BluetoothAudioHandoff(context, phone.address, log::add,
+            onHandoffReady = states::add,
+            platformLeaseFactory = { _, _, callback ->
+                changed = callback
+                object : BluetoothAudioLeaseClient {
+                    override fun start() {}
+                    override fun close() { released++ }
+                }
+            }).also { owners.add(it); it.setSuppressed(true); it.start() }
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(listOf(false), states)
+        changed(true, "system request accepted")
+        assertEquals(listOf(false), states) // Still connected according to the actual profile.
+        profile.states[phone] = BluetoothProfile.STATE_DISCONNECTED
+        changed(true, "disconnection confirmed")
+        assertEquals(listOf(false, true), states)
+        assertTrue(profile.disconnected.isEmpty())
+        handoff.close()
+        assertEquals(1, released)
+        changed(false, "late callback")
+        assertEquals(listOf(false, true), states)
+    }
+
+    @Test fun cancellationBeforeThePlatformReplyCannotMarkTheOldPhoneReady() {
+        shadowOf(adapter).setProfileProxy(11, DisconnectOnlyProfile(profile))
+        val states = mutableListOf<Boolean>()
+        lateinit var changed: (Boolean, String) -> Unit
+        val handoff = BluetoothAudioHandoff(context, phone.address, log::add,
+            onHandoffReady = states::add,
+            platformLeaseFactory = { _, _, callback ->
+                changed = callback
+                object : BluetoothAudioLeaseClient { override fun start() {}; override fun close() {} }
+            }).also { owners.add(it); it.setSuppressed(true); it.start() }
+        shadowOf(Looper.getMainLooper()).idle()
+        handoff.close()
+        profile.states[phone] = BluetoothProfile.STATE_DISCONNECTED
+        changed(true, "late disconnection")
+        assertEquals(listOf(false), states)
+    }
+
     class DisconnectOnlyProfile(private val delegate: MusicProfile) : BluetoothProfile by delegate {
         fun disconnect(device: BluetoothDevice): Boolean = delegate.disconnect(device)
     }

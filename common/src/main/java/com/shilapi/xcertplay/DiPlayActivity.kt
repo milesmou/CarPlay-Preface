@@ -113,7 +113,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     internal var authorizationExportWorker: (Runnable) -> Unit = { Thread(it, "diplay-authorization-export").start() }
     internal var authorizationComponentState: () -> AuthorizationComponentInstaller.State = { AuthorizationComponentInstaller(this).state() }
     internal var authorizationPrepareExport: () -> AuthorizationComponentExport.Saved = {
-        AuthorizationComponentExport.save(applicationContext, AuthorizationComponentInstaller(applicationContext).prepareExport())
+        AuthorizationComponentExport.save(applicationContext,
+            AuthorizationComponentInstaller(applicationContext).prepareExport())
     }
     internal var authorizationOpenFolder: (AuthorizationComponentExport.Saved) -> Boolean = {
         AuthorizationComponentExport.openFolder(it, ::startActivity)
@@ -1253,11 +1254,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun authorizationSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_authorization), getString(R.string.settings_authorization_summary))
-        val notice = card().apply {
-            addView(label(getString(R.string.settings_authorization_native_title), 18, WARNING, true))
-            addView(label(getString(R.string.settings_authorization_native_description), 14, MUTED))
-        }
-        content.addView(notice, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(SETTINGS_BLOCK_GAP_DP) })
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.AUTHORIZATION))
     }
 

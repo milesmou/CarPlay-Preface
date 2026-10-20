@@ -2,6 +2,9 @@ package com.shilapi.xcertplay
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.drawable.ClipDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.media.AudioManager
 import android.os.Build
 import android.view.Gravity
@@ -89,6 +92,21 @@ internal class CarPlayMenuVolumeControls(
         }
         val slider = SeekBar(context).apply {
             contentDescription = context.getString(title)
+            fun track(color: Int) = GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = dp(VOLUME_TRACK_THICKNESS_DP) / 2f
+            }
+            progressDrawable = LayerDrawable(arrayOf(
+                track(palette.trackOff),
+                ClipDrawable(track(palette.accent), Gravity.START, ClipDrawable.HORIZONTAL),
+            )).apply {
+                setId(0, android.R.id.background)
+                setId(1, android.R.id.progress)
+                for (index in 0 until numberOfLayers) {
+                    setLayerHeight(index, dp(VOLUME_TRACK_THICKNESS_DP))
+                    setLayerGravity(index, Gravity.CENTER_VERTICAL)
+                }
+            }
             progressTintList = ColorStateList.valueOf(palette.accent)
             thumbTintList = ColorStateList.valueOf(palette.accent)
         }
@@ -161,7 +179,8 @@ internal class CarPlayMenuVolumeControls(
     }
 
     companion object {
-        private const val VOLUME_SLIDER_HEIGHT_DP = 48
-        private const val VOLUME_BLOCK_GAP_DP = 12
+        private const val VOLUME_TRACK_THICKNESS_DP = 4
+        private const val VOLUME_SLIDER_HEIGHT_DP = 56
+        private const val VOLUME_BLOCK_GAP_DP = 8
     }
 }

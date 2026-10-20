@@ -6,6 +6,20 @@ import org.gradle.api.file.DirectoryProperty
 def authenticationAssets = providers.environmentVariable('DIPLAY_AUTH_ASSETS_DIR')
     .orNull?.with { file(it).canonicalFile } ?: rootProject.file('runtime-assets').canonicalFile
 
+// User-selected media inputs stay local. They do not replace APK signing or accessory identity.
+def mediaAuthorizationDirectory = providers.environmentVariable('DIPLAY_ECARX_MEDIA_AUTH_DIR')
+    .orNull?.with { file(it).canonicalFile } ?: rootProject.file('agent_docs/runtime-ecarx-media').canonicalFile
+def mediaMetadataFile = new File(mediaAuthorizationDirectory, 'manifest-values.json')
+def mediaMetadata = [:]
+if (mediaMetadataFile.isFile()) {
+    try {
+        mediaMetadata = new groovy.json.JsonSlurper().parseText(
+            providers.fileContents(layout.file(providers.provider { mediaMetadataFile })).asText.get())
+    } catch (Exception ignored) {
+        throw new GradleException('Invalid local ECARX media manifest inputs')
+    }
+}
+
 def repositorySigning = new groovy.json.JsonSlurper().parseText(
     providers.fileContents(rootProject.layout.projectDirectory.file('signing/signing.json')).asText.get())
 def repositoryKeystore = rootProject.file("signing/${repositorySigning.keystoreFile}").canonicalFile
@@ -16,6 +30,11 @@ def signingValue = { String environment, Object fallback ->
 
 android {
     sourceSets.main.assets.srcDir(authenticationAssets)
+    sourceSets.main.assets.srcDir(new File(mediaAuthorizationDirectory, 'assets'))
+    defaultConfig {
+        manifestPlaceholders.ecarxMediaAppId = mediaMetadata['eCarX_OpenAPI_AppId'] ?: ''
+        manifestPlaceholders.ecarxMediaAppKey = mediaMetadata['eCarX_OpenAPI_AppKey'] ?: ''
+    }
     signingConfigs {
         release {
             storeFile = file(signingValue('ANDROID_KEYSTORE_PATH', repositoryKeystore.absolutePath))
@@ -28,7 +47,8 @@ android {
     buildTypes.configureEach { signingConfig = signingConfigs.release }
 }
 
-// Only the selected accessory pair may be credentials in APK assets.
+// Only the selected accessory pair may supply key/certificate containers in APK assets.
+// The separately verified QQ media license is opaque data, not an APK signing key.
 def credentialAssets = files(android.sourceSets.collectMany { source ->
     source.assets.directories.collect { directory ->
         fileTree(directory) {
@@ -54,6 +74,18 @@ def rejectBundledCredentials = tasks.register('rejectBundledCredentials') {
     }
 }
 tasks.named('preBuild') { dependsOn(rejectBundledCredentials) }
+
+def verifyEcarxMediaAuthorization = tasks.register('verifyEcarxMediaAuthorization', Exec) {
+    group = 'verification'
+    description = 'Verify the user-selected local QQ media license and manifest inputs.'
+    def script = rootProject.file('scripts/ecarx_media_authorization.py')
+    inputs.files(script, mediaMetadataFile,
+        new File(mediaAuthorizationDirectory, 'assets/license.txt'),
+        new File(mediaAuthorizationDirectory, 'provenance.json'))
+    workingDir(rootProject.projectDir)
+    commandLine('python', script.absolutePath, '--verify', '--directory', mediaAuthorizationDirectory.absolutePath)
+}
+tasks.named('preBuild') { dependsOn(verifyEcarxMediaAuthorization) }
 
 // The component remains a separate platform-signed APK inside each distributable app.
 abstract class PrepareAuthorizationAssets extends Sync {

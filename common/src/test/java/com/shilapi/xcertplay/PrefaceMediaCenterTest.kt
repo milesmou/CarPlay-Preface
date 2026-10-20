@@ -349,6 +349,19 @@ class PrefaceMediaCenterTest {
         assertTrue(api.command(4))
     }
 
+    @Test fun pauseDuringAnInitialPlaybackClaimInvalidatesTheReturnedGrant() {
+        ready()
+        api.onRequest = {
+            center.update(song.copy(playing = false), true)
+            center.update(song, true)
+        }
+        play()
+        assertFalse(center.status().ownsSource)
+        assertFalse(api.command(4))
+        assertTrue(api.publications.isEmpty())
+        assertTrue(log.any { it.contains("request-play-invalidated") })
+    }
+
     @Test fun aQueuedDisconnectCannotResetTheReplacementPlaybackRecord() {
         ready(); play()
         center.disconnect()
@@ -373,6 +386,11 @@ class PrefaceMediaCenterTest {
         var unregistrations = 0
         var disconnections = 0
         var initializations = 0
+        var closes = 0
+        var asynchronousPlay = false
+        var asynchronousPublish = false
+        val playReplies = ArrayDeque<() -> Unit>()
+        val publishReplies = ArrayDeque<() -> Unit>()
         val publications = mutableListOf<CarPlayNowPlaying>()
         val requestTokens = mutableListOf<Any>()
         override fun init(snapshot: () -> PrefaceMediaCenter.Snapshot, command: (Int) -> Boolean,
@@ -384,7 +402,67 @@ class PrefaceMediaCenterTest {
         override fun register(): Any? { registrations++; failure?.let { throw it }; onRegister(); return token }
         override fun requestPlay(token: Any): Boolean { requests++; requestTokens.add(token); onRequest(); return acceptPlay }
         override fun publish(token: Any, info: CarPlayNowPlaying): Boolean { publications.add(info); return true }
+        override fun requestPlayAsync(token: Any, completed: (Boolean) -> Unit) {
+            val accepted = requestPlay(token)
+            if (asynchronousPlay) playReplies.add { completed(accepted) } else completed(accepted)
+        }
+        override fun publishAsync(token: Any, info: CarPlayNowPlaying, completed: (Boolean) -> Unit) {
+            val accepted = publish(token, info)
+            if (asynchronousPublish) publishReplies.add { completed(accepted) } else completed(accepted)
+        }
         override fun disconnect() { disconnections++ }
         override fun unregister(token: Any): Boolean { unregistrations++; return true }
+        override fun close() { closes++ }
+    }
+
+    @Test fun asynchronousPlayIsNotOwnedBeforeTheRealReplyAndPauseInvalidatesIt() {
+        api.asynchronousPlay = true
+        ready(); play()
+        assertFalse(center.status().ownsSource); assertFalse(api.command(4))
+        center.update(song.copy(playing = false), true); drain()
+        api.playReplies.removeFirst().invoke(); drain()
+        assertFalse(center.status().ownsSource); assertTrue(api.publications.isEmpty())
+        assertEquals(1, api.disconnections)
+    }
+
+    @Test fun oldRemoteGrantCannotAffectAReplacementSession() {
+        api.asynchronousPlay = true
+        ready(); play(); center.disconnect()
+        center.update(song, true, requestSource = true); drain()
+        api.playReplies.removeFirst().invoke(); drain()
+        assertFalse(center.status().ownsSource)
+        api.playReplies.removeFirst().invoke(); drain()
+        assertTrue(center.status().ownsSource); assertEquals(listOf(song), api.publications)
+    }
+
+    @Test fun apiLossDuringAPendingRemoteClaimRetainsOnlyUninterruptedPlaybackIntent() {
+        api.asynchronousPlay = true
+        ready(); play()
+        api.ready(false); drain()
+        api.ready(true); drain()
+        assertEquals(2, api.requests)
+        api.playReplies.removeFirst().invoke(); drain()
+        assertFalse(center.status().ownsSource)
+        api.playReplies.removeFirst().invoke(); drain()
+        assertTrue(center.status().ownsSource)
+    }
+
+    @Test fun pendingRemotePublicationCoalescesToTheLatestMetadataWithoutReclaiming() {
+        api.asynchronousPublish = true
+        ready(); play()
+        center.update(song.copy(elapsedMillis = 1200L), true); drain()
+        assertEquals(1, api.publications.size)
+        api.publishReplies.removeFirst().invoke(); drain()
+        assertEquals(2, api.publications.size)
+        assertEquals(1200L, api.publications.last().elapsedMillis)
+        assertEquals(1, api.requests)
+        center.close(); drain()
+        api.publishReplies.removeFirst().invoke(); drain()
+        assertFalse(center.status().ownsSource)
+    }
+
+    @Test fun closingBeforeSdkReadyReleasesTheBackendWithoutARegistrationToken() {
+        center.start(); drain(); center.close(); drain()
+        assertEquals(1, api.closes); assertEquals(0, api.unregistrations)
     }
 }

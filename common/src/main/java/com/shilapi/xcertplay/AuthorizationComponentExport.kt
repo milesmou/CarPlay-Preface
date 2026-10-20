@@ -9,6 +9,7 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /** Publishes a verified component to public Downloads. All intents open folders, never APKs. */
 internal object AuthorizationComponentExport {
@@ -26,19 +27,16 @@ internal object AuthorizationComponentExport {
     internal fun saveToDirectory(verified: File, directory: File): Saved {
         check(directory.isDirectory || directory.mkdirs()) { "Public Downloads is unavailable" }
         val expected = AuthorizationComponentInstaller.sha256(verified.readBytes())
-        var destination = File(directory, verified.name)
-        var index = 1
-        while (destination.exists()) {
-            if (destination.isFile && AuthorizationComponentInstaller.sha256(destination.readBytes()) == expected)
-                return Saved(destination.absolutePath, directory, alreadySaved = true)
-            destination = File(directory, "${verified.nameWithoutExtension}-${index++}.apk")
-        }
+        val destination = File(directory, verified.name)
+        check(!destination.exists() || destination.isFile) { "APK destination is not a file" }
+        if (destination.isFile && AuthorizationComponentInstaller.sha256(destination.readBytes()) == expected)
+            return Saved(destination.absolutePath, directory, alreadySaved = true)
         val temporary = File.createTempFile(".preface-authorization-", ".part", directory)
         try {
             verified.inputStream().use { input -> temporary.outputStream().use { input.copyTo(it) } }
             check(AuthorizationComponentInstaller.sha256(temporary.readBytes()) == expected)
-            // No REPLACE_EXISTING: another file or concurrent export is never overwritten.
-            Files.move(temporary.toPath(), destination.toPath())
+            // Verify the complete copy before replacing the same named APK.
+            Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
             return Saved(destination.absolutePath, directory)
         } finally { temporary.delete() }
     }

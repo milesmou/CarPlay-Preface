@@ -3012,6 +3012,7 @@ class CarPlayHostActivity : ComponentActivity() {
             locationProvider = locationProvider,
             onNativeBluetoothPlaying = renderer::setNativeBluetoothPlaying,
             managesPlaybackAudioFocus = renderer.managesPlaybackAudioFocus,
+            onBluetoothHandoffReady = renderer::setBluetoothHandoffReady,
         )
         controller = next
         renderer.setAudioOwnershipChangedListener { owned ->

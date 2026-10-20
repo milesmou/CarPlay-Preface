@@ -90,6 +90,8 @@ class AndroidMediaSink(
 
     fun onIphoneMediaPlaying(playing: Boolean) = audioFocusCoordinator.onMediaPlaying(playing)
 
+    fun setBluetoothHandoffReady(ready: Boolean) = audioFocusCoordinator.setBluetoothHandoffReady(ready)
+
     /** Frozen connection settings for volume adjustment before an audio track is created. */
     fun configuredVolumeStream(navigation: Boolean): Int = if (navigation) navigationChannel else mediaChannel
 
@@ -123,7 +125,6 @@ class AndroidMediaSink(
     private var callSpeaker: CallSpeaker? = null
     private var earpieceFallbackTried = false
     private var communicationModeStream: AudioStreamId? = null
-    private var savedAudioMode = AudioManager.MODE_NORMAL
     private val pendingVideoCodec = ConcurrentHashMap<Int, VideoCodec>()
     private val videoRecoveryHandlers = ConcurrentHashMap<Int, () -> Unit>()
     private val videoDiagnosticHandlers = ConcurrentHashMap<Int, (String) -> Unit>()
@@ -400,7 +401,7 @@ class AndroidMediaSink(
             }
             if (!uplink.start()) {
                 microphoneUplinks.remove(id, uplink)
-                restoreAudioMode(id)
+                releaseCommunicationMode(id)
             }
         } catch (error: Exception) {
             Log.e("xcertplay-usb", "microphone start failed stream=$id", error)
@@ -413,7 +414,7 @@ class AndroidMediaSink(
         try {
             microphoneUplinks.remove(id)?.close()
         } finally {
-            restoreAudioMode(id)
+            releaseCommunicationMode(id)
         }
     }
 
@@ -422,16 +423,16 @@ class AndroidMediaSink(
         synchronized(audioModeLock) {
             if (communicationModeStream != null) return
             // Select the HAL communication path before AudioRecord is created.
-            savedAudioMode = manager.mode
+            val previousMode = manager.mode
             manager.mode = AudioManager.MODE_IN_COMMUNICATION
             communicationModeStream = id
             earpieceFallbackTried = false
-            Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id")
+            Log.i("xcertplay-usb", "audio mode $previousMode -> ${manager.mode} for telephony stream=$id")
             // The report, not just logcat: a head unit left in the voice path plays no media,
             // and that cannot be diagnosed from a car without adb. A failing report must not
             // disturb the mode, so it is the last thing done and it cannot throw out of here.
             runCatching {
-                onAudioDiagnostic("Audio: mode entered communication from=$savedAudioMode" +
+                onAudioDiagnostic("Audio: mode entered communication from=$previousMode" +
                     " now=${manager.mode} stream=$id")
             }
         }
@@ -448,7 +449,7 @@ class AndroidMediaSink(
         runCatching { onAudioDiagnostic(line) }
     }
 
-    private fun restoreAudioMode(id: AudioStreamId?) {
+    private fun releaseCommunicationMode(id: AudioStreamId?) {
         val manager = audioManager ?: return
         synchronized(audioModeLock) {
             val active = communicationModeStream ?: return
@@ -457,15 +458,20 @@ class AndroidMediaSink(
             callSpeaker?.restore()
             callSpeaker = null
             // The report is built inside the try but sent outside it: reporting from in there
-            // would let a failing callback be caught as a failed restore.
+            // would let a failing callback be caught as a failed release.
             val line = try {
-                manager.mode = savedAudioMode
-                Log.i("xcertplay-usb", "audio mode restored to ${manager.mode}")
-                "Audio: mode restored requested=$savedAudioMode now=${manager.mode} stream=$active"
+                // AudioService tracks mode requests by caller. NORMAL removes our request and
+                // leaves any ongoing system call in control. Replaying the previous global mode
+                // can recreate an ended call; IN_CALL is silently denied without phone privileges,
+                // leaving our IN_COMMUNICATION request active and volume keys stuck on calls.
+                manager.mode = AudioManager.MODE_NORMAL
+                val currentMode = manager.mode
+                Log.i("xcertplay-usb", "communication mode released; current audio mode=$currentMode")
+                "Audio: mode released requested=${AudioManager.MODE_NORMAL} now=$currentMode stream=$active"
             } catch (error: RuntimeException) {
-                Log.w("xcertplay-usb", "could not restore audio mode $savedAudioMode", error)
+                Log.w("xcertplay-usb", "could not release communication mode", error)
                 val currentMode = runCatching { manager.mode.toString() }.getOrDefault("unknown")
-                "Audio: mode restore failed requested=$savedAudioMode now=$currentMode" +
+                "Audio: mode release failed requested=${AudioManager.MODE_NORMAL} now=$currentMode" +
                     " error=${error.javaClass.simpleName}"
             }
             runCatching { onAudioDiagnostic(line) }
@@ -502,7 +508,7 @@ class AndroidMediaSink(
             microphoneUplinks.values.forEach(MicrophoneUplink::close)
         } finally {
             microphoneUplinks.clear()
-            restoreAudioMode(null)
+            releaseCommunicationMode(null)
         }
     }
 

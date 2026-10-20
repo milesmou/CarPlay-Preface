@@ -255,6 +255,36 @@ class AudioFocusAutoYieldTest {
 
     private fun coordinator(enabled: Boolean = true, autoYield: Boolean = true) =
         AudioFocusCoordinator(context, enabled, autoYield).also(coordinators::add)
+
+    @Test fun pendingA2dpHandoffDefersMediaFocusAndMutesMusicUntilConfirmed() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add).also(coordinators::add)
+        val media = track()
+        coordinator.setBluetoothHandoffReady(false)
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.onMediaPlaying(true)
+        assertTrue(owners.isEmpty())
+        assertEquals(listOf(0f), volumes(media))
+        coordinator.setBluetoothHandoffReady(true)
+        assertEquals(listOf(true), owners)
+        assertEquals(listOf(0f, 1f), volumes(media))
+        coordinator.setBluetoothHandoffReady(false)
+        assertEquals(listOf(true, false), owners)
+        assertEquals(listOf(0f, 1f, 0f), volumes(media))
+    }
+
+    @Test fun handoffDoesNotRemoveVoiceFocusOrOverrideTheSavedMediaFocusOptOut() {
+        val owners = mutableListOf<Boolean>()
+        val coordinator = AudioFocusCoordinator(context, true, onOwnershipChanged = owners::add,
+            mediaFocusEnabled = false).also(coordinators::add)
+        coordinator.setBluetoothHandoffReady(false)
+        coordinator.acquire(track(), AudioChannel.PHONE, attributes)
+        assertEquals(listOf(true), owners)
+        coordinator.acquire(track(), AudioChannel.MEDIA, attributes)
+        coordinator.setBluetoothHandoffReady(true)
+        coordinator.release(tracks.first())
+        assertEquals(listOf(true, false), owners)
+    }
     private fun track(): AudioTrack = AudioTrack.Builder().setAudioAttributes(attributes)
         .setAudioFormat(AudioFormat.Builder().setSampleRate(44100).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
             .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build())

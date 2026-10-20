@@ -142,16 +142,8 @@ internal class CarPlayQuickMenu(
                 setOnClickListener { onClick() }
             }
 
-        val actions = LinearLayout(menuContext).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        fun addBlock(view: View) {
-            actions.addView(view, LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = if (actions.childCount == 0) 0 else menuDp(SETTINGS_MENU_ACTION_GAP_DP)
-            })
-        }
-
-        fun actionRow(first: View, second: View): View = object : LinearLayout(menuContext) {
+        fun actionRow(first: View, second: View,
+            minimumItemWidthDp: Int = SETTINGS_MENU_MIN_ACTION_WIDTH_DP): View = object : LinearLayout(menuContext) {
             init {
                 isBaselineAligned = false
                 addView(first, LayoutParams(0, -2, 1f))
@@ -160,7 +152,7 @@ internal class CarPlayQuickMenu(
 
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                 val stacked = MeasureSpec.getSize(widthMeasureSpec) <
-                    menuDp(SETTINGS_MENU_MIN_ACTION_WIDTH_DP * 2 + SETTINGS_MENU_ACTION_GAP_DP)
+                    menuDp(minimumItemWidthDp * 2 + SETTINGS_MENU_ACTION_GAP_DP)
                 orientation = if (stacked) VERTICAL else HORIZONTAL
                 for (index in 0 until childCount) {
                     val params = getChildAt(index).layoutParams as LayoutParams
@@ -174,7 +166,8 @@ internal class CarPlayQuickMenu(
                 }
                 super.onMeasure(widthMeasureSpec, heightMeasureSpec)
                 if (!stacked) {
-                    val height = maxOf(first.measuredHeight, second.measuredHeight)
+                    val height = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY)
+                        MeasureSpec.getSize(heightMeasureSpec) else maxOf(first.measuredHeight, second.measuredHeight)
                     for (child in listOf(first, second)) {
                         child.measure(MeasureSpec.makeMeasureSpec(child.measuredWidth, MeasureSpec.EXACTLY),
                             MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY))
@@ -184,18 +177,17 @@ internal class CarPlayQuickMenu(
             }
         }
 
-        addBlock(actionRow(
-            action(R.string.settings_return_to_home, R.drawable.ic_dp_home) { home() },
-            action(R.string.settings_all_settings, R.drawable.ic_dp_advanced) {
-                settings()
-            },
-        ))
-        addBlock(actionRow(
-            action(R.string.picture_adjustments, R.drawable.ic_dp_display) {
-                picture()
-            },
-            action(R.string.exit_application, R.drawable.ic_dp_back, DiPlayButtonKind.DANGER) { exit() },
-        ))
+        val actions = actionRow(
+            actionRow(
+                action(R.string.settings_return_to_home, R.drawable.ic_dp_home) { home() },
+                action(R.string.settings_all_settings, R.drawable.ic_dp_advanced) { settings() },
+            ),
+            actionRow(
+                action(R.string.picture_adjustments, R.drawable.ic_dp_display) { picture() },
+                action(R.string.exit_application, R.drawable.ic_dp_back, DiPlayButtonKind.DANGER) { exit() },
+            ),
+            minimumItemWidthDp = SETTINGS_MENU_MIN_ACTION_WIDTH_DP * 2 + SETTINGS_MENU_ACTION_GAP_DP,
+        )
 
         val volumes = CarPlayMenuVolumeControls(menuContext, palette, volume)
         onVolumeControls(volumes)
@@ -203,31 +195,15 @@ internal class CarPlayQuickMenu(
             orientation = LinearLayout.VERTICAL
             addView(text(R.string.settings_quick_volume, 14f))
             addView(volumes, LinearLayout.LayoutParams(-1, -2).apply {
-                topMargin = menuDp(SETTINGS_MENU_ACTION_GAP_DP)
+                topMargin = menuDp(SETTINGS_MENU_VOLUME_HEADING_GAP_DP)
             })
         }
-        val body = object : LinearLayout(menuContext) {
-            init {
-                addView(actions, LayoutParams(-1, -2))
-                addView(audio, LayoutParams(-1, -2))
-            }
-            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                val availableWidth = MeasureSpec.getSize(widthMeasureSpec)
-                val wide = availableWidth >= menuDp(SETTINGS_MENU_SPLIT_MIN_WIDTH_DP)
-                val paneWidth = (availableWidth - menuDp(SETTINGS_MENU_PANE_GAP_DP)).coerceAtLeast(0)
-                val actionWidth = paneWidth * 9 / 20
-                orientation = if (wide) HORIZONTAL else VERTICAL
-                for (index in 0 until childCount) {
-                    val params = getChildAt(index).layoutParams as LayoutParams
-                    params.width = if (!wide) LayoutParams.MATCH_PARENT else if (index == 0) actionWidth else paneWidth - actionWidth
-                    params.weight = 0f
-                    params.marginStart = if (wide && index > 0) menuDp(SETTINGS_MENU_PANE_GAP_DP) else 0
-                    params.marginEnd = 0
-                    params.resolveLayoutDirection(layoutDirection)
-                    params.topMargin = if (!wide && index > 0) menuDp(SETTINGS_MENU_ACTION_GAP_DP) else 0
-                }
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-            }
+        val body = LinearLayout(menuContext).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(actions, LinearLayout.LayoutParams(-1, -2))
+            addView(audio, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = menuDp(SETTINGS_MENU_SECTION_GAP_DP)
+            })
         }
         content.addView(body, LinearLayout.LayoutParams(-1, -2))
 
@@ -248,13 +224,13 @@ internal class CarPlayQuickMenu(
         private const val SETTINGS_MENU_ICON_GAP_DP = 8
         private const val SETTINGS_MENU_BORDER_DP = 1
         private const val SETTINGS_MENU_SCRIM_ALPHA = 224
-        private const val SETTINGS_MENU_CONTROL_HEIGHT_DP = 48
+        private const val SETTINGS_MENU_CONTROL_HEIGHT_DP = 56
         private const val SETTINGS_MENU_BUTTON_PADDING_DP = 16
         private const val SETTINGS_MENU_MIN_ACTION_WIDTH_DP = 160
         private const val SETTINGS_MENU_OUTER_GAP_DP = 16
-        private const val SETTINGS_MENU_PADDING_DP = 20
-        private const val SETTINGS_MENU_SPLIT_MIN_WIDTH_DP = 760
-        private const val SETTINGS_MENU_PANE_GAP_DP = 24
+        private const val SETTINGS_MENU_PADDING_DP = 16
+        private const val SETTINGS_MENU_SECTION_GAP_DP = 16
+        private const val SETTINGS_MENU_VOLUME_HEADING_GAP_DP = 8
         const val MAX_SETTINGS_MENU_WIDTH_DP = 1040
     }
 }

@@ -46,14 +46,14 @@ class BluetoothAudioSessionTest {
         app.getSharedPreferences("xcertplay_airplay", 0).edit().clear().commit()
     }
 
-    private fun connect(bluetooth: Boolean): AirPlaySession {
+    private fun connect(bluetooth: Boolean, transport: CarPlayTransport = CarPlayTransport.WIRELESS): AirPlaySession {
         controller = CarPlayController(app,
-            CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL, transport = CarPlayTransport.WIRELESS,
+            CarPlayRuntimeConfig(mfiTarget = MfiTarget.LOCAL, transport = transport,
                 identification = Iap2IdentificationConfig("test", "test", "test", "test", "1", "1", carPlayUsbInterfaceNumber = 3)),
             AirPlayConfig("test", address, "02:00:00:00:00:01", "1", AirPlayDisplayConfig(1920, 720), disableAudioOutput = bluetooth),
             AirPlayIdentity.generate(), PairingStore(), object : AirPlaySessionListener {}, object : AirPlayMediaHandler {}, {},
             onNativeBluetoothPlaying = playing::add)
-        ReflectionHelpers.setField(controller, "wirelessPeerBluetoothAddress", address)
+        ReflectionHelpers.setField(controller, "wirelessPeerBluetoothAddress", if (transport == CarPlayTransport.WIRELESS) address else null)
         listener = ReflectionHelpers.getField(controller, "sessionListener")
         return mock(AirPlaySession::class.java).also { listener.onSessionActive(it); shadowOf(Looper.getMainLooper()).idle() }
     }
@@ -71,6 +71,7 @@ class BluetoothAudioSessionTest {
 
     @Test fun queuedOldSessionCannotTouchReplacementPhoneSession() {
         val first = connect(false)
+        assertEquals(1, profile.disconnects) // CarPlay owns a lease as soon as this session starts.
         listener.onCommand(first, "disableBluetooth", mapOf("deviceID" to address))
         val replacementProfile = MusicProfile(profile.phone)
         shadowOf(adapter).setProfileProxy(11, replacementProfile)
@@ -79,7 +80,8 @@ class BluetoothAudioSessionTest {
         listener.onSessionActive(next)
         listener.onSessionEnded(first)
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(0, profile.disconnects)
+        assertEquals(1, profile.disconnects) // The retired session never adds another operation.
+        assertEquals(1, replacementProfile.disconnects)
         listener.onCommand(next, "disableBluetooth", mapOf("deviceID" to address))
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1, replacementProfile.disconnects)
@@ -87,15 +89,34 @@ class BluetoothAudioSessionTest {
 
     @Test fun phoneCannotRedirectHandoffToAnotherBondedDevice() {
         val session = connect(false)
+        assertEquals(1, profile.disconnects)
         val other = adapter.getRemoteDevice("02:66:77:88:99:AA")
         shadowOf(other).setBondState(BluetoothDevice.BOND_BONDED)
         shadowOf(adapter).setBondedDevices(setOf(profile.phone, other))
         listener.onCommand(session, "disableBluetooth", mapOf("deviceID" to other.address))
         shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(0, profile.disconnects)
+        assertEquals(1, profile.disconnects) // Invalid deviceID does not change the session's phone.
         listener.onCommand(session, "disableBluetooth", mapOf("deviceID" to address))
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1, profile.disconnects)
+    }
+
+    @Test fun usbMusicDoesNotRequireBluetoothToBeEnabled() {
+        shadowOf(adapter).setEnabled(false)
+        val session = connect(false, CarPlayTransport.WIRED)
+        listener.onCommand(session, "disableBluetooth", mapOf("deviceID" to address))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(controller.bluetoothHandoffReady)
+        assertEquals(0, profile.disconnects)
+    }
+
+    @Test fun usbMusicDoesNotRequireAnOtherwiseUnusedBluetoothPairing() {
+        shadowOf(adapter).setBondedDevices(emptySet())
+        val session = connect(false, CarPlayTransport.WIRED)
+        listener.onCommand(session, "disableBluetooth", mapOf("deviceID" to address))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(controller.bluetoothHandoffReady)
+        assertEquals(0, profile.disconnects)
     }
 
     class MusicProfile(val phone: BluetoothDevice) : BluetoothProfile {

@@ -21,7 +21,7 @@ class AuthorizationComponentExportTest {
     private fun withFiles(test: (File, File) -> Unit) {
         val root = Files.createTempDirectory("authorization-export-test").toFile()
         try {
-            val source = File(root, "Preface-Android9-Authorization-2.apk").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val source = File(root, "Preface-Android9-Authorization.apk").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             test(source, File(root, "Download"))
         } finally { root.deleteRecursively() }
     }
@@ -54,32 +54,41 @@ class AuthorizationComponentExportTest {
         assertEquals(modified, File(second.path).lastModified())
         assertEquals(1, downloads.listFiles()!!.size)
     }
-    @Test fun aMatchingNumberedCopyIsAlsoReportedAsAlreadySaved() = withFiles { source, downloads ->
-        downloads.mkdirs()
-        File(downloads, source.name).writeText("unrelated file")
+    @Test fun authorizationExportKeepsItsStableNameAcrossUpdates() = withFiles { source, downloads ->
         val first = AuthorizationComponentExport.saveToDirectory(source, downloads)
-        val second = AuthorizationComponentExport.saveToDirectory(source, downloads)
-        assertTrue(second.alreadySaved)
-        assertEquals(first.path, second.path)
-        assertEquals(2, downloads.listFiles()!!.size)
+        source.writeBytes(source.readBytes() + byteArrayOf(7))
+        val updated = AuthorizationComponentExport.saveToDirectory(source, downloads)
+        assertFalse(updated.alreadySaved)
+        assertEquals(first.path, updated.path)
+        assertArrayEquals(source.readBytes(), File(updated.path).readBytes())
+        assertTrue(AuthorizationComponentExport.saveToDirectory(source, downloads).alreadySaved)
+        assertEquals(listOf(source.name), downloads.listFiles()!!.map { it.name })
     }
     @Test fun aChangedSavedApkIsNotMistakenForTheVerifiedCopy() = withFiles { source, downloads ->
         val first = AuthorizationComponentExport.saveToDirectory(source, downloads)
         File(first.path).writeText("changed bytes")
         val next = AuthorizationComponentExport.saveToDirectory(source, downloads)
         assertFalse(next.alreadySaved)
-        assertNotEquals(first.path, next.path)
+        assertEquals(first.path, next.path)
         assertArrayEquals(source.readBytes(), File(next.path).readBytes())
-        assertEquals("changed bytes", File(first.path).readText())
+        assertEquals(1, downloads.listFiles()!!.size)
     }
-    @Test fun aDifferentFileIsNeverOverwrittenOrDeleted() = withFiles { source, downloads ->
+    @Test fun overwritesOnlyTheSameNamedFile() = withFiles { source, downloads ->
         downloads.mkdirs()
         val existing = File(downloads, source.name).apply { writeText("keep this") }
         val other = File(downloads, "other.apk").apply { writeText("keep other") }
         val saved = AuthorizationComponentExport.saveToDirectory(source, downloads)
-        assertNotEquals(existing.absolutePath, saved.path)
-        assertEquals("keep this", existing.readText())
+        assertFalse(saved.alreadySaved)
+        assertEquals(existing.absolutePath, saved.path)
+        assertArrayEquals(source.readBytes(), existing.readBytes())
         assertEquals("keep other", other.readText())
+        assertEquals(2, downloads.listFiles()!!.size)
+    }
+    @Test fun aDirectoryNamedLikeTheApkIsNotReplaced() = withFiles { source, downloads ->
+        val existing = File(downloads, source.name).apply { mkdirs() }
+        assertThrows(IllegalStateException::class.java) { AuthorizationComponentExport.saveToDirectory(source, downloads) }
+        assertTrue(existing.isDirectory)
+        assertEquals(listOf(existing), downloads.listFiles()!!.toList())
     }
     @Test fun unavailableDirectoryDoesNotChangeItsContents() = withFiles { source, downloads ->
         downloads.parentFile!!.mkdirs(); downloads.writeText("not a directory")

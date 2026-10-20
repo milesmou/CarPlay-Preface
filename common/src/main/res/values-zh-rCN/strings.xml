@@ -14,7 +14,7 @@
     <string name="settings_authorization">授权</string>
     <string name="settings_authorization_summary">管理本应用的系统授权。</string>
     <string name="settings_authorization_native_title">系统授权组件</string>
-    <string name="settings_authorization_native_description">已内置 Android 9 授权组件。系统匹配时，保存到下载目录后用文件管理器手动安装，再逐项授权。</string>
+    <string name="settings_authorization_native_description">已内置 Android 9 授权组件。系统匹配时，保存到下载目录后，用文件管理器手动安装。</string>
     <string name="settings_authorization_component_available">保存到 Download 后，用文件管理器手动安装。</string>
     <string name="settings_authorization_component_update_available">有新版组件，保存后用文件管理器手动更新。</string>
     <string name="settings_authorization_component_reinstall_required">新版不能覆盖旧补丁。请先保存 APK，仅手动卸载旧的“星瑞系统授权”后重装。保留 CarPlay 主应用。</string>
@@ -25,7 +25,7 @@
     <string name="settings_authorization_component_permission_missing">组件已安装，但当前不可用或缺少系统权限，请在系统设置中检查。</string>
     <string name="settings_authorization_component_unsupported">内置组件与当前系统不匹配，或本构建未包含组件。可使用下方已有系统授权入口。</string>
     <string name="settings_authorization_component_install_failed">无法保存组件，请检查系统是否匹配、下载目录是否可写及剩余空间后重试。</string>
-    <string name="settings_authorization_component_saved">已保存到：%1$s。请在文件管理器中打开此文件手动安装。</string>
+    <string name="settings_authorization_component_saved">已保存到：%1$s。请在文件管理器中打开 APK 手动安装。</string>
     <string name="settings_authorization_component_already_saved">授权 APK 已保存到：%1$s，无需重复保存。</string>
     <string name="settings_authorization_component_folder_unavailable">若下载目录未打开，请手动用文件管理器进入 Download；已保存的 APK 仍在上方显示的路径中。</string>
     <string name="settings_authorization_component_storage_denied">未获得存储权限，无法保存到下载目录。请允许访问存储后重试。</string>

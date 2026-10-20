@@ -16,7 +16,11 @@ internal class PrefaceMediaCenter(
         fun register(): Any?
         fun requestPlay(token: Any): Boolean
         fun publish(token: Any, info: CarPlayNowPlaying): Boolean
+        fun requestPlayAsync(token: Any, completed: (Boolean) -> Unit) { completed(requestPlay(token)) }
+        fun publishAsync(token: Any, info: CarPlayNowPlaying, completed: (Boolean) -> Unit) { completed(publish(token, info)) }
+        fun updateEligibility(eligible: Boolean, commandsAllowed: Boolean) {}
         fun disconnect() {}
+        fun close() {}
         fun unregister(token: Any): Boolean
         fun report(): String = ""
     }
@@ -38,6 +42,10 @@ internal class PrefaceMediaCenter(
     private var apiRecovery: Snapshot? = null
     private val initializationRetryOwners = mutableListOf<WeakReference<Any>>()
     private var published: CarPlayNowPlaying? = null
+    private var claimRevision = 0L
+    private var pendingClaim: Snapshot? = null
+    private var publishRevision = 0L
+    private var publishing = false
 
     fun start() = worker.execute {
         if (closed) return@execute
@@ -56,6 +64,7 @@ internal class PrefaceMediaCenter(
         initializationGeneration++
         ownsSource = false
         cleanup()
+        attempt("close-backend") { backend?.close() }
         backend = null
         initializeBackend()
     }
@@ -103,8 +112,12 @@ internal class PrefaceMediaCenter(
         if (closed) return
         if (!ready) {
             val desired = snapshot
+            val pending = pendingClaim
             if (desired.eligible && desired.commandsAllowed && desired.info.playing &&
-                (ownsSource || desired.request > handledRequest)) apiRecovery = desired
+                (ownsSource || desired.request > handledRequest || pending?.let {
+                    it.request == desired.request && it.eligibilityEpoch == desired.eligibilityEpoch &&
+                        it.recoveryEpoch == desired.recoveryEpoch
+                } == true)) apiRecovery = desired
             registered = false
             ownsSource = false
             handledRequest = desired.request
@@ -123,6 +136,7 @@ internal class PrefaceMediaCenter(
     private fun synchronizeSource() {
         if (closed) return
         val desired = snapshot
+        attempt("eligibility") { backend?.updateEligibility(desired.eligible, desired.commandsAllowed) }
         if (!desired.eligible) {
             ownsSource = false
             handledRequest = desired.request
@@ -138,20 +152,37 @@ internal class PrefaceMediaCenter(
         if (desired.request > handledRequest || recovering) {
             handledRequest = desired.request
             if (desired.commandsAllowed && desired.info.playing && !ownsSource) attempt("request-play") {
-                val accepted = api.requestPlay(current)
-                ownsSource = accepted && !closed && snapshot.eligible &&
-                    snapshot.eligibilityEpoch == desired.eligibilityEpoch &&
-                    (!recovering || (snapshot.commandsAllowed && snapshot.info.playing &&
-                        snapshot.recoveryEpoch == desired.recoveryEpoch))
-                status(if (accepted) "request-play-accepted" else "request-play-denied")
+                val revision = ++claimRevision
+                pendingClaim = desired
+                publishRevision++
+                publishing = false
                 published = null
+                api.requestPlayAsync(current) { accepted -> worker.execute {
+                    if (closed || backend !== api || token !== current || claimRevision != revision) return@execute
+                    pendingClaim = null
+                    val latest = snapshot
+                    ownsSource = accepted && latest.eligible && latest.commandsAllowed && latest.info.playing &&
+                        latest.request == desired.request && latest.eligibilityEpoch == desired.eligibilityEpoch &&
+                        latest.recoveryEpoch == desired.recoveryEpoch
+                    status(if (!accepted) "request-play-denied" else if (ownsSource) "request-play-accepted" else "request-play-invalidated")
+                    if (accepted && !ownsSource) attempt("invalidate-play") { api.disconnect() }
+                    published = null
+                    synchronizeSource()
+                } }
             }
         }
         if (!ownsSource || closed || !snapshot.eligible) return
         val info = snapshot.info
-        if (published == info) return
+        if (published == info || publishing) return
         attempt("publish") {
-            if (api.publish(current, info)) published = info else status("publish-rejected")
+            val revision = ++publishRevision
+            publishing = true
+            api.publishAsync(current, info) { accepted -> worker.execute {
+                if (closed || backend !== api || token !== current || publishRevision != revision) return@execute
+                publishing = false
+                if (accepted) published = info else status("publish-rejected")
+                if (snapshot.info != info) synchronizeSource()
+            } }
         }
     }
 
@@ -164,6 +195,10 @@ internal class PrefaceMediaCenter(
             recoveryEpoch = previous.recoveryEpoch + 1L)
         snapshot = next
         ownsSource = false
+        claimRevision++
+        pendingClaim = null
+        publishRevision++
+        publishing = false
         worker.execute {
             // A replacement session may already have updated the same process-owned registration.
             if (!closed && snapshot.eligibilityEpoch == next.eligibilityEpoch && !snapshot.eligible) {
@@ -180,10 +215,14 @@ internal class PrefaceMediaCenter(
         ownsSource = false
         // The SDK may retain its ready callback after unregister; release renderer/activity owners.
         dispatch = null
-        worker.execute { cleanup(); status("closed") }
+        worker.execute { cleanup(); attempt("close-backend") { backend?.close() }; status("closed") }
     }
 
     private fun cleanup() {
+        claimRevision++
+        pendingClaim = null
+        publishRevision++
+        publishing = false
         val old = token ?: return
         token = null
         published = null
@@ -194,9 +233,13 @@ internal class PrefaceMediaCenter(
 
     private inline fun attempt(phase: String, action: () -> Unit) {
         try { action() } catch (error: Exception) {
+            if (phase == "request-play") pendingClaim = null
+            if (phase == "publish") { publishing = false; publishRevision++ }
             status("$phase-failed:${rootCause(error).javaClass.simpleName}")
             runCatching { diagnostic("OEM media diagnostic phase=$phase ${MediaReadinessDiagnostics.failure(error)}") }
         } catch (error: LinkageError) {
+            if (phase == "request-play") pendingClaim = null
+            if (phase == "publish") { publishing = false; publishRevision++ }
             status("$phase-unavailable:${error.javaClass.simpleName}")
         }
     }

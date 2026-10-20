@@ -68,7 +68,7 @@ class AuthorizationComponentInstallerTest {
         assertEquals(AuthorizationComponentInstaller.State.INSTALLABLE, subject.state())
         val file = subject.prepareExport()
         assertArrayEquals(bytes, file.readBytes())
-        assertTrue(file.name.endsWith("-7.apk"))
+        assertEquals("Preface-Android9-Authorization.apk", file.name)
         verify(pm, never()).checkPermission(anyString(), anyString())
     }
     @Test fun inspectingStateDoesNotExtractApkOrLaunchAnything() {

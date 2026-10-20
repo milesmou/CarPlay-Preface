@@ -136,6 +136,7 @@ internal object CarPlayMediaKeys {
         val changingController = controller !== next
         val adoptingStartupRegistration = controller == null && mediaCenter != null
         if (controller !== next) {
+            controller?.bluetoothHandoffListener = null
             releaseLocked(keepStartupRegistration = true)
             learnedHeld.clear()
             siriHandledPresses.clear()
@@ -156,6 +157,7 @@ internal object CarPlayMediaKeys {
         if (audioDiagnostics == null) {
             audioDiagnostics = CarAudioDiagnostics(context.applicationContext, ::reportDiagnostic).also { it.start() }
         }
+        registerPrefaceVoiceReceiver(context, next)
         if (!next.usesCarBluetoothAudio) registerPrefaceReceiver(context, next)
         else reportDiagnostic("Media route=car-bluetooth; wheel keys and music remain vehicle-owned")
         if (adoptingStartupRegistration) {
@@ -170,6 +172,27 @@ internal object CarPlayMediaKeys {
             onIphonePlaying(next, playing)
         }
         next.nowPlayingListener = { _ -> onNowPlayingChanged(next) }
+        val mediaContext = context.applicationContext
+        next.bluetoothHandoffListener = { ready ->
+            mainHandler.post {
+                synchronized(this) {
+                    if (controller !== next || next.usesCarBluetoothAudio) return@synchronized
+                    if (!ready) {
+                        val audio = appContext?.getSystemService(AudioManager::class.java)
+                        if (audio != null) focusRequest?.abandon(audio)
+                        focusRequest = null; focusOwner = null; focusHeld = false
+                        session?.isActive = false
+                    } else if (mediaAudioActive) {
+                        if (session == null || !next.managesPlaybackAudioFocus) {
+                            session?.release(); session = null
+                            start(mediaContext)
+                        }
+                    }
+                    refreshTrackOwnership()
+                    synchronizeMediaCenter(requestSource = ready && mediaAudioActive)
+                }
+            }
+        }
         next.artworkListener = { id, bytes -> onArtworkChanged(next, id, bytes) }
         val retained = next.nowPlayingSnapshot()
         onNowPlayingChanged(next)
@@ -183,6 +206,7 @@ internal object CarPlayMediaKeys {
         expected.playbackListener = null
         expected.nowPlayingListener = null
         expected.artworkListener = null
+        expected.bluetoothHandoffListener = null
         controller = null
         releaseLocked(keepStartupRegistration = true)
     }
@@ -295,6 +319,7 @@ internal object CarPlayMediaKeys {
     // keys. When CarPlay starts playing again it becomes the car's media source again, as any player
     // would; only the start counts, so a car source picked while the iPhone plays on is not undone.
     private fun regainFocusLocked() {
+        if (controller?.bluetoothHandoffReady != true) return
         val request = focusRequest ?: return
         if (focusHeld) return
         val audio = appContext?.getSystemService(AudioManager::class.java) ?: return
@@ -320,7 +345,7 @@ internal object CarPlayMediaKeys {
 
     private fun start(context: Context) {
         val expectedController = controller ?: return
-        if (expectedController.usesCarBluetoothAudio) return
+        if (expectedController.usesCarBluetoothAudio || !expectedController.bluetoothHandoffReady) return
         val focusDisabled = AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
         val delegated = expectedController.managesPlaybackAudioFocus
         val granted = if (delegated) {
@@ -451,7 +476,8 @@ internal object CarPlayMediaKeys {
     fun report(): String = "Media keys controllerAttached=${controller != null} mediaSessionActive=${session?.isActive == true} " +
         "carBluetoothRoute=${controller?.usesCarBluetoothAudio == true} " +
         "focusRequested=${focusRequest != null} focusHeld=$focusHeld mediaStreamActive=$mediaAudioActive " +
-        "broadcastRegistered=${prefaceReceiver != null}; ${trackInterception?.report() ?: "Track interception not initialized"}; " +
+        "broadcastRegistered=${prefaceReceiver != null} voiceBroadcastRegistered=${prefaceVoiceReceiver != null} " +
+        "siriBlocked=${siriUnavailableReason() ?: "none"}; ${trackInterception?.report() ?: "Track interception not initialized"}; " +
         (mediaCenter?.report() ?: "OEM media center not initialized")
 
     private fun publishPlaybackStateLocked() {
@@ -603,6 +629,43 @@ internal object CarPlayMediaKeys {
 
     private var callback: CarPlayMediaCallback? = null
 
+    /** The E02 voice event belongs to the connected projection, independently of its music route. */
+    private fun registerPrefaceVoiceReceiver(context: Context, expected: CarPlayController) {
+        if (prefaceVoiceReceiver != null) return
+        lateinit var voiceReceiver: PrefaceVoiceButtonReceiver
+        voiceReceiver = PrefaceVoiceButtonReceiver {
+            if (synchronized(this) { controller !== expected || prefaceVoiceReceiver !== voiceReceiver }) false
+            else {
+                val blocked = when {
+                    WheelMediaLearning.offer(true, 298) -> "key-learning"
+                    WheelMediaBindings.resolve(context, 298) != WheelMediaBindings.Action.SIRI -> "binding-changed"
+                    else -> siriUnavailableReason()
+                }
+                if (blocked != null) {
+                    reportDiagnostic("Siri voice broadcast ignored reason=$blocked")
+                    false
+                } else {
+                    val accepted = requestSiriForPress(WheelMediaBindings.canonical(298))
+                    reportDiagnostic("Siri voice broadcast accepted=$accepted carBluetoothRoute=${expected.usesCarBluetoothAudio}")
+                    accepted
+                }
+            }
+        }
+        runCatching {
+            ContextCompat.registerReceiver(context.applicationContext, voiceReceiver,
+                IntentFilter(PrefaceVoiceButtonReceiver.ACTION).apply {
+                    addCategory(Intent.CATEGORY_DEFAULT)
+                    priority = 1000
+                }, ContextCompat.RECEIVER_EXPORTED)
+        }.onSuccess {
+            prefaceVoiceReceiver = voiceReceiver
+            reportDiagnostic("Siri voice broadcast receiver registered carBluetoothRoute=${expected.usesCarBluetoothAudio}")
+        }.onFailure {
+            Log.w(TAG, "Preface voice broadcast receiver unavailable", it)
+            reportDiagnostic("Siri voice broadcast receiver unavailable failureClass=${it.javaClass.simpleName}")
+        }
+    }
+
     private fun registerPrefaceReceiver(context: Context, expected: CarPlayController) {
         if (prefaceReceiver != null) return
         trackInterception = PrefaceTrackKeyInterception(
@@ -620,26 +683,10 @@ internal object CarPlayMediaKeys {
             if (trackKeysEligible()) dispatchMedia(index, "preface-intercept") else refreshTrackOwnership()
         }
         refreshTrackOwnership()
-        if (prefaceVoiceReceiver == null) {
-            val voiceReceiver = PrefaceVoiceButtonReceiver {
-                if (WheelMediaLearning.offer(true, 298)) false
-                else if (WheelMediaBindings.resolve(context, 298) == WheelMediaBindings.Action.SIRI)
-                    requestSiriForPress(WheelMediaBindings.canonical(298))
-                else false
-            }
-            runCatching {
-                ContextCompat.registerReceiver(context.applicationContext, voiceReceiver,
-                    IntentFilter(PrefaceVoiceButtonReceiver.ACTION).apply {
-                        addCategory(Intent.CATEGORY_DEFAULT)
-                        priority = 1000
-                    }, ContextCompat.RECEIVER_EXPORTED)
-            }.onSuccess { prefaceVoiceReceiver = voiceReceiver }
-                .onFailure { Log.w(TAG, "Preface voice broadcast receiver unavailable", it) }
-        }
         val receiver = PrefaceMediaButtonReceiver(
             eligible = {
                 // Siri keeps its own toggle/release policy; media execution is checked centrally.
-                synchronized(this) { controller === expected } && trackKeysEligible()
+                synchronized(this) { controller === expected } && (trackKeysEligible() || siriKeyEligible())
             },
             send = { dispatchMedia(it, "preface-wheel") },
             route = { event -> handleLearnedMediaKey(event.action == KeyEvent.ACTION_DOWN, event.keyCode,
@@ -697,6 +744,7 @@ internal object CarPlayMediaKeys {
                 (focusHeld || (focusRequest == null && controller?.managesPlaybackAudioFocus != true && foreground()))
         }
         return ownsMedia && !usesCarBluetoothAudio()
+            && controller?.bluetoothHandoffReady == true
     }
 
     private fun trackKeysEligible(): Boolean =
@@ -721,13 +769,20 @@ internal object CarPlayMediaKeys {
         val sent = synchronized(this) { controller }?.requestSiri() == true
         if (sent) lastPrefaceSiriRequest = now
         Log.i(TAG, "Preface voice key -> Siri sent=$sent")
+        reportDiagnostic("Siri request sent=$sent")
         return sent
     }
 
-    private fun siriKeyEligible(): Boolean {
-        val context = appContext ?: return false
-        return if (usesCarBluetoothAudio()) synchronized(this) { controller != null } &&
-            CarPlayBackgroundSession.active && !inCall(context) else trackKeysEligible()
+    private fun siriKeyEligible(): Boolean = siriUnavailableReason() == null
+
+    private fun siriUnavailableReason(): String? {
+        val context = appContext ?: return "context-unavailable"
+        if (synchronized(this) { controller == null } || !CarPlayBackgroundSession.active) return "session-inactive"
+        if (inCall(context)) return "call-active"
+        // An explicit voice press in the visible projection must work before music gains focus.
+        // In the background retain media ownership; native Bluetooth has its own music owner.
+        if (!usesCarBluetoothAudio() && !foreground() && !synchronized(this) { focusHeld }) return "source-not-active"
+        return null
     }
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */

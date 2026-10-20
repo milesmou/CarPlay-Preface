@@ -115,7 +115,7 @@ class MicrophoneSourceFallbackTest {
         sink.onMicrophoneStarted(AudioStreamId(101, "telephony"), config("telephony"))
         assertEquals(listOf(MediaRecorder.AudioSource.VOICE_COMMUNICATION), RecorderBuilder.attempts)
         assertNull(captured.get())
-        assertEquals(AudioManager.MODE_RINGTONE, context.getSystemService(AudioManager::class.java).mode)
+        assertEquals(AudioManager.MODE_NORMAL, context.getSystemService(AudioManager::class.java).mode)
         assertTrue(ShadowAudioEffect.getAudioEffects().isEmpty())
     }
 
