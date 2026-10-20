@@ -20,3 +20,12 @@
 - [完整文档](docs/README.md) · [固件资料](docs/PREFACE_FIRMWARE_REFERENCE.md) · [来源与许可证](docs/THIRD_PARTY_NOTICES.md)
 
 反馈问题时，请提供车机固件、iPhone／iOS 版本、连接方式和复现步骤。
+
+## 支持与联系
+
+| 赞助开发者一杯咖啡 ☕ | 联系开发者 |
+| :---: | :---: |
+| 如果这个项目对你有帮助，欢迎扫码赞助。 | 有问题可以扫码添加微信，联系开发者。 |
+| <a href="docs/images/wechat-donate.jpg"><img src="docs/images/wechat-donate.jpg" alt="微信赞助收款码" width="280"></a> | <a href="docs/images/wechat-contact.jpg"><img src="docs/images/wechat-contact.jpg" alt="开发者微信联系二维码" width="280"></a> |
+
+点击图片可查看原图。
