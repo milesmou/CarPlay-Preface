@@ -3,6 +3,8 @@ package com.shilapi.xcertplay.media
 import android.media.AudioFormat as AndroidAudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.content.Context
+import android.media.AudioManager
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.NoiseSuppressor
@@ -43,6 +45,7 @@ internal class MicrophoneUplink(
         )
     },
     private val noAudioRestartMillis: Long = NO_AUDIO_RESTART_MILLIS,
+    context: Context? = null,
 ) : Closeable {
     private val running = AtomicBoolean(false)
     private val stats = MicrophoneCaptureStats(config, report = { message ->
@@ -55,6 +58,11 @@ internal class MicrophoneUplink(
     @Volatile private var effects: List<AudioEffect> = emptyList()
     @Volatile private var echoCanceller: CallEchoCanceller? = null
     private var thread: Thread? = null
+    private val appContext = runCatching { context?.applicationContext }.getOrNull()
+    private val audioManager = runCatching { appContext?.getSystemService(AudioManager::class.java) }.getOrNull()
+    private val routeDiagnostics = MicrophoneRouteDiagnostics(config.audioType,
+        readState = { readMicrophoneRouteState(recorder, appContext, audioManager, echoCanceller != null, effects) },
+        report = { line -> Log.i(TAG, line); onDiagnostic(line) })
 
     fun start(): Boolean {
         if (!running.compareAndSet(false, true)) return true
@@ -142,6 +150,7 @@ internal class MicrophoneUplink(
             }
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
+            routeDiagnostics.sample(MicrophoneRouteDiagnostics.Stage.START)
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
                 isDaemon = true
                 start()
@@ -279,6 +288,7 @@ internal class MicrophoneUplink(
         var lastAudioNs = System.nanoTime()
         try {
             while (running.get()) {
+                routeDiagnostics.sample(MicrophoneRouteDiagnostics.Stage.POLL)
                 stats.reading()
                 val count = recorder.read(readBuffer, 0, readBuffer.size, AudioRecord.READ_BLOCKING)
                 stats.read(count)
@@ -329,6 +339,7 @@ internal class MicrophoneUplink(
                     filled += copied
                     offset += copied
                     if (filled == frame.size) {
+                        stats.capturedLevel(frame)
                         if (canceller != null && clock != null && reference != null) {
                             // Ask slightly ahead of the frame so speaker latency the clock misses stays inside the tail.
                             echoReference?.read(reference, clock.frameEndNs(offset / 2) + ECHO_REFERENCE_LEAD_NS)
@@ -359,6 +370,7 @@ internal class MicrophoneUplink(
                 stats.failure(MicrophoneFailureStage.CAPTURE, error)
             }
         } finally {
+            routeDiagnostics.sample(MicrophoneRouteDiagnostics.Stage.END)
             stats.flush(ended = true, routeType = routeInfo)
             running.set(false)
             release()

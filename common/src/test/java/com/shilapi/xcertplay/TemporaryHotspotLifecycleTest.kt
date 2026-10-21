@@ -8,9 +8,11 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,10 +62,10 @@ class TemporaryHotspotLifecycleTest {
         fun close() { manager.close(); worker.shutdownNow(); assertTrue(worker.awaitTermination(2, TimeUnit.SECONDS)) }
     }
 
-    @Test fun interfaceMustStillBeReadyAfterRadioObservation() {
+    @Test fun interfaceMustStillBeReadyBeforePublishingHotspot() {
         var fixture: Fixture? = null
         val value = Fixture(channel = 0) { message ->
-            if (message.contains("radio observation timed out")) fixture!!.interfaces = emptyList()
+            if (message.contains("advertising automatic channel 0")) fixture!!.interfaces = emptyList()
         }
         fixture = value
         try {
@@ -73,6 +75,77 @@ class TemporaryHotspotLifecycleTest {
             val reused = assertThrows(java.util.concurrent.ExecutionException::class.java) { value.start().get(1, TimeUnit.SECONDS) }
             assertTrue(reused.cause is IllegalStateException)
         } finally { value.close() }
+    }
+
+    @Test fun unknownChannelDoesNotWaitForBackgroundRadioObservation() {
+        val observing = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val value = Fixture(channel = 0) { message ->
+            if (message.contains("background radio observation starting")) {
+                observing.countDown()
+                release.await()
+            }
+        }
+        try {
+            val started = value.start()
+            assertTrue(observing.await(2, TimeUnit.SECONDS))
+            // The diagnostic reader is still blocked, but the connection already has its
+            // system credentials and validated interface. It must not await radio readback.
+            val info = started.get(1, TimeUnit.SECONDS)
+            assertEquals("temporary-test", info.ssid)
+            assertEquals("test12345", info.passphrase)
+            assertEquals(0, info.channel)
+            assertEquals("2.4 GHz", info.bandLabel)
+            assertNull(info.frequencyMHz)
+            value.manager.validateReady()
+            verify(value.reservation, never()).close()
+        } finally { release.countDown(); value.close() }
+    }
+
+    @Test fun backgroundRadioFailureDoesNotInvalidateTheReadyHotspot() {
+        val failed = CountDownLatch(1)
+        val value = Fixture(channel = 0) { message ->
+            if (message.contains("background radio observation starting")) throw IOException("test reader unavailable")
+            if (message.contains("background radio observation failed")) failed.countDown()
+        }
+        try {
+            val info = value.start().get(2, TimeUnit.SECONDS)
+            assertTrue(failed.await(2, TimeUnit.SECONDS))
+            assertEquals(0, info.channel)
+            assertNull(info.frequencyMHz)
+            value.manager.validateReady()
+            verify(value.reservation, never()).close()
+        } finally { value.close() }
+    }
+
+    @Test fun closingHotspotCancelsBackgroundObservation() = cancelledBackgroundObservation(systemStop = false)
+
+    @Test fun systemStopCancelsBackgroundObservation() = cancelledBackgroundObservation(systemStop = true)
+
+    private fun cancelledBackgroundObservation(systemStop: Boolean) {
+        val observing = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val radioThread = AtomicReference<Thread>()
+        val diagnostics = CopyOnWriteArrayList<String>()
+        val value = Fixture(channel = 0) { message ->
+            diagnostics.add(message)
+            if (message.contains("background radio observation starting")) {
+                radioThread.set(Thread.currentThread())
+                observing.countDown()
+                release.await()
+            }
+        }
+        try {
+            val started = value.start()
+            assertTrue(observing.await(2, TimeUnit.SECONDS))
+            assertEquals(0, started.get(1, TimeUnit.SECONDS).channel)
+            if (systemStop) value.callback.onStopped() else value.manager.close()
+            radioThread.get().join(2_000)
+            assertFalse("radio observation must stop with its reservation", radioThread.get().isAlive)
+            assertFalse(diagnostics.any { it.contains("observation failed") || it.contains("observation timed out") || it.contains("observed radio frequency=") })
+            assertThrows(IOException::class.java) { value.manager.validateReady() }
+        } finally { release.countDown(); value.close() }
+        verify(value.reservation, times(1)).close()
     }
 
     @Test fun stoppedCallbackAndReplacementInterfaceInvalidateTheReservation() {

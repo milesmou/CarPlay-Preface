@@ -29,7 +29,8 @@ internal class MicrophoneCaptureStats(
     private var sendErrors = 0L
     private var lastSentNs: Long? = null
     private var sendGapMaxNs = 0L
-    private var peakSample = 0
+    private val captureLevels = PcmLevelWindow()
+    private val uplinkLevels = PcmLevelWindow()
     private var routedDeviceType: Int? = null
 
     fun started(routeType: Int?) {
@@ -56,14 +57,10 @@ internal class MicrophoneCaptureStats(
      * The loudest 16-bit little-endian sample sent in this window. Without it, a microphone that
      * delivers silence and an uplink the iPhone discards looked the same in a report (#647).
      */
-    fun level(pcm: ByteArray) {
-        var index = 0
-        while (index + 1 < pcm.size) {
-            val sample = (pcm[index].toInt() and 0xff) or (pcm[index + 1].toInt() shl 8)
-            peakSample = maxOf(peakSample, kotlin.math.abs(sample))
-            index += 2
-        }
-    }
+    fun level(pcm: ByteArray) = uplinkLevels.observe(pcm)
+
+    /** AudioRecord PCM before this application's optional processing; the HAL may already process it. */
+    fun capturedLevel(pcm: ByteArray) = captureLevels.observe(pcm)
 
     fun encoded(frameCount: Int, emptyCount: Int) {
         encodedFrames += frameCount.coerceAtLeast(0)
@@ -92,11 +89,15 @@ internal class MicrophoneCaptureStats(
         val now = nowNs()
         if (!ended && now - windowStart < REPORT_INTERVAL_NS) return
         if (routeType != null) routedDeviceType = runCatching { routeType() }.getOrNull()
+        if (captureLevels.samples > 0 || uplinkLevels.samples > 0) {
+            emit("Microphone: levels $metadata windowMs=${(now - windowStart).coerceAtLeast(0) / 1_000_000} " +
+                captureLevels.describe("capture") + " " + uplinkLevels.describe("uplink") + " ended=$ended")
+        }
         emit("Microphone: stats $metadata routedDeviceType=${routedDeviceType ?: "unknown"} " +
             "captureBytes=$capturedBytes reads=$reads zeroReads=$zeroReads readErrors=$readErrors " +
             "readMaxMs=${readMaxNs / 1_000_000} encodedFrames=$encodedFrames " +
             "emptyEncodedFrames=$emptyEncodedFrames udpSent=$udpSent sendErrors=$sendErrors " +
-            "sendGapMaxMs=${sendGapMaxNs / 1_000_000} peakDbfs=${peakDbfs(peakSample)} ended=$ended")
+            "sendGapMaxMs=${sendGapMaxNs / 1_000_000} peakDbfs=${peakDbfs(uplinkLevels.peak)} ended=$ended")
         windowStart = now
         capturedBytes = 0
         reads = 0
@@ -108,7 +109,8 @@ internal class MicrophoneCaptureStats(
         udpSent = 0
         sendErrors = 0
         sendGapMaxNs = 0
-        peakSample = 0
+        captureLevels.reset()
+        uplinkLevels.reset()
     }
 
     private fun emit(message: String) { runCatching { report(message) } }
@@ -146,5 +148,50 @@ internal class MicrophoneCaptureStats(
         fun reportStartFailure(config: MicrophoneConfig, error: Throwable, report: (String) -> Unit) {
             runCatching { report(failureMessage(metadata(config), MicrophoneFailureStage.START, error, null)) }
         }
+    }
+}
+
+/** Retains numeric aggregates only. The threshold is signal energy, not speech recognition. */
+private class PcmLevelWindow {
+    var samples = 0L
+        private set
+    var peak = 0
+        private set
+    private var squareSum = 0L
+    private var nonzero = 0L
+    private var aboveMinus50 = 0L
+
+    fun observe(pcm: ByteArray) {
+        var index = 0
+        while (index + 1 < pcm.size) {
+            val sample = (pcm[index].toInt() and 0xff) or (pcm[index + 1].toInt() shl 8)
+            val magnitude = kotlin.math.abs(sample)
+            samples++
+            peak = maxOf(peak, magnitude)
+            squareSum += sample.toLong() * sample
+            if (magnitude > 0) nonzero++
+            if (magnitude >= 104) aboveMinus50++ // ceil(32768 * 10^(-50/20))
+            index += 2
+        }
+    }
+
+    fun describe(prefix: String): String {
+        val rms = when {
+            samples == 0L -> "unavailable"
+            squareSum == 0L -> "silent"
+            else -> Math.round(10 * kotlin.math.log10(squareSum.toDouble() / samples / (32768.0 * 32768.0))).toString()
+        }
+        fun permille(value: Long) = if (samples == 0L) "unavailable" else (value * 1000 / samples).toString()
+        val peakDbfs = if (samples == 0L) "unavailable" else MicrophoneCaptureStats.peakDbfs(peak)
+        return "${prefix}Samples=$samples ${prefix}PeakDbfs=$peakDbfs ${prefix}RmsDbfs=$rms " +
+            "${prefix}NonzeroPermille=${permille(nonzero)} ${prefix}AboveMinus50Permille=${permille(aboveMinus50)}"
+    }
+
+    fun reset() {
+        samples = 0
+        peak = 0
+        squareSum = 0
+        nonzero = 0
+        aboveMinus50 = 0
     }
 }

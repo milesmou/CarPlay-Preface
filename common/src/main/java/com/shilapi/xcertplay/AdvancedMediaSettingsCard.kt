@@ -49,6 +49,11 @@ internal class AdvancedMediaSettingsCard(
                 markReconnectNeeded()
             }
         }
+        toggle(card, getString(R.string.phone_audio_route), getString(R.string.phone_audio_route_description),
+            PhoneAudioSettings.phoneAudioRoute(context)) {
+            PhoneAudioSettings.setPhoneAudioRoute(context, it)
+            PhoneAudioRoute.settingsChanged(context)
+        }
         // Focus options finish the regular group; their experimental override starts the lower group.
         audioFocusControls(card)
         toggle(card, getString(R.string.settings_low_latency_decoder),
@@ -71,11 +76,6 @@ internal class AdvancedMediaSettingsCard(
             AirPlayPersistence.loadCallVoiceFilter(context)) {
             AirPlayPersistence.saveCallVoiceFilter(context, it)
             markReconnectNeeded()
-        }
-        toggle(card, getString(R.string.phone_audio_route), getString(R.string.phone_audio_route_description),
-            PhoneAudioSettings.phoneAudioRoute(context)) {
-            PhoneAudioSettings.setPhoneAudioRoute(context, it)
-            PhoneAudioRoute.settingsChanged(context)
         }
         toggle(card, getString(R.string.phone_audio_route_apps), getString(R.string.phone_audio_route_apps_description),
             PhoneAudioSettings.phoneAudioRouteApps(context)) {

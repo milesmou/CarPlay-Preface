@@ -55,9 +55,13 @@ internal class PhoneAudioRouteController(
     private var held = false // scheduler thread
     private var cancelRelease: (() -> Unit)? = null // scheduler thread
     @Volatile private var failedAt = NEVER
+    @Volatile private var carPlayUsesBluetoothAudio = false
 
-    fun setWanted(reason: PhoneAudioReason, value: Boolean) {
-        synchronized(lock) { if (value) wanted += reason else wanted -= reason }
+    fun setWanted(reason: PhoneAudioReason, value: Boolean, usesCarBluetoothAudio: Boolean = false) {
+        synchronized(lock) {
+            if (reason == PhoneAudioReason.CARPLAY_CALL) carPlayUsesBluetoothAudio = usesCarBluetoothAudio
+            if (value) wanted += reason else wanted -= reason
+        }
         evaluate()
     }
 
@@ -65,12 +69,15 @@ internal class PhoneAudioRouteController(
     fun settingsChanged() = evaluate()
 
     /** True while the CarPlay call's echo is left to the car, so DiPlay's own canceller must stay out of it. */
-    fun carPlayCallsUseCarAudio(): Boolean = enabled(PhoneAudioReason.CARPLAY_CALL) && !failedRecently()
+    fun carPlayCallsUseCarAudio(): Boolean = enabledForRoute(PhoneAudioReason.CARPLAY_CALL) && !failedRecently()
+
+    private fun enabledForRoute(reason: PhoneAudioReason): Boolean =
+        enabled(reason) && (reason != PhoneAudioReason.CARPLAY_CALL || !carPlayUsesBluetoothAudio)
 
     private fun failedRecently(): Boolean = failedAt != NEVER && now() - failedAt < failureBackoffMillis
 
     private fun needed(): Boolean =
-        synchronized(lock) { wanted.toList() }.any(enabled) && !failedRecently()
+        synchronized(lock) { wanted.toList() }.any(::enabledForRoute) && !failedRecently()
 
     private fun evaluate() {
         scheduler.execute {
@@ -113,12 +120,10 @@ internal class PhoneAudioRouteController(
 /**
  * Puts the car's audio into its phone state by holding a self-managed Telecom call.
  *
- * On a BYD DiLink 3 head unit, Telecom tells the car's audio layer about any call, and the voice processing
- * the car applies to a phone call, echo cancellation included, only runs in that state. A third-party call
- * played as media never reaches it, so the far end hears its own voice back. Any app may register a
- * self-managed call (the normal permission MANAGE_OWN_CALLS), so DiPlay holds one for as long as a call
- * needs the car's audio. Both uses are off by default, see [PhoneAudioSettings.phoneAudioRoute] and
- * [PhoneAudioSettings.phoneAudioRouteApps].
+ * Requests the head unit's phone audio state through Telecom, which still decides call admission.
+ * The auxiliary call carries no audio; CarPlay recording and playback stay in the media pipeline.
+ * CarPlay calls default to enabled for Preface E02, while other apps' calls remain opt-in. Saved choices
+ * take precedence, see [PhoneAudioSettings.phoneAudioRoute] and [PhoneAudioSettings.phoneAudioRouteApps].
  */
 object PhoneAudioRoute {
     private const val TAG = "DiPlay-PhoneAudio"
@@ -157,10 +162,13 @@ object PhoneAudioRoute {
         syncWatcher(app)
     }
 
-    /** The iPhone has a call (any phase), or none any more. */
-    fun carPlayCall(active: Boolean) {
+    /** The audio mode comes from the current controller, never from a next-connection preference. */
+    fun carPlayCall(active: Boolean, usesCarBluetoothAudio: Boolean) {
+        if (carPlayCallActive != active) {
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.IPHONE_CALL_STATE, active = active)
+        }
         carPlayCallActive = active
-        controller?.setWanted(PhoneAudioReason.CARPLAY_CALL, active)
+        controller?.setWanted(PhoneAudioReason.CARPLAY_CALL, active, usesCarBluetoothAudio)
     }
 
     /** Whether a call on another app currently wants the car's phone audio. */
@@ -170,6 +178,8 @@ object PhoneAudioRoute {
 
     /** One of the two settings changed. */
     fun settingsChanged(context: Context) {
+        PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.SETTINGS_CHANGED,
+            carplay = PhoneAudioSettings.phoneAudioRoute(context), otherApps = PhoneAudioSettings.phoneAudioRouteApps(context))
         attach(context)
         controller?.settingsChanged()
     }
@@ -179,6 +189,18 @@ object PhoneAudioRoute {
      * run its own canceller or the platform effects on the call microphone.
      */
     fun carPlayCallsUseCarAudio(): Boolean = controller?.carPlayCallsUseCarAudio() == true
+
+    /** Read-only export; does not attach a backend, query call identities or request any authorization. */
+    fun diagnosticReport(context: Context): String = buildString {
+        append("Phone audio settings: carplay=${PhoneAudioSettings.phoneAudioRoute(context)} " +
+            "otherApps=${PhoneAudioSettings.phoneAudioRouteApps(context)} " +
+            "iphoneCallReported=$carPlayCallActive auxiliaryActive=${PhoneAudioCall.isActive()} " +
+            "carAudioPolicy=${carPlayCallsUseCarAudio()}; policy is not confirmation of an active auxiliary call\n")
+        append("Phone audio history: current process only; atEpochMs is device wall time\n")
+        val history = PhoneAudioDiagnostics.snapshot()
+        if (history.isEmpty()) append("No phone audio events recorded in this process.")
+        else append(history.joinToString("\n"))
+    }
 
     /** DiPlay's own call microphone shows up in the recording list; it is not another app's call. */
     internal fun ownCarPlayCallActive(): Boolean = carPlayCallActive

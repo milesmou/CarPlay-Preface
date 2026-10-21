@@ -492,8 +492,8 @@
     <string name="call_echo_cancellation_description">Reduce call echo. Results depend on the car. Applies at the next connection.</string>
     <string name="call_voice_filter">Clearer call voices (experimental)</string>
     <string name="call_voice_filter_description">Reduce bass in calls; voice tone may change. Applies at the next connection.</string>
-    <string name="phone_audio_route">Car phone audio for CarPlay calls (experimental)</string>
-    <string name="phone_audio_route_description">Use the car’s call audio and echo cancellation instead of CarPlay echo cancellation. Voice may become louder or distorted. Off by default; applies to the next call.</string>
+    <string name="phone_audio_route">Car phone audio for CarPlay calls</string>
+    <string name="phone_audio_route_description">Use the car’s call audio and echo cancellation instead of CarPlay echo cancellation only in CarPlay audio mode. Bluetooth audio stays with the car. Voice may become louder or distorted. On by default; applies to the next call.</string>
     <string name="phone_audio_route_apps">Car phone audio for VoIP calls in other apps (experimental)</string>
     <string name="phone_audio_route_apps_description">Use car call audio for other apps’ calls, excluding voice messages. Also enables the wheel accessibility service. Off by default.</string>
     <string name="smooth_video">Smooth video (experimental)</string>

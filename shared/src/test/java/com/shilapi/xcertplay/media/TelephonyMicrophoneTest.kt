@@ -404,6 +404,26 @@ class TelephonyMicrophoneTest {
         assertEquals(AudioRecord.STATE_UNINITIALIZED, recorder.get()!!.state)
     }
 
+    @Test fun diagnosticsDistinguishAudioRecordSignalFromSoftwareProcessingLoss() {
+        val diagnostics = CopyOnWriteArrayList<String>()
+        val nextRead = CountDownLatch(1)
+        provideCallFrame(nextRead, sample = 16384)
+        val fake = FakeCallEchoCanceller(erase = true)
+        val uplink = MicrophoneUplink(config("telephony"), onDiagnostic = diagnostics::add,
+            echoReference = EchoReference(16_000), echoCancellerFactory = { _, _, _ -> fake }, context = context)
+        try {
+            assertTrue(uplink.start())
+            assertTrue(nextRead.await(5, TimeUnit.SECONDS))
+        } finally { uplink.close() }
+        val level = diagnostics.single { it.startsWith("Microphone: levels") }
+        assertTrue(level.contains("captureSamples=320 capturePeakDbfs=-6 captureRmsDbfs=-6"))
+        assertTrue(level.contains("uplinkSamples=320 uplinkPeakDbfs=silent uplinkRmsDbfs=silent"))
+        val route = diagnostics.first { it.startsWith("Microphone: route") }
+        assertTrue(route.contains("permissionGranted=true"))
+        assertTrue(route.contains("softwareAec=true platformAec=DISABLED platformNs=DISABLED"))
+        assertTrue(diagnostics.any { it.contains("udpSent=1 sendErrors=0") && it.endsWith("ended=true") })
+    }
+
     @Test fun softwareProcessingFailureRestoresPlatformAecAndKeepsTheSameRecorderRunning() {
         val fake = FakeCallEchoCanceller(succeeds = false)
         val nextRead = CountDownLatch(1)
@@ -495,14 +515,21 @@ class TelephonyMicrophoneTest {
         sink.onAudioRtp(id, AudioFormat(AudioCodecKind.LPCM, 16_000, 1, id.type, "telephony"), byteArrayOf(), 0)
     }
 
-    private fun provideCallFrame(nextRead: CountDownLatch? = null) {
+    private fun provideCallFrame(nextRead: CountDownLatch? = null, sample: Int = 0) {
         val produced = AtomicBoolean()
         ShadowAudioRecord.setSourceProvider { record ->
             recorder.compareAndSet(null, record)
             readStarted.countDown()
             object : ShadowAudioRecord.AudioRecordSource {
                 override fun readInByteArray(buffer: ByteArray, offset: Int, size: Int, blocking: Boolean): Int {
-                    if (produced.compareAndSet(false, true)) return config("telephony").frameBytes
+                    if (produced.compareAndSet(false, true)) {
+                        val count = config("telephony").frameBytes
+                        for (i in 0 until count step 2) {
+                            buffer[offset + i] = sample.toByte()
+                            buffer[offset + i + 1] = (sample shr 8).toByte()
+                        }
+                        return count
+                    }
                     nextRead?.countDown()
                     Thread.sleep(5)
                     return 0
@@ -511,13 +538,14 @@ class TelephonyMicrophoneTest {
         }
     }
 
-    private class FakeCallEchoCanceller(private val succeeds: Boolean = true) : CallEchoCanceller {
+    private class FakeCallEchoCanceller(private val succeeds: Boolean = true, private val erase: Boolean = false) : CallEchoCanceller {
         override val frameSamples = 320
         val processed = CountDownLatch(1)
         @Volatile var closed = false
         @Volatile var platformAecEnabledAtProcessing: Boolean? = null
         override fun process(frame: ByteArray, reference: ShortArray): Boolean {
             platformAecEnabledAtProcessing = ShadowAudioEffect.getAudioEffects().filterIsInstance<AcousticEchoCanceler>().singleOrNull()?.enabled
+            if (erase) frame.fill(0)
             processed.countDown()
             return succeeds
         }

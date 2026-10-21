@@ -5,6 +5,9 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.telecom.Connection
 import android.telecom.ConnectionRequest
 import android.telecom.ConnectionService
@@ -27,6 +30,7 @@ private const val START_TIMEOUT_MILLIS = 3_000L
 internal class TelecomPhoneAudioBackend(private val context: Context) : PhoneAudioBackend {
     override fun start(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RESULT, result = PhoneAudioDiagnostics.Result.API_UNAVAILABLE)
             Log.i(TAG, "self-managed calls need Android 8 or newer")
             return false
         }
@@ -35,8 +39,16 @@ internal class TelecomPhoneAudioBackend(private val context: Context) : PhoneAud
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun place(): Boolean {
-        val telecom = context.getSystemService(TelecomManager::class.java) ?: return false
+        val telecom = context.getSystemService(TelecomManager::class.java) ?: run {
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RESULT, result = PhoneAudioDiagnostics.Result.SERVICE_UNAVAILABLE)
+            return false
+        }
         val handle = PhoneAccountHandle(ComponentName(context, PhoneAudioConnectionService::class.java), ACCOUNT_ID)
+        val started = SystemClock.elapsedRealtime()
+        PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.REQUEST,
+            permissionGranted = runCatching {
+                context.checkSelfPermission(Manifest.permission.MANAGE_OWN_CALLS) == PackageManager.PERMISSION_GRANTED
+            }.getOrNull())
         return try {
             telecom.registerPhoneAccount(
                 PhoneAccount.builder(handle, ACCOUNT_LABEL)
@@ -44,16 +56,35 @@ internal class TelecomPhoneAudioBackend(private val context: Context) : PhoneAud
                     .addSupportedUriScheme(PhoneAccount.SCHEME_SIP)
                     .build(),
             )
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.REGISTERED)
+            // Observe admission without changing the request, granting access or retrying it.
+            runCatching { telecom.isOutgoingCallPermitted(handle) }
+                .onSuccess { PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.ADMISSION_QUERY, outgoingPermitted = it) }
+                .onFailure { PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.ADMISSION_QUERY, error = it) }
             val created = PhoneAudioCall.expect()
             telecom.placeCall(
                 Uri.fromParts(PhoneAccount.SCHEME_SIP, ADDRESS, null),
                 Bundle().apply { putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle) },
             )
-            created.await(START_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS) && PhoneAudioCall.isActive()
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.PLACE_RETURNED)
+            val completed = created.await(START_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+            val active = completed && PhoneAudioCall.isActive()
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RESULT, active = active,
+                elapsedMs = SystemClock.elapsedRealtime() - started,
+                result = when {
+                    active -> PhoneAudioDiagnostics.Result.ACTIVE
+                    completed -> PhoneAudioDiagnostics.Result.CALLBACK_FAILED
+                    else -> PhoneAudioDiagnostics.Result.TIMEOUT
+                })
+            active
         } catch (error: SecurityException) {
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RESULT,
+                result = PhoneAudioDiagnostics.Result.SECURITY_ERROR, error = error, elapsedMs = SystemClock.elapsedRealtime() - started)
             Log.w(TAG, "Telecom call not allowed", error)
             false
         } catch (error: RuntimeException) {
+            PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RESULT,
+                result = PhoneAudioDiagnostics.Result.RUNTIME_ERROR, error = error, elapsedMs = SystemClock.elapsedRealtime() - started)
             Log.w(TAG, "Telecom call failed", error)
             false
         }
@@ -83,15 +114,20 @@ internal object PhoneAudioCall {
             created?.countDown()
         }
         Log.i(TAG, "Telecom call active")
+        PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.CREATED, active = true)
     }
 
     fun failed() {
+        PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.CREATE_FAILED, active = false)
         Log.w(TAG, "Telecom did not create the call")
         synchronized(lock) { created?.countDown() }
     }
 
     fun released(owner: Connection) {
-        synchronized(lock) { if (connection === owner) connection = null }
+        val released = synchronized(lock) {
+            if (connection !== owner) false else { connection = null; true }
+        }
+        if (released) PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RELEASED, active = false)
     }
 
     fun end() {
@@ -99,6 +135,7 @@ internal object PhoneAudioCall {
         current.setDisconnected(DisconnectCause(DisconnectCause.LOCAL))
         current.destroy()
         Log.i(TAG, "Telecom call ended")
+        PhoneAudioDiagnostics.record(PhoneAudioDiagnostics.Event.RELEASED, active = false)
     }
 }
 

@@ -15,6 +15,7 @@ import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowWifiManager
+import org.robolectric.util.ReflectionHelpers
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -23,20 +24,18 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [32], manifest = Config.NONE,
     shadows = [LocalOnlyHotspotManagerTest.Radio::class, LocalOnlyHotspotManagerTest.Reservation::class])
 class LocalOnlyHotspotManagerTest {
-    @Test fun cancelledStartupStillClosesALateSystemReservation() = lateReservation(cancel = true)
-    @Test fun timedOutStartupStillClosesALateSystemReservation() = lateReservation(cancel = false)
+    @Test fun cancelledStartupStillClosesALateSystemReservation() { lateReservation(cancel = true) }
+    @Test fun timedOutStartupStillClosesALateSystemReservation() { lateReservation(cancel = false) }
 
     @Test @Config(sdk = [28])
     fun android9UsesThePublicHotspotApi() {
-        val radio = shadowOf(RuntimeEnvironment.getApplication().getSystemService(WifiManager::class.java)) as Radio
-        lateReservation(cancel = true)
+        val radio = lateReservation(cancel = true)
         assertEquals(1, radio.standardRequests)
     }
 
     @Test @Config(sdk = [33])
     fun android13AlsoUsesThePublicApiWithoutCustomConfiguration() {
-        val radio = shadowOf(RuntimeEnvironment.getApplication().getSystemService(WifiManager::class.java)) as Radio
-        lateReservation(cancel = true)
+        val radio = lateReservation(cancel = true)
         assertEquals(1, radio.standardRequests)
     }
 
@@ -52,8 +51,8 @@ class LocalOnlyHotspotManagerTest {
     @Test @Config(sdk = [28])
     fun incompatibleHotspotModeFailsWithoutWaitingForTheStartupTimeout() {
         val context = RuntimeEnvironment.getApplication()
-        val radio = shadowOf(context.getSystemService(WifiManager::class.java)) as Radio
         val manager = LocalOnlyHotspotManager(context)
+        val radio = radio(manager)
         val worker = Executors.newSingleThreadExecutor()
         try {
             val result = worker.submit<Throwable?> { runCatching { manager.start(5000) }.exceptionOrNull() }
@@ -69,7 +68,6 @@ class LocalOnlyHotspotManagerTest {
 
     private fun activeHotspot(channel: Int, stop: Boolean = false) {
         val context = RuntimeEnvironment.getApplication()
-        val radio = shadowOf(context.getSystemService(WifiManager::class.java)) as Radio
         val ap = org.mockito.Mockito.mock(java.net.NetworkInterface::class.java)
         val address = java.net.InetAddress.getByName("192.168.43.1")
         org.mockito.Mockito.`when`(ap.name).thenReturn("ap0")
@@ -79,6 +77,7 @@ class LocalOnlyHotspotManagerTest {
         org.mockito.Mockito.`when`(ap.inetAddresses).thenAnswer { java.util.Collections.enumeration(listOf(address)) }
         val appeared = java.util.concurrent.atomic.AtomicBoolean(false)
         val manager = LocalOnlyHotspotManager(context, interfaceProvider = { if (appeared.get()) listOf(ap) else emptyList() })
+        val radio = radio(manager)
         val worker = Executors.newSingleThreadExecutor()
         val reservation = Shadow.newInstanceOf(WifiManager.LocalOnlyHotspotReservation::class.java)
         val state = Shadow.extract<Reservation>(reservation)
@@ -113,10 +112,13 @@ class LocalOnlyHotspotManagerTest {
         } finally { manager.close(); worker.shutdownNow() }
     }
 
-    private fun lateReservation(cancel: Boolean) {
+    private fun radio(manager: LocalOnlyHotspotManager): Radio =
+        shadowOf(ReflectionHelpers.getField<WifiManager>(manager, "wifiManager")) as Radio
+
+    private fun lateReservation(cancel: Boolean): Radio {
         val context = RuntimeEnvironment.getApplication()
-        val radio = shadowOf(context.getSystemService(WifiManager::class.java)) as Radio
         val manager = LocalOnlyHotspotManager(context)
+        val radio = radio(manager)
         val worker = Executors.newSingleThreadExecutor()
         try {
             val result = worker.submit<Boolean> { runCatching { manager.start(if (cancel) 5000 else 100) }.isFailure }
@@ -132,6 +134,7 @@ class LocalOnlyHotspotManagerTest {
             val state = Shadow.extract<Reservation>(reservation)
             assertEquals(1, state.closes)
         } finally { manager.close(); worker.shutdownNow() }
+        return radio
     }
 
     @Implements(WifiManager::class)

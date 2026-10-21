@@ -86,7 +86,7 @@ class WheelMediaKeyWindowTest {
     @Test fun theKeysKeepTheCarsOwnActionDuringACall() {
         NavigationOutputs.onFrame(Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
             u8(2, 4); string(4, "active-call")
-        })
+        }, usesCarBluetoothAudio = false)
         assertEquals(AudioManager.MODE_NORMAL, host.getSystemService(AudioManager::class.java).mode)
         assertTrue(inCall(host))
         assertFalse(host.dispatchKeyEvent(key(KeyEvent.KEYCODE_MEDIA_NEXT, true)))

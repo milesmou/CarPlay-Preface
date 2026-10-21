@@ -600,6 +600,7 @@ class CarPlayHostSettingsTest {
         val intent = shadowOf(activity).nextStartedActivity
         assertEquals(DiPlayActivity::class.java.name, intent.component!!.className)
         assertEquals("settings", intent.getStringExtra("page"))
+        assertTrue(intent.getBooleanExtra(DiPlayActivity.EXTRA_SETTINGS_RETURN_TO_CARPLAY, false))
     }
 
     @Test fun leavingWithoutAPendingEditDoesNotAsk() {

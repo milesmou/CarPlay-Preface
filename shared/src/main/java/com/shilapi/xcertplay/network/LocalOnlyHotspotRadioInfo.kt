@@ -25,10 +25,12 @@ internal class LocalOnlyHotspotRadioInfo(private val wifi: WifiManager) : Closea
     @Volatile private var diagnostic: ((String) -> Unit)? = null
     private var lastFrequency: Int? = null
     private var lastClientCount: Int? = null
+    private var closed = false
     var unavailableReason: String? = null
         private set
 
-    fun start() {
+    @Synchronized fun start() {
+        if (closed) return
         if (Build.VERSION.SDK_INT < 33) {
             unavailableReason = "live hotspot channel requires Android 13 or later"
             return
@@ -82,7 +84,8 @@ internal class LocalOnlyHotspotRadioInfo(private val wifi: WifiManager) : Closea
         return settledRadio(current.radios, bssid, (System.nanoTime() - current.changedNs) / 1_000_000)
     }
 
-    fun watch(bssid: String?, onDiagnostic: (String) -> Unit) {
+    @Synchronized fun watch(bssid: String?, onDiagnostic: (String) -> Unit) {
+        if (closed) return
         watchedBssid = bssid
         diagnostic = onDiagnostic
         reportRadio()
@@ -113,7 +116,8 @@ internal class LocalOnlyHotspotRadioInfo(private val wifi: WifiManager) : Closea
         }
     }
 
-    override fun close() {
+    @Synchronized override fun close() {
+        closed = true
         diagnostic = null
         val owned = callback
         callback = null

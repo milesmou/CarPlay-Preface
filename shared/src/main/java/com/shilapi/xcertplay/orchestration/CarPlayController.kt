@@ -827,7 +827,7 @@ class CarPlayController(
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
         if (closed) return
         synchronized(phoneCalls) { phoneCalls.accept(frame) }
-        NavigationOutputs.onFrame(frame)
+        NavigationOutputs.onFrame(frame, usesCarBluetoothAudio)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         synchronized(playbackStatus) {
             val previousPlaying = playbackStatus.playing

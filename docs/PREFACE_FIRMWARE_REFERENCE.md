@@ -25,9 +25,12 @@
 | 方控、输入观察者、SDK 准入 | [Siri 方控](PREFACE_SIRI_WHEEL_2026-10-20.md)、[构建 327 分析](PREFACE_FIRMWARE_327.md)、[音频方案](BLUETOOTH_MUSIC_WHEEL.md) |
 | 电话接听／挂断键 | [电话键接入](PREFACE_PHONE_WHEEL_2026-10-20.md)：299→200005 短按接听／挂断，独立于音乐焦点；HFP 存在或未知时保留原车，避免双发。94 项定向测试通过，实车验证尚未完成。 |
 | 音频流、焦点、导航混音 | [通话音量残留](CONNECTION_REPORT_2026-10-20_BUILD98_VOLUME.md)、[音频方案](BLUETOOTH_MUSIC_WHEEL.md)、[元数据](PREFACE_MEDIA_METADATA.md) |
+| 车机电话音频 | [Telecom 权限与准入分析](PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md)：1205 曾被拒绝、1206 辅助通话成功，音质改善仍待验证。后续源码移除实验性标志，未保存时默认开启并保留保存值；仅在当前会话采用 CarPlay 音频时请求辅助通话，蓝牙音频保留原车处理，通话状态照常更新；尚未打包。 |
+| CarPlay 通话麦克风补充日志 | [诊断字段与复测](CALL_MICROPHONE_DIAGNOSTICS_2026-10-21.md)、[1206 实车分析](CONNECTION_REPORT_2026-10-21_BUILD1206_MICROPHONE.md)：新字段已有 IHU353G／169 运行证据；手动 ADC 增益在采集启动时被覆盖，采集／上传电平统计一致，辅助通话本轮成功。根因及人工对端听感仍待确认。 |
+| 高德首次顶部按钮失效 | [1206 输入分析](PREFACE_MAP_FIRST_CONTROLS_2026-10-21.md)：用户确认仅连接后首次显示的四个按钮失效，隐藏重显恢复，拖动／缩放正常；左上连续点击已有完整 HID 报告，无直接本地吞键证据。苹果地图未对照，根因和修复均未确认。 |
 | 蓝牙交接、自动暂停、方控跳页 | [构建 100：组件交接生效、助手被拒](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md)、[构建 99 自动暂停与切歌转蓝牙](CONNECTION_REPORT_2026-10-20_BUILD99_AUDIO.md)、[构建 97 原车日志与修正](CONNECTION_REPORT_2026-10-20_BUILD97.md)、[v0.2.20.1 移植](GEELYPLAY_BLUETOOTH_0.2.20.1.md)、[后续修正](BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md)、[构建 91 报告](CONNECTION_REPORT_2026-10-19_BUILD91.md) |
 | 连接入口、取消与自动连接 | [主页优先级](HOME_CONNECTION_PRIORITY.md)、[自动连接](AUTOMATIC_CONNECTION.md)、[蓝牙重连复核](BLUETOOTH_AUTO_RECONNECT_2026-10-16.md) |
-| 连接耗时与提速评估 | [构建 98 实车时序](CONNECTION_STARTUP_TIMING_2026-10-20.md)：无线约 18 秒、三次 USB 约 17–22 秒；主要等待在网络建链，尚未修改连接流程或验证提速。 |
+| 连接耗时与提速评估 | [历史时序与源码改动](CONNECTION_STARTUP_TIMING_2026-10-20.md)、[构建 1205 实车报告](CONNECTION_REPORT_2026-10-21_BUILD1205.md)：新建热点准备由旧版 3.390 秒降至约 1.04 秒；完整无线连接 15.720／21.218 秒、复用 6.423 秒，仍有波动。 |
 | 无线热点与生命周期 | [手动／临时热点](MANUAL_HOTSPOT.md)、[HiCar 证据](HICAR_HOTSPOT_327.md)、[热点恢复](HOTSPOT_BLUETOOTH_RECOVERY_2026-10-16.md)、[清理屏障](WIRELESS_TEARDOWN_RECOVERY.md) |
 | USB 当前方案 | [官方 v0.2.20 NCM＋本地 VPN/TUN](USB_VPN_RESTORE_0.2.20.md)、[VPN 固件证据](PREFACE_VPN_FIRMWARE_ANALYSIS_2026-10-16.md) |
 | 授权组件、系统 UID、平台签名 | [组件说明与当前构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md)、[系统授权](SYSTEM_AUTHORIZATION.md)、[原生设置对照](NATIVE_SETTINGS_AUTHORIZATION_REFERENCE_2026-10-19.md) |
@@ -58,6 +61,8 @@
 | [构建 98](CONNECTION_REPORT_2026-10-20_BUILD98_VOLUME.md) | 用户确认两种切歌正常；日志定位通话后通信模式未释放，系统音量事件均为通话流。源码已修正，尚未打包或复测。 |
 | [构建 99](CONNECTION_REPORT_2026-10-20_BUILD99_AUDIO.md) | 无线和 USB 均复现蓝牙发 PAUSE、原车方控让蓝牙夺回焦点；QQ 资料已打包，媒体中心授权仍被拒绝。本轮仅分析。 |
 | [构建 100](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md) | 组件 10 的无线／USB A2DP 交接及退出恢复已有实际状态证据，一次方向盘 NEXT 成功；助手自己的媒体中心准入仍明确被拒，另记录退出代理连接泄漏告警。 |
+| [构建 1205](CONNECTION_REPORT_2026-10-21_BUILD1205.md) | 热点后台回读提速已有时序支持，完整无线连接仍波动；USB／无线通话均打开内置输入并持续上传但电平偏低，原车电话模式切换会重建采集处理器，实验电话音频请求被 Telecom 拒绝，麦克风根因及修复仍待验证。 |
+| [构建 1206](CONNECTION_REPORT_2026-10-21_BUILD1206_MICROPHONE.md) | 手动 ADC 增益 −8→0→−2 后，CarPlay 录音仍自动写为此前相同的 −3；采集与上传电平统计一致、1508 包本地发送无错误，HAL 自带 AEC／NS，辅助通话本轮创建成功。用户确认调节前后各有 CarPlay 音频通话大致能听清，不支持调节后才改善；人工对端音量仍未确认。 |
 
 历史报告保持各自版本和时间，不能用后来的源码说明覆盖当时运行事实。当前构建结果见 [组件与构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md)，不逐次在本页复制。
 

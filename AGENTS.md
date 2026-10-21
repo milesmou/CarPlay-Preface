@@ -19,6 +19,8 @@ Instructions for coding agents that work on CarPlay-Preface.
 
 10. 按用户 2026-10-20 最新要求，高效视频（HEVC）、直接视频输出和 MTK 解码器低延迟在保存值缺失时默认开启，用户已保存的选择优先。保留 HEVC 硬件能力检查及 H.264 回退、MTK 当前编码解码器路径检查及失败回退，不以 CPU 名称或车型识别启用；不强制写入或覆盖旧设置，不因默认值变更中断当前会话。直接输出和 MTK 专用项作为普通高级选项；普通“低延迟解码”和“流畅视频”仍保留实验性标识且默认关闭，HEVC 软件解码仍默认关闭。用户实测未见异常的反馈明确属于 MTK 专用选项，不能归到普通低延迟或扩展为量化性能结论，详见 `docs/PREFACE_WIRELESS_VIDEO_2026-10-20.md`。
 
+11. 按用户 2026-10-21 最新要求，“CarPlay 通话使用车机电话音频”移除实验性标志，作为普通高级选项，在保存值缺失时默认开启；用户已保存的关闭选择优先，不强制改写旧设置。仅对当前会话的 CarPlay 音频方案请求辅助通话，蓝牙音频方案保留原车 HFP，不因 iPhone 通话状态额外创建辅助通话；使用控制器本次连接固定的音频方案，不读取下次连接才生效的保存值来改变当前通话。通话状态显示继续更新，其他应用的 VoIP 选项独立。通话回声消除、更清晰的通话人声及其他应用 VoIP 电话音频继续默认关闭并保留实验性标志。保留 Telecom 权限、准入、失败退避与释放检查，不因更改默认值主动创建辅助通话或打断会话，也不据此宣称麦克风问题已修复。详见 `docs/PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md`。
+
 ## 效果图与界面预览基准
 
 1. 后续所有车机界面设计、效果图和预览统一以 **2023 款星瑞的 12.3 英寸中控屏、1920×720 像素、横屏**为基准，按该屏幕校准文字、按钮和间距。交付原始 1920×720 图片，不将其他尺寸的图片拉伸后作为适配预览。
@@ -152,6 +154,8 @@ Each locale MUST use its existing form: `(تجريبي)`, `(experimental)`, `(э
 8. When you move a control between categories, update `AdaptiveSettingsUiTest.settingsLiveWhereDriversLookForThem`.
 
 ### Settings entry
+
+从 CarPlay 投影的“全部设置”入口打开设置后，设置页返回按钮和系统返回键直接恢复原 CarPlay 投影，不先回应用主页、不主动重连；从主页进入设置仍返回主页。返回来源随页面状态恢复，设置内的备份等子页先返回设置。会话已结束或连接已取消时回主页，不为返回动作启动新连接。
 
 Picture adjustments are available only from the connected CarPlay projection quick menu. Do not add a picture-adjustment button to Settings or start a connection for that action. Keep saved picture values and live adjustment behavior.
 

@@ -11,10 +11,10 @@ object NavigationOutputs {
     @Volatile private var listener: ((ClusterTurnGuidance?) -> Unit)? = null
     private var published: ClusterTurnGuidance? = null
 
-    fun onFrame(frame: Iap2Frame) {
+    fun onFrame(frame: Iap2Frame, usesCarBluetoothAudio: Boolean) {
         if (frame.messageId == CarPlayCallState.CALL_STATE_UPDATE) {
             val active = synchronized(lock) { calls.accept(frame); calls.current() != null }
-            PhoneAudioRoute.carPlayCall(active)
+            PhoneAudioRoute.carPlayCall(active, usesCarBluetoothAudio)
         }
         synchronized(lock) { overlayRoute.accept(frame.messageId, frame.payload) }
         refreshTurnOverlay()
@@ -53,7 +53,7 @@ object NavigationOutputs {
             calls.clear()
             if (preserveTurnOverlay) overlayRoute.holdAcrossDrop() else overlayRoute.clear()
         }
-        PhoneAudioRoute.carPlayCall(false)
+        PhoneAudioRoute.carPlayCall(false, usesCarBluetoothAudio = false)
         refreshTurnOverlay()
     }
 }

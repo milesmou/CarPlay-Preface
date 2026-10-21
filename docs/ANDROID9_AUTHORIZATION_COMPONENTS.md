@@ -57,6 +57,26 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
+## 0.2.2／1206 麦克风诊断测试包构建核验
+
+2026-10-21，按用户要求执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步为 1206，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1206-debug.apk`，25,637,334 字节，包名 `com.preface.carplay`，主包保持仓库原证书。新增诊断内容及复测方法见 [通话麦克风诊断](CALL_MICROPHONE_DIAGNOSTICS_2026-10-21.md)。
+
+主包 SHA-256：`a63152ee01f3f2223c285556337ca99295f094077547e9441e337ef76a3eb1a3`。
+
+内置组件仍为 11，其字节与构建任务确认有效的当前生成资产一致，SHA-256 为 `590b9ea5d6dec3dbe83304f9ebc8b4ad53aa426c37ea14d924c38aec40e07ecf`；包名、版本、平台证书、`android.uid.system` 和 manifest.json 一致。主包媒体输入、Manifest 参数及配件认证资产核验通过，无媒体助手或额外签名输入入包。
+
+源码阶段的 79 项定向测试和报告模块编译此前已通过，本次打包未追加单元测试、主应用全量 Lint 或完整 CI；组件 Release 的 vital 检查随构建依赖执行。构建后 ADB 设备列表为空，未安装主包或内置组件，未启动模拟器。原始 APK 和输出元数据保留；构建与核验记录位于本机忽略目录 `agent_docs/build1206-20261021/`。麦克风根因和实车效果仍待验证。
+
+## 0.2.2／1205 测试包构建核验
+
+2026-10-21，按用户要求仅执行 `:mobile:assembleDebug` 成功。0.2.1／1204 已正式发布，本次按发布后的默认补丁递增规则使用 **0.2.2／1205**；mobile／automotive 源码版本同步，本次仅构建 mobile。原始 APK 和 Gradle 元数据保留，交付文件为 `CarPlay-Preface-0.2.2-1205-debug.apk`，25,620,950 字节，包名 `com.preface.carplay`，主证书保持原值。
+
+主 APK SHA-256：`46114a8a3aecb847348a29c88129e2e766bdd147457f43ae0c289f1973b48139`。
+
+内置授权组件 11 的字节、元数据、包名、版本、平台证书及 `android.uid.system` 均已核对，与本次自动构建／签名生成的 assets 一致。组件 SHA-256：`590b9ea5d6dec3dbe83304f9ebc8b4ad53aa426c37ea14d924c38aec40e07ecf`。主包媒体授权输入、ECARX manifest 参数和已批准的配件认证资产校验通过，包内无媒体助手或额外签名材料。
+
+该包包含临时热点直接采用系统配置、未知信道保持 `0` 和后台频段／信道诊断改动，详见 [热点说明](MANUAL_HOTSPOT.md)。源码修改阶段的 49 项相关定向测试此前已通过，本次打包没有追加单元测试、全量 Lint 或 CI；授权组件 Release 的 `lintVital` 随构建依赖执行。构建后复查 ADB，已向在线模拟器 `emulator-5558` 执行 `install -r` 并确认安装版本为 0.2.2／1205，保留数据；没有单独安装组件或修改授权。构建、签名、资产核验与安装记录位于本机忽略目录 `agent_docs/build1205-20261021/`，实车连接速度及稳定性仍待验证。
+
 ## 0.2.1 正式包构建核验
 
 2026-10-20，按用户要求发布 0.2.1，执行 `:mobile:assembleRelease` 成功，正式包为 `CarPlay-Preface-0.2.1-1204.apk`，包名 `com.preface.carplay`，非调试包，使用仓库原有主证书。内置授权组件 11 的字节、元数据、包名、版本、平台证书和系统共享 UID 均已核对，与本次生成 assets 一致；主包的媒体授权输入和已批准配件认证资产校验通过，包内无媒体助手或额外签名材料。

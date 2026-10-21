@@ -62,6 +62,50 @@ class MicrophoneCaptureStatsTest {
         assertEquals("0", MicrophoneCaptureStats.peakDbfs(32768))
     }
 
+    @Test fun separatesCapturedEnergyFromProcessedSilenceAndResetsEachWindow() {
+        var now = 0L
+        val reports = mutableListOf<String>()
+        val stats = MicrophoneCaptureStats(config, reports::add) { now }
+        // Two half-scale samples, one zero and one incomplete byte: ignore the incomplete sample.
+        val capture = byteArrayOf(0, 0x40, 0, 0xc0.toByte(), 0, 0, 0x7f)
+        val original = capture.copyOf()
+        stats.capturedLevel(capture)
+        stats.level(ByteArray(6))
+        assertArrayEquals(original, capture)
+        now = 5_000_000_000
+        stats.flush()
+        val first = reports.first { it.startsWith("Microphone: levels") }
+        assertTrue(first.contains("captureSamples=3 capturePeakDbfs=-6 captureRmsDbfs=-8"))
+        assertTrue(first.contains("captureNonzeroPermille=666 captureAboveMinus50Permille=666"))
+        assertTrue(first.contains("uplinkSamples=3 uplinkPeakDbfs=silent uplinkRmsDbfs=silent"))
+        assertTrue(first.contains("uplinkNonzeroPermille=0 uplinkAboveMinus50Permille=0"))
+        stats.capturedLevel(byteArrayOf(1, 0, 0, 0x80.toByte()))
+        stats.level(byteArrayOf(1, 0))
+        stats.flush(ended = true)
+        val last = reports.last { it.startsWith("Microphone: levels") }
+        assertTrue(last.contains("captureSamples=2 capturePeakDbfs=0 captureRmsDbfs=-3"))
+        assertTrue(last.contains("captureNonzeroPermille=1000 captureAboveMinus50Permille=500"))
+        assertTrue(last.contains("uplinkSamples=1 uplinkPeakDbfs=-90 uplinkRmsDbfs=-90"))
+        assertTrue(last.endsWith("ended=true"))
+        assertTrue(reports.all { it.length < 700 })
+    }
+
+    @Test fun missingSamplesDifferFromSilenceAndLevelsFollowTheFiveSecondGate() {
+        var now = 0L
+        val reports = mutableListOf<String>()
+        val stats = MicrophoneCaptureStats(config, reports::add) { now }
+        stats.capturedLevel(ByteArray(8))
+        repeat(100) { stats.flush() }
+        assertTrue(reports.isEmpty())
+        now = 5_000_000_000
+        stats.flush()
+        val level = reports.first()
+        assertTrue(level.contains("captureSamples=4 capturePeakDbfs=silent captureRmsDbfs=silent"))
+        assertTrue(level.contains("uplinkSamples=0 uplinkPeakDbfs=unavailable uplinkRmsDbfs=unavailable"))
+        stats.flush(ended = true)
+        assertEquals(1, reports.count { it.startsWith("Microphone: levels") })
+    }
+
     @Test fun reportingIsBoundedAndRouteQueriesRunOnlyWhenDue() {
         var now = 0L
         var reports = 0

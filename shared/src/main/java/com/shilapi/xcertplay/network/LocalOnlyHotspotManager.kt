@@ -50,6 +50,7 @@ class LocalOnlyHotspotManager(
     private var reservation: WifiManager.LocalOnlyHotspotReservation? = null
     private var multicastLock: WifiManager.MulticastLock? = null
     private var radioObserver: LocalOnlyHotspotRadioInfo? = null
+    private var radioWorker: Thread? = null
     private var activeInterface: ApInterface? = null
     private var stopped = false
     private var closed = false
@@ -98,7 +99,6 @@ class LocalOnlyHotspotManager(
             }
 
             val activeReservation = awaitStart(attempt, deadlineNanos, timeoutMillis)
-            radioInfo.start()
             acquiredMulticastLock = acquireMulticastLock(attempt)
             val configuration = readConfiguration(activeReservation)
             onDiagnostic("LocalOnlyHotspot reservation band=${configuration.bandLabel} channel=${configuration.channel}")
@@ -109,9 +109,10 @@ class LocalOnlyHotspotManager(
                 attempt = attempt,
                 deadlineNanos = deadlineNanos,
             )
-            val liveRadio = awaitRadioInfo(radioInfo, apInterface, configuration, attempt, deadlineNanos)
+            if (configuration.channel == 0) {
+                onDiagnostic("LocalOnlyHotspot channel unavailable; advertising automatic channel 0")
+            }
             validateInterface(apInterface)
-            radioInfo.watch(apInterface.bssid ?: configuration.bssid) { onDiagnostic(it) }
 
             synchronized(stateLock) {
                 ensureStartActiveLocked(attempt)
@@ -124,27 +125,18 @@ class LocalOnlyHotspotManager(
                 stopped = false
                 acquiredMulticastLock = null
             }
-            val advertisedChannel = liveRadio?.frequencyMHz?.let(::wifiFrequencyMhzToChannel)
-                ?: configuration.channel
-            if (liveRadio == null && advertisedChannel == 0) {
-                onDiagnostic("LocalOnlyHotspot channel unavailable; advertising automatic channel 0")
-            }
+            startRadioObservation(radioInfo, apInterface, configuration, attempt)
 
             return WirelessHotspotInfo(
                 ssid = configuration.ssid,
                 passphrase = configuration.passphrase,
                 security = configuration.security,
-                channel = advertisedChannel,
-                frequencyMHz = liveRadio?.frequencyMHz,
+                channel = configuration.channel,
+                frequencyMHz = null,
                 bssid = apInterface.bssid ?: configuration.bssid,
                 interfaceName = apInterface.name,
                 hostAddress = apInterface.hostAddress,
-                bandLabel = when (liveRadio?.frequencyMHz) {
-                    in 2412..2484 -> "2.4 GHz"
-                    in 5160..5895 -> "5 GHz"
-                    in 5955..7115 -> "6 GHz"
-                    else -> configuration.bandLabel
-                },
+                bandLabel = configuration.bandLabel,
                 backend = WirelessHotspotBackend.LOCAL_ONLY_HOTSPOT,
             )
         } catch (failure: Exception) {
@@ -155,21 +147,92 @@ class LocalOnlyHotspotManager(
         }
     }
 
+    private fun startRadioObservation(
+        observer: LocalOnlyHotspotRadioInfo,
+        ap: ApInterface,
+        configuration: HotspotConfiguration,
+        attempt: StartAttempt,
+    ) {
+        // Radio readback is diagnostic only. Never delay credentials, rewrite a published
+        // channel, or fail the connection because a driver cannot report its frequency.
+        try {
+            val worker = Thread({
+                try {
+                    if (!isRadioObservationActive(observer, ap, attempt)) return@Thread
+                    reportRadioDiagnostic(observer, ap, attempt, "LocalOnlyHotspot background radio observation starting")
+                    if (!isRadioObservationActive(observer, ap, attempt)) return@Thread
+                    observer.start()
+                    val liveRadio = awaitRadioInfo(observer, ap, configuration, attempt)
+                    if (liveRadio != null) {
+                        validateInterface(ap)
+                        reportRadioDiagnostic(observer, ap, attempt,
+                            "LocalOnlyHotspot observed radio frequency=${liveRadio.frequencyMHz}MHz channel=${wifiFrequencyMhzToChannel(liveRadio.frequencyMHz)}; advertised channel unchanged=${configuration.channel}")
+                    }
+                    if (isRadioObservationActive(observer, ap, attempt)) {
+                        observer.watch(ap.bssid ?: configuration.bssid) {
+                            reportRadioDiagnostic(observer, ap, attempt, it)
+                        }
+                    }
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } catch (failure: Exception) {
+                    reportRadioDiagnostic(observer, ap, attempt,
+                        "LocalOnlyHotspot background radio observation failed failureClass=${failure.javaClass.simpleName}")
+                } finally {
+                    synchronized(stateLock) {
+                        if (radioWorker === Thread.currentThread()) radioWorker = null
+                    }
+                }
+            }, "diplay-hotspot-radio").apply { isDaemon = true }
+            synchronized(stateLock) {
+                if (!isRadioObservationActive(observer, ap, attempt)) return
+                radioWorker = worker
+                try {
+                    worker.start()
+                } catch (failure: RuntimeException) {
+                    radioWorker = null
+                    throw failure
+                }
+            }
+        } catch (failure: RuntimeException) {
+            reportRadioDiagnostic(observer, ap, attempt,
+                "LocalOnlyHotspot background radio observation unavailable failureClass=${failure.javaClass.simpleName}")
+        }
+    }
+
+    private fun isRadioObservationActive(
+        observer: LocalOnlyHotspotRadioInfo,
+        ap: ApInterface,
+        attempt: StartAttempt,
+    ): Boolean = synchronized(stateLock) {
+        !closed && !stopped && ownedAttempt === attempt &&
+            reservation != null && reservation === attempt.reservation &&
+            radioObserver === observer && activeInterface === ap
+    }
+
+    private fun reportRadioDiagnostic(
+        observer: LocalOnlyHotspotRadioInfo,
+        ap: ApInterface,
+        attempt: StartAttempt,
+        message: String,
+    ) {
+        if (isRadioObservationActive(observer, ap, attempt)) onDiagnostic(message)
+    }
+
     private fun awaitRadioInfo(
         observer: LocalOnlyHotspotRadioInfo,
         ap: ApInterface,
         configuration: HotspotConfiguration,
         attempt: StartAttempt,
-        deadlineNanos: Long,
     ): LocalOnlyHotspotRadioInfo.Radio? {
         val legacy = LegacyHotspotRadio.Settled()
         var lastRadioError: String? = null
-        val observationDeadline = minOf(deadlineNanos, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2500))
+        val observationDeadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2500)
         while (true) {
-            ensureStartActive(attempt)
+            if (Thread.currentThread().isInterrupted || !isRadioObservationActive(observer, ap, attempt)) return null
             observer.settledForBssid(ap.bssid ?: configuration.bssid)?.let { return it }
             if (configuration.channel > 0 && observer.unavailableReason != null) {
-                onDiagnostic("LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}; using configured channel=${configuration.channel}")
+                reportRadioDiagnostic(observer, ap, attempt, "LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}; using configured channel=${configuration.channel}")
                 return null
             }
             if (Build.VERSION.SDK_INT < 33) {
@@ -182,20 +245,15 @@ class LocalOnlyHotspotManager(
                 // The AP address can appear before the driver exposes its frequency. Retry within
                 // the observation deadline; never borrow the station channel or guess an AP channel.
             } else if (observer.unavailableReason != null) {
-                onDiagnostic("LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}")
+                reportRadioDiagnostic(observer, ap, attempt, "LocalOnlyHotspot radio observation unavailable reason=${observer.unavailableReason}")
                 return null
             }
             val remaining = observationDeadline - System.nanoTime()
             if (remaining <= 0) {
-                onDiagnostic("LocalOnlyHotspot radio observation timed out reason=${lastRadioError ?: "frequency not settled"} configuredChannel=${configuration.channel}")
+                reportRadioDiagnostic(observer, ap, attempt, "LocalOnlyHotspot radio observation timed out reason=${lastRadioError ?: "frequency not settled"} configuredChannel=${configuration.channel}")
                 return null
             }
-            try {
-                TimeUnit.NANOSECONDS.sleep(minOf(remaining, INTERFACE_POLL_NANOS))
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw IOException("Interrupted while waiting for the LocalOnlyHotspot channel", interrupted)
-            }
+            TimeUnit.NANOSECONDS.sleep(minOf(remaining, INTERFACE_POLL_NANOS))
         }
     }
 
@@ -235,6 +293,7 @@ class LocalOnlyHotspotManager(
         val activeReservation: WifiManager.LocalOnlyHotspotReservation?
         val activeMulticastLock: WifiManager.MulticastLock?
         val activeObserver: LocalOnlyHotspotRadioInfo?
+        val activeRadioWorker: Thread?
         val attempt: StartAttempt?
         synchronized(stateLock) {
             if (closed) return
@@ -242,12 +301,14 @@ class LocalOnlyHotspotManager(
             attempt = ownedAttempt
             startAttempt?.stopped = true
             stateLock.notifyAll()
-            // onStarted already owns a reservation while interface/radio discovery is still
+            // onStarted already owns a reservation while interface discovery is still
             // running. Release it now so a replacement cannot overlap that pending hotspot.
             activeReservation = reservation ?: startAttempt?.reservation
             startAttempt?.reservation = null
             activeMulticastLock = multicastLock
             activeObserver = radioObserver
+            activeRadioWorker = radioWorker
+            radioWorker = null
             radioObserver = null
             reservation = null
             activeInterface = null
@@ -255,6 +316,7 @@ class LocalOnlyHotspotManager(
         }
 
         releaseMulticastLock(activeMulticastLock)
+        activeRadioWorker?.interrupt()
         activeObserver?.close()
         if (activeReservation != null) {
             onDiagnostic("LocalOnlyHotspot releasing application reservation; system stop may be asynchronous")
@@ -302,16 +364,24 @@ class LocalOnlyHotspotManager(
             override fun onStopped() {
                 onDiagnostic("LocalOnlyHotspot system callback stopped applicationClosed=$closed")
                 var lockToRelease: WifiManager.MulticastLock? = null
+                var observerToClose: LocalOnlyHotspotRadioInfo? = null
+                var workerToStop: Thread? = null
                 synchronized(stateLock) {
                     if (startAttempt === attempt) attempt.stopped = true
                     if (reservation === attempt.reservation) {
                         stopped = true
                         lockToRelease = multicastLock
                         multicastLock = null
+                        observerToClose = radioObserver
+                        radioObserver = null
+                        workerToStop = radioWorker
+                        radioWorker = null
                     }
                     stateLock.notifyAll()
                 }
                 releaseMulticastLock(lockToRelease)
+                workerToStop?.interrupt()
+                observerToClose?.close()
                 attempt.lease?.callbackFinished()
             }
         }

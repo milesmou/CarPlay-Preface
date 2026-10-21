@@ -3432,7 +3432,9 @@ class CarPlayHostActivity : ComponentActivity() {
             finish()
         }
         startActivity(Intent(this, DiPlayActivity::class.java)
-            .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            .putExtra("page", page)
+            .putExtra(DiPlayActivity.EXTRA_SETTINGS_RETURN_TO_CARPLAY, page == "settings")
+            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
 
     /** Keep a timed-out sink visible to surface teardown until its codecs have actually been released. */

@@ -106,6 +106,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var appearanceRenderPending = false
     private var appearanceButtonFocusPending = false
     private var page = "home"
+    private var settingsReturnToCarPlay = false
     private var settingsCategory = SettingsCategory.CONNECTION
     private var writeAuthorizationUnavailable = false
     private var additionalAuthorizationUnavailable = false
@@ -341,6 +342,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         backupForReport = savedInstanceState?.getBoolean("backup_for_report") == true
         page = (savedInstanceState?.getString("page") ?: intent.getStringExtra("page"))
             ?.takeIf { it in setOf("home", "settings", "backup", "wireless-recovery") } ?: "home"
+        settingsReturnToCarPlay = savedInstanceState?.getBoolean(EXTRA_SETTINGS_RETURN_TO_CARPLAY)
+            ?: (page == "settings" && intent.getBooleanExtra(EXTRA_SETTINGS_RETURN_TO_CARPLAY, false))
         render()
         handleWirelessRecovery()
         if (consumeBluetoothAutoConnectIntent(intent) ||
@@ -363,6 +366,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
         connectionSettingsReturnCategory = null
+        settingsReturnToCarPlay = intent.getStringExtra("page") == "settings" &&
+            intent.getBooleanExtra(EXTRA_SETTINGS_RETURN_TO_CARPLAY, false)
         if (ConnectionAutoStart.paused) {
             ++connectionRequest
             pendingWireless = false
@@ -451,6 +456,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     }
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
+        outState.putBoolean(EXTRA_SETTINGS_RETURN_TO_CARPLAY, settingsReturnToCarPlay)
         outState.putBoolean("backup_for_report", backupForReport)
         outState.putString("settings_category", settingsCategory.name)
         connectionSettingsReturnCategory?.let { outState.putString("connection_settings_return_category", it.name) }
@@ -791,6 +797,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun navigateBack() {
         val returnCategory = connectionSettingsReturnCategory
         when {
+            page == "settings" && settingsReturnToCarPlay -> {
+                settingsReturnToCarPlay = false
+                page = "home"
+                connectionSettingsReturnCategory = null
+                if (!ConnectionAutoStart.paused && CarPlayBackgroundSession.hasSession()) {
+                    // Resume the existing projection without selecting a transport or starting a new connection.
+                    startActivity(ConnectionAutoStart.stamp(Intent(this, CarPlayHostActivity::class.java))
+                        .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                } else render()
+                return
+            }
             page == "backup" -> {
                 stopBackupServer()
                 page = "settings"
@@ -2920,6 +2937,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             appendLine("CarPlay setup: ${if (setupError == null) "ready" else "authentication unavailable"}")
             appendLine("Saved video preference (may differ from active session): ${if (AirPlayPersistence.loadHevcEnabled(appContext)) "HEVC" else "H.264"}; ${AirPlayPersistence.loadFps(appContext)} fps")
             appendLine("Media-key audio focus: ${if (AirPlayPersistence.loadDisableMediaKeyAudioFocus(appContext)) "disabled" else "enabled"}")
+            appendLine("Saved audio mode (active session may differ): ${if (AirPlayPersistence.loadCarBluetoothAudio(appContext)) "Bluetooth" else "CarPlay"}; " +
+                "callEchoCancellation=${AirPlayPersistence.loadCallEchoCancellation(appContext)} callVoiceFilter=${AirPlayPersistence.loadCallVoiceFilter(appContext)}")
+            appendLine(PhoneAudioRoute.diagnosticReport(appContext))
             appendLine(CarPlayMediaKeys.report())
             appendLine("MTK decoder tuning preference: ${if (AirPlayPersistence.loadMtkDecoderTuning(appContext)) "enabled" else "disabled"}")
             appendLine("CarPlay size: ${com.shilapi.xcertplay.airplay.CarPlaySize.fromWidthMillimeters(AirPlayPersistence.loadWidthPhysicalMm(appContext)).label}")
@@ -3485,6 +3505,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val FOCUS_RING get() = palette.focusRing
 
     companion object {
+        internal const val EXTRA_SETTINGS_RETURN_TO_CARPLAY = "com.preface.carplay.SETTINGS_RETURN_TO_CARPLAY"
         internal fun isLauncherIntent(intent: Intent): Boolean =
             intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
                 !intent.hasExtra("page")

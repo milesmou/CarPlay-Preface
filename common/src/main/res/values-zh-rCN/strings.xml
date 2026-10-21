@@ -468,8 +468,8 @@
     <string name="call_echo_cancellation_description">减少通话回声，效果取决于车机。下次连接生效。</string>
     <string name="call_voice_filter">更清晰的通话人声（实验性）</string>
     <string name="call_voice_filter_description">削减通话低音，可能改变音色。下次连接生效。</string>
-    <string name="phone_audio_route">CarPlay 通话使用车机电话音频（实验性）</string>
-    <string name="phone_audio_route_description">使用原车电话音频与回声消除，停用 CarPlay 回声消除；声音可能变大或失真。默认关闭，下次通话生效。</string>
+    <string name="phone_audio_route">CarPlay 通话使用车机电话音频</string>
+    <string name="phone_audio_route_description">仅在 CarPlay 音频方案下使用原车电话音频与回声消除，停用 CarPlay 回声消除；蓝牙音频方案交给原车。声音可能变大或失真。默认开启，下次通话生效。</string>
     <string name="phone_audio_route_apps">其他应用的 VoIP 通话使用车机电话音频（实验性）</string>
     <string name="phone_audio_route_apps_description">其他应用通话也使用原车电话音频，不影响语音留言。会同时开启方控无障碍服务。默认关闭。</string>
     <string name="smooth_video">流畅视频（实验性）</string>

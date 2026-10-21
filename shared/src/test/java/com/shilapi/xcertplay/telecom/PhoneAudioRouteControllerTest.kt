@@ -36,9 +36,19 @@ class PhoneAudioRouteControllerTest {
         class Task(val at: Long, val block: () -> Unit) { var cancelled = false }
 
         var time = 0L
+        var queueExecutions = false
+        private val executions = mutableListOf<() -> Unit>()
         private val tasks = mutableListOf<Task>()
 
-        override fun execute(block: () -> Unit) = block()
+        override fun execute(block: () -> Unit) {
+            if (queueExecutions) executions += block else block()
+        }
+
+        fun runExecutions() {
+            val pending = executions.toList()
+            executions.clear()
+            pending.forEach { it() }
+        }
 
         override fun schedule(delayMillis: Long, block: () -> Unit): () -> Unit {
             val task = Task(time + delayMillis, block)
@@ -71,6 +81,67 @@ class PhoneAudioRouteControllerTest {
         assertEquals(1, backend.starts)
         route.setWanted(PhoneAudioReason.CARPLAY_CALL, false)
         assertEquals("the call is kept for a moment", 0, backend.stops)
+        scheduler.advance(PhoneAudioRouteController.RELEASE_DELAY_MILLIS)
+        assertEquals(1, backend.stops)
+    }
+
+    @Test fun bluetoothAudioCallNeverStartsTheAuxiliaryCallOrCarPlayProcessingPolicy() {
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        route.settingsChanged()
+        assertEquals(0, backend.starts)
+        assertFalse(route.carPlayCallsUseCarAudio())
+    }
+
+    @Test fun enablingTheOptionDuringBluetoothAudioStillDoesNotStartAnAuxiliaryCall() {
+        enabled.remove(PhoneAudioReason.CARPLAY_CALL)
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        enabled += PhoneAudioReason.CARPLAY_CALL
+        route.settingsChanged()
+        assertEquals(0, backend.starts)
+        assertFalse(route.carPlayCallsUseCarAudio())
+    }
+
+    @Test fun aNewCarPlayAudioCallCanStartAfterABluetoothAudioCall() {
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, false, usesCarBluetoothAudio = true)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = false)
+        assertEquals(1, backend.starts)
+        assertTrue(route.carPlayCallsUseCarAudio())
+    }
+
+    @Test fun switchingToABluetoothAudioSessionReleasesThePreviousAuxiliaryCall() {
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = false)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, false)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        scheduler.advance(PhoneAudioRouteController.RELEASE_DELAY_MILLIS)
+        assertEquals(1, backend.starts)
+        assertEquals(1, backend.stops)
+        assertFalse(route.carPlayCallsUseCarAudio())
+    }
+
+    @Test fun queuedCarPlayAudioRequestRechecksTheCurrentBluetoothAudioMode() {
+        scheduler.queueExecutions = true
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = false)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, false)
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        scheduler.runExecutions()
+        assertEquals(0, backend.starts)
+        assertFalse(route.carPlayCallsUseCarAudio())
+    }
+
+    @Test fun bluetoothAudioDoesNotDisableAnExplicitlyEnabledOtherAppsCall() {
+        val route = controller()
+        route.setWanted(PhoneAudioReason.CARPLAY_CALL, true, usesCarBluetoothAudio = true)
+        route.setWanted(PhoneAudioReason.VOIP_APP, true)
+        assertEquals(1, backend.starts)
+        assertFalse(route.carPlayCallsUseCarAudio())
+        route.setWanted(PhoneAudioReason.VOIP_APP, false)
         scheduler.advance(PhoneAudioRouteController.RELEASE_DELAY_MILLIS)
         assertEquals(1, backend.stops)
     }
