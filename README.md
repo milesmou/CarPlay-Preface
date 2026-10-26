@@ -33,11 +33,6 @@
 
    请在 **设置 → 授权** 页面保存并手动安装或更新授权组件，再返回该页面点击 **创建 VPN**，按系统提示允许授权，然后重试有线连接。
 
-## 支持与联系
+## 禁止二次售卖声明
 
-| 赞助开发者一杯咖啡 ☕ | 联系开发者 |
-| :---: | :---: |
-| 如果这个项目对你有帮助，欢迎扫码赞助。 | 有问题可以扫码添加微信，联系开发者。 |
-| <a href="docs/images/wechat-donate.png"><img src="docs/images/wechat-donate.png" alt="微信赞助收款码" width="280"></a> | <a href="docs/images/wechat-contact.png"><img src="docs/images/wechat-contact.png" alt="开发者微信联系二维码" width="280"></a> |
-
-点击图片可查看原图。
+本项目免费分享，禁止任何个人或组织将本项目及其安装包二次售卖、付费分发，或通过改名、重新打包、捆绑销售等方式变相收费。请勿购买付费版本。
