@@ -57,6 +57,26 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
+## 0.2.2／1208 测试包构建核验
+
+2026-10-26，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步递增为 1208，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1208-debug.apk`，25,656,978 字节，包名 `com.preface.carplay`，原始 APK 和输出元数据保留。
+
+主包保持仓库原证书 SHA-256 `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`；主包 SHA-256 为 `33c301de651acf0959e950a25d687fd54371b5791c51715e85024333e8833ed3`。APK 中已核对仪表导航实验功能及免费开源／GitHub 仓库说明，仪表功能默认关闭、下次连接生效，实际车机权限及仪表显示仍待验证。
+
+内置授权组件 11 的 SHA-256 为 `50e25ee38bf205066e05bcc6aa5646276a2768738a96dd0ad9fd81ab5afd6fd8`；包名、版本、平台证书、系统共享 UID、元数据、生成 assets 和本次构建任务确认的签名产物均一致。主包媒体输入、Manifest 参数及配件认证资产核验通过，无媒体助手和额外签名输入入包。
+
+构建后发现一台在线设备 `emulator-5558`，已使用命名后的 APK 执行 `adb install -r` 成功，设备版本查询为 0.2.2／1208，保留数据。没有另行安装或授权内置组件。源码阶段此前 33 项定向验证通过，本次打包未追加单元测试、主应用全量 Lint 或完整 CI；组件依赖的 vital 检查随构建执行。安装成功不代表仪表功能已实车验证。本机日志、签名／资产核验和安装记录位于 `agent_docs/build1208-20261026/`。
+
+## 0.2.2／1207 测试包构建核验
+
+2026-10-21，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功。mobile／automotive 源码构建号同步为 1207，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1207-debug.apk`，25,637,430 字节，包名 `com.preface.carplay`，主包保持仓库原证书。
+
+本包包含“CarPlay 通话使用车机电话音频”默认开启及去除实验性标志、按当前会话音频方案区分辅助通话，以及从投影进入设置后直接返回原投影。用户已保存的关闭选择优先。高德首次显示顶部按钮的问题仍只完成分析，未修改触摸行为，不作为本包修复项。
+
+主包 SHA-256：`14c0487935c943eaa44cd78225a4d00d015393e509ac21195dbc7a1ce1354e02`。内置授权组件 11 的 SHA-256 为 `55d3bb8d3cbfa5ba19fd08dc5ff3026b61b65c3c91a7a92aab81900332ad5705`，与本次生成资产字节一致；包名、版本、平台证书、`android.uid.system` 和 manifest.json 均已核验。主包媒体输入、Manifest 参数和配件认证资产校验通过，无媒体助手或额外签名输入入包。
+
+此次打包未追加单元测试、主应用全量 Lint 或完整 CI，组件 Release 的 vital 检查随依赖执行。构建后 ADB 设备列表为空，未安装主包或独立组件，未启动模拟器；实车效果待验证。保留原始 APK 和输出元数据，本机构建、签名核验及设备记录位于忽略目录 `agent_docs/build1207-20261021/`。
+
 ## 0.2.2／1206 麦克风诊断测试包构建核验
 
 2026-10-21，按用户要求执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步为 1206，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1206-debug.apk`，25,637,334 字节，包名 `com.preface.carplay`，主包保持仓库原证书。新增诊断内容及复测方法见 [通话麦克风诊断](CALL_MICROPHONE_DIAGNOSTICS_2026-10-21.md)。

@@ -18,6 +18,19 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun experimentalInstrumentNavigationBacksUpOnlyItsSwitch() {
+        val values = prefs("diplay_instrument_navigation")
+        values.edit().putBoolean("enabled", true).putString("last_road", "private-road").commit()
+        val bytes = SettingsBackupCodec.export(context, "test")
+        val saved = JSONObject(bytes.toString(Charsets.UTF_8)).getJSONObject("settings")
+            .getJSONObject("diplay_instrument_navigation")
+        assertTrue(saved.getBoolean("enabled"))
+        assertFalse(saved.has("last_road"))
+        values.edit().clear().commit()
+        assertFalse(SettingsBackupCodec.import(context, bytes).invalid)
+        assertTrue(com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.enabled(context))
+    }
+
     @Test fun automaticConnectionBacksUpOnlyTheUnifiedOption() {
         val values = prefs("diplay")
         values.edit().clear().putBoolean("auto_connect", false)

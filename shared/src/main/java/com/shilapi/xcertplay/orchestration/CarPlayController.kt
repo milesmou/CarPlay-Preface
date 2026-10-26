@@ -140,6 +140,7 @@ class CarPlayController(
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
 
     private val appContext = context.applicationContext
+    private val instrumentNavigation = com.shilapi.xcertplay.vehicle.PrefaceInstrumentNavigation.create(appContext, ::debugLog)
     private var bluetoothAudioOwnership = false
     private var bluetoothAudioCommand = false
     private var bluetoothAudioHandoff: com.shilapi.xcertplay.vehicle.BluetoothAudioHandoff? = null
@@ -309,6 +310,7 @@ class CarPlayController(
                 }
             }
             activeSession = session
+            if (replacement) instrumentNavigation?.start(session)
             if (replacement) publishBluetoothHandoffReady(usesCarBluetoothAudio || wirelessPeerBluetoothAddress == null)
             wirelessPeerBluetoothAddress?.let { configureBluetoothAudioHandoff(session, it) }
 
@@ -326,6 +328,7 @@ class CarPlayController(
             }
             if (activeSession === session) {
                 activeSession = null
+                instrumentNavigation?.end(session)
                 synchronized(phoneCalls) { phoneCalls.clear() }
                 synchronized(albumReplayLock) { initialArtworkReplay = null }
                 NavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
@@ -680,6 +683,7 @@ class CarPlayController(
             dashboardMapOutputVisible = false
         }
         firstTcpWatchdog?.terminate()
+        instrumentNavigation?.close()
         mainHandler.post { clearBluetoothAudioHandoff() }
         startupTimer.shutdownNow()
         val teardownStarted = System.nanoTime()
@@ -826,6 +830,7 @@ class CarPlayController(
     // HUD (SOME/IP) and cluster (AMap broadcast) keep separate state so one failing cannot stall the other.
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
         if (closed) return
+        instrumentNavigation?.accept(frame, activeSession)
         synchronized(phoneCalls) { phoneCalls.accept(frame) }
         NavigationOutputs.onFrame(frame, usesCarBluetoothAudio)
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)

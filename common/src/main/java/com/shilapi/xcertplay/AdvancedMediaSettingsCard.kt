@@ -56,6 +56,12 @@ internal class AdvancedMediaSettingsCard(
         }
         // Focus options finish the regular group; their experimental override starts the lower group.
         audioFocusControls(card)
+        toggle(card, getString(R.string.settings_instrument_navigation),
+            getString(R.string.settings_instrument_navigation_description),
+            com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.enabled(context)) {
+            com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.save(context, it)
+            markReconnectNeeded()
+        }
         toggle(card, getString(R.string.settings_low_latency_decoder),
             getString(R.string.settings_low_latency_decoder_description),
             AirPlayPersistence.loadLowLatencyDecoder(context)) {

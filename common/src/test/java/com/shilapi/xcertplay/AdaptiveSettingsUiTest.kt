@@ -1099,6 +1099,38 @@ class AdaptiveSettingsUiTest {
         }
     }
 
+    @Test
+    @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
+    fun experimentalInstrumentNavigationSavesForNextConnectionWithoutStoppingCarPlay() {
+        val settings = com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings
+        assertFalse(settings.enabled(context))
+        val screen = openSettings()
+        val session = mock(CarPlayController::class.java)
+        var stops = 0
+        CarPlayBackgroundSession.store(session, mock(AndroidMediaSink::class.java), 1920, 720, Any(),
+            CarPlaySessionDisplay(1920, 720, Surface.ROTATION_0, false, false, 1920, 720)) { stops++ }
+        CarPlayBackgroundSession.active = true
+        try {
+            PendingReconnect.clear()
+            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.EXPERIMENTAL)
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            val title = screen.getString(R.string.settings_instrument_navigation)
+            assertEquals("仪表导航提示（实验性）", title)
+            val toggle = descendants(screen.window.decorView).filterIsInstance<Switch>()
+                .single { it.contentDescription == title }
+            assertFalse(toggle.isChecked)
+            (toggle.parent as View).performClick()
+            assertTrue(settings.enabled(context))
+            assertTrue(PendingReconnect.isPending(session))
+            assertEquals(0, stops)
+            assertSame(session, CarPlayBackgroundSession.snapshot()?.controller)
+        } finally {
+            CarPlayBackgroundSession.active = false
+            CarPlayBackgroundSession.clear()
+            PendingReconnect.clear()
+        }
+    }
+
     @Test fun settingsLiveWhereDriversLookForThem() {
         AirPlayPersistence.saveWirelessHotspotMode(context, WirelessHotspotMode.MANUAL)
         val screen = openSettings()
@@ -1141,6 +1173,10 @@ class AdaptiveSettingsUiTest {
             assertFalse(text(it), text(it) in audio)
         }
         assertTrue(text(R.string.right_hand_drive) in vehicle)
+        assertTrue(text(R.string.settings_instrument_navigation) in advanced)
+        for (other in listOf(connection, display, audio, vehicle)) {
+            assertFalse(text(R.string.settings_instrument_navigation) in other)
+        }
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)
         assertTrue(vehicle.any { it.startsWith(text(R.string.settings_wheel_siri) + " · ") })
         assertTrue(text(R.string.settings_wheel_keys) in vehicle)
