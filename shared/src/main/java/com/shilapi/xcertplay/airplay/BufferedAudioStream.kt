@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.airplay
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.Closeable
 import java.io.DataInputStream
 import java.math.BigInteger

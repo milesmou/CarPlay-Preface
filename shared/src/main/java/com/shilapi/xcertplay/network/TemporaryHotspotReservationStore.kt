@@ -21,7 +21,7 @@ object TemporaryHotspotReservationStore {
     fun release() {
         val retained = take() ?: return
         runCatching { retained.manager.close() }.onFailure {
-            android.util.Log.w("DiPlay-Hotspot", "Idle reservation release failed failureClass=${it.javaClass.simpleName}")
+            com.shilapi.xcertplay.logging.CarPlayLog.w("DiPlay-Hotspot", "Idle reservation release failed failureClass=${it.javaClass.simpleName}")
         }
     }
 }

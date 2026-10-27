@@ -15,7 +15,7 @@ import android.telecom.DisconnectCause
 import android.telecom.PhoneAccount
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import androidx.annotation.RequiresApi
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit

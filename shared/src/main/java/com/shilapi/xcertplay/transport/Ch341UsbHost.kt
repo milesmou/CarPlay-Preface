@@ -12,7 +12,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.Closeable
 import java.util.concurrent.Executor
 

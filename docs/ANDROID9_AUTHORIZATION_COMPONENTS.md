@@ -57,6 +57,26 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
+## 0.2.2／1210 测试包构建核验
+
+2026-10-27，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步递增为 1210，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1210-debug.apk`，25,657,534 字节，包名 `com.preface.carplay`，原始 APK 和输出元数据保留。
+
+主包 SHA-256 为 `8e8e1ad32a12715cf23a31fc7195d9aa68eb845a1290290d5119262bc978b720`，保持仓库原证书 SHA-256 `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`。包内已核对统一日志入口、分级回调和报告头标识，Debug BuildConfig 开关为 true，此测试包使用 `debug-detailed`，保留详细日志；本次没有构建 Release。原厂仪表 SDK 接入及导航页首项、默认开启、保存值优先的设置继续保留，实车仪表显示仍待验证。
+
+内置授权组件 11 的 SHA-256 为 `11ac3cf1220f6d0fd1b94dda43d6d30ac46e8ae271b82c23907e3effc225583e`；包名、版本、平台证书、系统共享 UID、元数据、生成 assets 和本次构建任务确认有效的签名产物一致。主包媒体输入、Manifest 参数和配件认证资产核验通过，无媒体助手或额外签名输入入包。
+
+已向唯一在线设备 `emulator-5558` 使用命名后的 APK 执行 `adb install -r` 成功，版本查询为 0.2.2／1210，保留数据；未单独安装或授权内置组件。此前日志分级源码的 Debug／Release 共 84 项定向验证通过，本次打包未追加单元测试、主应用全量 Lint 或完整 CI；组件依赖检查随构建任务图纳入。本机核验和安装记录位于 `agent_docs/build1210-20261027/`。
+
+## 0.2.2／1209 测试包构建核验
+
+2026-10-27，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步递增为 1209，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1209-debug.apk`，25,657,534 字节，包名 `com.preface.carplay`，原始 APK 和输出元数据保留。
+
+主包 SHA-256 为 `d8490e5222fcbab28f346b250a64452f4b1f837221e5f186b75f798b50f61408`，保持仓库原证书 SHA-256 `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`。包内已核对原厂仪表 SDK 接入标识和接口名称，旧直接属性后端已移除；“仪表导航提示”移至导航页第一项、去除实验性标题，缺失保存值默认开启，已保存的关闭选择优先，下次连接生效。原厂 SDK 的实车准备状态和仪表显示仍待验证，详见 [分析与修正](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27.md)。
+
+内置授权组件 11 的 SHA-256 为 `11ac3cf1220f6d0fd1b94dda43d6d30ac46e8ae271b82c23907e3effc225583e`；包名、版本、平台证书、系统共享 UID、元数据、生成 assets 和本次构建任务确认的签名产物一致。主包媒体输入、Manifest 参数和配件认证资产核验通过，无媒体助手或额外签名输入入包。
+
+已向唯一在线设备 `emulator-5558` 使用命名后的 APK 执行 `adb install -r` 成功，版本查询为 0.2.2／1209，保留数据；未单独安装或授权内置组件。源码阶段此前 39 项定向验证通过，本次打包未追加单元测试、主应用全量 Lint 或完整 CI；组件依赖的 vital 检查随构建执行。本机核验和安装记录位于 `agent_docs/build1209-20261027/`。
+
 ## 0.2.2／1208 测试包构建核验
 
 2026-10-26，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步递增为 1208，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1208-debug.apk`，25,656,978 字节，包名 `com.preface.carplay`，原始 APK 和输出元数据保留。

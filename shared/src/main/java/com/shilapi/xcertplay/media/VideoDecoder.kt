@@ -4,7 +4,8 @@ import android.media.MediaCodec
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
+import com.shilapi.xcertplay.logging.LogPolicy
 import android.view.Surface
 import com.shilapi.xcertplay.airplay.VideoCodec
 import java.io.Closeable
@@ -205,7 +206,7 @@ internal class VideoDecoder(
                         null -> Unit
                     }
                     if (outputThread == null) decoder?.let(::drainOutput)
-                    stats.logIfDue()?.let(report)
+                    stats.logIfDue()?.let { if (LogPolicy.detailedEnabled) report(it) }
                     if (referenceChain.needsKeyFrame && lastConfig != null && outputSurface != null) requestKeyFrameIfDue()
                 } catch (error: Exception) {
                     onJobFailure(job?.javaClass?.simpleName ?: "drain", error)

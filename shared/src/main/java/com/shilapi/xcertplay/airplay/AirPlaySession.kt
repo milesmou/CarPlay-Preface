@@ -1,6 +1,8 @@
 package com.shilapi.xcertplay.airplay
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
+import com.shilapi.xcertplay.logging.DiagnosticLevel
+import com.shilapi.xcertplay.logging.LogPolicy
 import com.shilapi.xcertplay.mfi.MfiAuthenticator
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import java.io.BufferedInputStream
@@ -38,6 +40,8 @@ interface AirPlaySessionListener {
     /** Video in car: requestUI "videoplayback:", the iPhone asks the car to show its video player. */
     fun onVideoPlaybackUiRequested(session: AirPlaySession) {}
     fun onDebugLog(message: String) {}
+    /** Retained lifecycle events and failures also reach Release diagnostic reports. */
+    fun onDiagnosticLog(level: DiagnosticLevel, message: String) { onDebugLog(message) }
 }
 
 /** Stream transport seam; media decode/render is supplied by a later layer. */
@@ -123,6 +127,12 @@ class AirPlaySession(
     fun syncedNtp(): BigInteger = ntp.syncedNtp()
 
     internal fun logDebug(message: String) = debugLog(message)
+
+    internal fun logEvent(message: String) {
+        Log.event(TAG, message)
+        try { listener.onDiagnosticLog(DiagnosticLevel.EVENT, message) }
+        catch (error: Exception) { Log.w(TAG, "event log callback failed", error) }
+    }
 
     internal fun videoFrameRendered() {
         if (!closed.get()) listener.onVideoFrameRendered(this)
@@ -515,7 +525,7 @@ class AirPlaySession(
             closeReason = "control I/O failed: ${error.message ?: error.javaClass.simpleName}"
             if (!closed.get()) Log.e(TAG, "airplay $closeReason", error)
         } finally {
-            debugLog("airplay control closing reason=$closeReason activeStreams=$activeStreams")
+            logEvent("airplay control closing reason=$closeReason activeStreams=$activeStreams")
             close()
         }
     }
@@ -610,6 +620,7 @@ class AirPlaySession(
     }
 
     private fun debugLog(message: String, uiVisible: Boolean = true) {
+        if (!LogPolicy.detailedEnabled) return
         Log.i(TAG, message)
         if (!uiVisible) return
         try {
@@ -620,6 +631,7 @@ class AirPlaySession(
     }
 
     private fun trace(message: String) {
+        if (!LogPolicy.detailedEnabled) return
         try {
             listener.onDebugLog("TRACE $message")
         } catch (error: Exception) {
@@ -922,7 +934,7 @@ class AirPlaySession(
         } catch (error: Exception) {
             if (!closed.get()) Log.e(TAG, "airplay event read failed", error)
         } finally {
-            debugLog("airplay event connection closed")
+            logEvent("airplay event connection closed")
             videoPlaybackAvailability.setEventReady(false)
             if (eventSocket === socket) eventSocket = null
             eventCipher = null

@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.media
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.Closeable
 
 /** One active mono call canceller; the uplink owns its processing and teardown. */

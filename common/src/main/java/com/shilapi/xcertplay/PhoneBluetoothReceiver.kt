@@ -10,7 +10,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.SystemClock
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import androidx.core.content.ContextCompat
 
 /** Automatic connection uses the phone from the connected event; receiver profiles supplement ACL. */

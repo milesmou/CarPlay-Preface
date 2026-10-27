@@ -17,7 +17,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
+import com.shilapi.xcertplay.logging.DiagnosticLevel
+import com.shilapi.xcertplay.logging.LogPolicy
 import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
 import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
 import com.shilapi.xcertplay.airplay.AirPlayConfig
@@ -140,7 +142,7 @@ class CarPlayController(
     private enum class Phase { IDLE, MFI, WIRELESS, IPHONE, REENUMERATION, DATAPATHS, CONTROL }
 
     private val appContext = context.applicationContext
-    private val instrumentNavigation = com.shilapi.xcertplay.vehicle.PrefaceInstrumentNavigation.create(appContext, ::debugLog)
+    private val instrumentNavigation = com.shilapi.xcertplay.vehicle.PrefaceInstrumentNavigation.create(appContext, ::eventLog)
     private var bluetoothAudioOwnership = false
     private var bluetoothAudioCommand = false
     private var bluetoothAudioHandoff: com.shilapi.xcertplay.vehicle.BluetoothAudioHandoff? = null
@@ -315,7 +317,7 @@ class CarPlayController(
             wirelessPeerBluetoothAddress?.let { configureBluetoothAudioHandoff(session, it) }
 
             if (replacement) restoreDashboardContent(session)
-            debugLog(
+            eventLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
                     "peer=${session.host}",
             )
@@ -342,12 +344,12 @@ class CarPlayController(
                     if (wasPlaying) playbackListener?.invoke(false)
                 }
             }
-            debugLog("AirPlay session ended peer=${session.host}")
+            eventLog("AirPlay session ended peer=${session.host}")
             uiListener?.onSessionEnded(session)
         }
 
         override fun onTransportError(message: String) {
-            debugLog("AirPlay transport error: $message")
+            diagnosticLog(DiagnosticLevel.WARNING, "AirPlay transport error: $message")
             uiListener?.onTransportError(message)
         }
 
@@ -415,6 +417,10 @@ class CarPlayController(
 
         override fun onDebugLog(message: String) {
             debugLog(message)
+        }
+
+        override fun onDiagnosticLog(level: DiagnosticLevel, message: String) {
+            diagnosticLog(level, message)
         }
     }
 
@@ -1747,6 +1753,11 @@ class CarPlayController(
                 sessionListener.onDebugLog(message)
             }
 
+            override fun onDiagnosticLog(level: DiagnosticLevel, message: String) {
+                if (isStaleWirelessRun(generation)) return
+                sessionListener.onDiagnosticLog(level, message)
+            }
+
             // Passed on explicitly: without these the car's video player never opened over Wi-Fi.
             override fun onRemoteControlMessage(session: AirPlaySession, streamId: Long, message: Map<String, Any?>) =
                 sessionListener.onRemoteControlMessage(session, streamId, message)
@@ -2179,8 +2190,8 @@ class CarPlayController(
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
             milestone("carkit_control")
-            // Temporary lab capture, limited to accessory/authentication messages and two minutes.
-            try {
+            // Debug-only capture, limited to accessory/authentication messages and two minutes.
+            if (LogPolicy.detailedEnabled) try {
                 val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
                 Thread({
                     try {
@@ -2922,9 +2933,23 @@ class CarPlayController(
     }
 
     private fun debugLog(message: String) {
-        Log.i(IphoneCarPlayConfiguration.TAG, message)
+        diagnosticLog(DiagnosticLevel.DEBUG, message)
+    }
+
+    private fun eventLog(message: String) {
+        diagnosticLog(DiagnosticLevel.EVENT, message)
+    }
+
+    private fun diagnosticLog(level: DiagnosticLevel, message: String) {
+        if (!LogPolicy.enabled(level)) return
+        when (level) {
+            DiagnosticLevel.DEBUG -> Log.i(IphoneCarPlayConfiguration.TAG, message)
+            DiagnosticLevel.EVENT -> Log.event(IphoneCarPlayConfiguration.TAG, message)
+            DiagnosticLevel.WARNING -> Log.w(IphoneCarPlayConfiguration.TAG, message)
+            DiagnosticLevel.ERROR -> Log.e(IphoneCarPlayConfiguration.TAG, message)
+        }
         try {
-            uiListener?.onDebugLog(message)
+            uiListener?.onDiagnosticLog(level, message)
         } catch (error: Exception) {
             Log.w(IphoneCarPlayConfiguration.TAG, "debug log callback failed", error)
         }
@@ -2949,7 +2974,7 @@ class CarPlayController(
     private fun debugLog(message: String, error: Throwable) {
         Log.w(IphoneCarPlayConfiguration.TAG, message, error)
         try {
-            uiListener?.onDebugLog("$message: ${describeThrowable(error)}")
+            uiListener?.onDiagnosticLog(DiagnosticLevel.WARNING, "$message: ${describeThrowable(error)}")
         } catch (callbackError: Exception) {
             Log.w(IphoneCarPlayConfiguration.TAG, "debug log callback failed", callbackError)
         }
@@ -2985,7 +3010,9 @@ class CarPlayController(
             if (!closed && (generation == null || generation == wirelessGeneration.get()) && status != lastReportedStatus) {
                 lastReportedStatus = status
                 connectionDiagnostic("stage=${status.javaClass.simpleName}")
-                uiListener?.onDebugLog(status.debugLogMessage())
+                diagnosticLog(if (status is CarPlayStatus.Failed) DiagnosticLevel.ERROR else DiagnosticLevel.EVENT,
+                    status.retainedDiagnosticMessage())
+                debugLog(status.debugLogMessage())
                 uiStatusReporter?.invoke(status)
             }
         }

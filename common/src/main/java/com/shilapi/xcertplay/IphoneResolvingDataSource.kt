@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay
 
 import android.net.Uri
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.ByteArrayDataSource

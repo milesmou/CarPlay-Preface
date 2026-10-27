@@ -8,7 +8,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.transport.CarPlayLocationFix
 import com.shilapi.xcertplay.transport.Iap2LocationProvider
 import com.shilapi.xcertplay.transport.NmeaLocationEncoder

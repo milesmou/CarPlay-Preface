@@ -1,8 +1,7 @@
 package com.shilapi.xcertplay.vehicle
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.ServiceConnection
+import android.os.Handler
 import android.os.Looper
 import org.junit.Assert.*
 import org.junit.Before
@@ -12,152 +11,283 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class PrefaceInstrumentBackendTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
+    private lateinit var handle: PrefaceInstrumentSdkHandle
     private var currentSession = true
-    private val backend get() = PrefaceInstrumentCarBackend(context, resolve = { name ->
+    private var navigationInfoType: Class<*> = Info::class.java
+    private val resolved = mutableListOf<String>()
+    private val guidance = PrefaceInstrumentGuidance(102, 150, "测试道路", 12500, 90)
+
+    private fun backend() = PrefaceInstrumentSdkBackend(context, resolve = { name ->
+        resolved += name
         when (name) {
-            "android.car.Car" -> Car::class.java
-            "android.car.hardware.property.CarPropertyManager" -> Properties::class.java
-            "android.os.SystemProperties" -> SystemState::class.java
-            "com.ecarx.xui.adaptapi.dim.impl.util.ECarXDIMUtil" -> Encoder::class.java
-            else -> error(name)
+            "com.ecarx.xui.adaptapi.diminteraction.DimInteraction" -> Dim::class.java
+            "com.ecarx.xui.adaptapi.binder.IConnectable" -> Connectable::class.java
+            "com.ecarx.xui.adaptapi.binder.IConnectable\$IConnectWatcher" -> Watcher::class.java
+            "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction" -> Navigation::class.java
+            "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction\$INavigationInfo" -> navigationInfoType
+            else -> throw ClassNotFoundException(name) // No raw Car API, encoder or SystemProperties.
         }
-    }, currentSession = { currentSession })
+    }, currentSession = { currentSession }, sdk = handle)
 
     @Before fun reset() {
+        handle = PrefaceInstrumentSdkHandle()
         currentSession = true
-        Car.current = null
-        Car.properties = Properties()
-        SystemState.values.clear()
-        SystemState.values["sys.bicv.navi.status"] = "false"
-        SystemState.values["sys.bicv.phone.status"] = "false"
-        Encoder.values = emptyList()
+        navigationInfoType = Info::class.java
+        resolved.clear()
+        Dim.events.clear()
+        Dim.created = 0
+        Dim.instance = Dim()
+        Dim.automaticConnection = true
+        Dim.failPublish = null
+        Dim.failStart = null
+        Dim.failStop = null
     }
 
-    private fun connected(): PrefaceInstrumentCarBackend = backend.also {
-        it.connect(); shadowOf(Looper.getMainLooper()).idle(); assertTrue(it.ready())
-    }
+    private fun connected(): PrefaceInstrumentSdkBackend = backend().also { it.connect(); assertTrue(it.ready()) }
 
-    @Test fun writesOnlyFixedNavigationPropertyUsingFirmwareEncoder() {
+    @Test fun followsNativeCreateConnectStartUpdateStopLifecycle() {
         val api = connected()
-        api.publish(PrefaceInstrumentGuidance(102, 150, "道路", 12500, 90))
-        assertEquals(listOf(true, false, 2, 0, 12f, 1, 150f, 2, "道路"), Encoder.values)
-        assertEquals(762314830, Car.properties.ids.single())
-        assertArrayEquals(byteArrayOf(3, 42), Car.properties.sent.single())
+        api.publish(guidance)
+        api.publish(guidance.copy(distanceMeters = 120))
+        assertEquals(listOf("create", "watch", "connect", "navigation", "start", "update:1", "update:1"), Dim.events)
+        val info = Dim.instance.navigation.updates.first()
+        assertEquals(1, info.getNavigationStatus())
+        assertEquals(102, info.getNavigationTurnId())
+        assertEquals(150L, info.getDistanceToNextGuidancePoint())
+        assertEquals(12500L, info.getDistanceToDestination())
+        assertEquals(90L, info.getETA())
+        assertEquals("测试道路", info.getNextGuidancePointName())
+        assertEquals(0, info.getDrivingDirection())
+        assertEquals(0, info.getLaneInfo().size)
+        assertNull(info.getExtensionInfo())
         api.clear()
-        assertEquals(false, Encoder.values[0])
-        assertEquals(true, Encoder.values[1])
-        api.close(); shadowOf(Looper.getMainLooper()).idle()
-        assertFalse(Car.current!!.connected)
+        assertEquals(listOf("update:0", "stop"), Dim.events.takeLast(2))
+        assertEquals(0L, Dim.instance.navigation.updates.last().getDistanceToDestination())
+        api.close()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertEquals(listOf("unwatch", "disconnect"), Dim.events.takeLast(2))
     }
 
-    @Test fun nativeNavigationPhoneAndUnknownStateRejectAllWritesIncludingClear() {
+    @Test fun missingBicvPropertiesAreNotQueriedOrUsedAsAnAdmissionGate() {
         val api = connected()
-        for ((key, state) in listOf("sys.bicv.navi.status" to "true", "sys.bicv.phone.status" to "1",
-            "sys.bicv.phone.status" to "unknown", "sys.bicv.navi.status" to "")) {
-            SystemState.values[key] = state
-            assertFalse(api.available())
-            assertThrows(IllegalStateException::class.java) { api.publish(PrefaceInstrumentGuidance(102, 100, "", 0, 0)) }
-            assertThrows(IllegalStateException::class.java) { api.clear() }
-            SystemState.values[key] = "false"
-        }
-        assertTrue(Car.properties.sent.isEmpty())
+        api.publish(guidance)
+        assertTrue(resolved.none { "SystemProperties" in it || "CarProperty" in it || "ECarXDIMUtil" in it })
+        assertEquals(1, Dim.instance.navigation.updates.single().getNavigationStatus())
         api.close()
     }
 
-    @Test fun missingReadOnlyOrWrongTypePropertyDoesNotBecomeReady() {
-        for (config in listOf(null, PropertyConfig(access = 1), PropertyConfig(type = Int::class.java))) {
-            Car.properties.config = config
-            val api = backend
-            api.connect(); shadowOf(Looper.getMainLooper()).idle()
-            assertThrows(IllegalStateException::class.java) { api.ready() }
-            assertTrue(Car.properties.sent.isEmpty())
-            api.close(); shadowOf(Looper.getMainLooper()).idle()
-        }
+    @Test fun mustReceiveRealConnectionCallbackBeforeGettingNavigationOrPublishing() {
+        Dim.automaticConnection = false
+        val api = backend()
+        api.connect()
+        assertFalse(api.ready())
+        assertFalse("navigation" in Dim.events)
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
+        Dim.instance.watcher!!.onConnected()
+        assertTrue(api.ready())
+        api.publish(guidance)
+        Dim.instance.watcher!!.onDisConnected()
+        assertFalse(api.ready())
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
+        api.close()
     }
 
-    @Test fun disconnectAndClosedBackendCannotWrite() {
+    @Test fun queuedNativeStopsFinishBeforeAReplacementCanPublish() {
+        val first = connected()
+        first.publish(guidance)
+        first.clear()
+        first.close()
+        val second = backend()
+        second.connect()
+        assertFalse(second.ready())
+        assertThrows(IllegalStateException::class.java) { second.publish(guidance) }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertTrue(second.ready())
+        second.publish(guidance)
+        assertEquals(1, Dim.created) // Reuse the SDK's original vehicle-manager instance.
+        assertFalse("disconnect" in Dim.events)
+        val lastClear = Dim.events.indexOfLast { it == "native-clear:500" }
+        assertTrue(lastClear < Dim.events.indexOfLast { it == "update:1" })
+        first.close()
+        assertTrue(second.ready())
+        second.close()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertEquals(1, Dim.events.count { it == "disconnect" })
+    }
+
+    @Test fun reconnectReusesOriginalNativeInstanceAfterFullRelease() {
+        val first = connected()
+        first.publish(guidance); first.close()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        val second = connected()
+        second.publish(guidance)
+        assertEquals(1, Dim.created)
+        assertEquals(2, Dim.events.count { it == "connect" })
+        assertEquals(2, Dim.events.count { it == "start" })
+        second.close()
+    }
+
+    @Test fun expiredSessionCannotStartOrPublishAndUnsupportedTurnIsRejected() {
         val api = connected()
         currentSession = false
-        assertThrows(IllegalStateException::class.java) { api.publish(PrefaceInstrumentGuidance(102, 100, "", 0, 0)) }
-        assertTrue(Car.properties.sent.isEmpty())
-        Car.current!!.connected = false
-        assertFalse(api.ready())
-        assertThrows(IllegalStateException::class.java) { api.clear() }
-        api.close(); shadowOf(Looper.getMainLooper()).idle()
-        assertFalse(api.ready())
-    }
-
-    @Test fun unavailableSdkFailsBeforeCarConnection() {
-        val api = PrefaceInstrumentCarBackend(context, resolve = { throw ClassNotFoundException(it) })
-        assertThrows(ClassNotFoundException::class.java) { api.connect() }
-        assertNull(Car.current)
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
+        assertFalse("start" in Dim.events)
+        currentSession = true
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance.copy(turnId = 999)) }
+        assertFalse("start" in Dim.events)
         api.close()
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
     }
 
-    @Test fun encoderInputsFitInstrumentDistanceAndTimeFields() {
+    @Test fun nativePermissionRejectionHasNoRawPropertyFallback() {
         val api = connected()
-        api.publish(PrefaceInstrumentGuidance(109, Int.MAX_VALUE, "", Long.MAX_VALUE, Long.MAX_VALUE))
-        assertEquals(6553.5f, Encoder.values[4])
-        assertEquals(1638.3f, Encoder.values[6])
-        assertEquals(8191, Encoder.values[7])
+        Dim.failPublish = SecurityException("native rejection")
+        val failure = assertThrows(java.lang.reflect.InvocationTargetException::class.java) { api.publish(guidance) }
+        assertTrue(failure.targetException is SecurityException)
+        api.close()
+        assertTrue("stop" in Dim.events)
+        assertTrue(resolved.none { "CarProperty" in it || "ECarXDIMUtil" in it })
+    }
+
+    @Test fun failedStopStillReleasesWatcherAndConnection() {
+        val api = connected()
+        api.publish(guidance)
+        Dim.failStop = SecurityException("stop rejected")
+        api.close()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertEquals(listOf("unwatch", "disconnect"), Dim.events.takeLast(2))
+    }
+
+    @Test fun rejectedStartDoesNotClearNavigationThatWeNeverStarted() {
+        val api = connected()
+        Dim.failStart = SecurityException("start denied")
+        assertThrows(java.lang.reflect.InvocationTargetException::class.java) { api.publish(guidance) }
+        api.close()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(Dim.instance.navigation.updates.isEmpty())
+        assertFalse("stop" in Dim.events)
+        assertEquals(listOf("unwatch", "disconnect"), Dim.events.takeLast(2))
+    }
+
+    @Test fun unavailableSdkDoesNotPretendToConnect() {
+        val api = PrefaceInstrumentSdkBackend(context, resolve = { throw ClassNotFoundException(it) }, sdk = handle)
+        assertThrows(ClassNotFoundException::class.java) { api.connect() }
+        assertFalse(api.ready())
+        assertEquals(0, Dim.created)
         api.close()
     }
 
-    @Test fun savedExperimentalChoiceDefaultsOffAndIsPreserved() {
-        assertFalse(PrefaceInstrumentSettings.enabled(context))
+    @Test fun mismatchedSdkDataInterfaceFailsBeforeCreatingTheNativeInstance() {
+        navigationInfoType = BadInfo::class.java
+        val api = backend()
+        assertThrows(IllegalStateException::class.java) { api.connect() }
+        assertEquals(0, Dim.created)
+        api.close()
+    }
+
+    @Test fun backgroundCallbacksAreOrderedOnMainAndReleasedCallbacksAreIgnored() {
+        Dim.automaticConnection = false
+        val api = backend()
+        api.connect()
+        val watcher = Dim.instance.watcher!!
+        Thread { watcher.onConnected() }.apply { start(); join() }
+        assertFalse(api.ready())
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(api.ready())
+        api.close()
+        shadowOf(Looper.getMainLooper()).idle()
+        watcher.onConnected()
+        assertFalse(handle.connected)
+    }
+
+    @Test fun instrumentNavigationDefaultsOnAndPreservesSavedChoices() {
+        val prefs = context.getSharedPreferences(PrefaceInstrumentSettings.PREFERENCES, Context.MODE_PRIVATE)
+        assertFalse(prefs.contains(PrefaceInstrumentSettings.ENABLED))
+        assertTrue(PrefaceInstrumentSettings.enabled(context))
+        assertFalse(prefs.contains(PrefaceInstrumentSettings.ENABLED))
         PrefaceInstrumentSettings.save(context, true)
         assertTrue(PrefaceInstrumentSettings.enabled(context))
         PrefaceInstrumentSettings.save(context, false)
         assertFalse(PrefaceInstrumentSettings.enabled(context))
+        prefs.edit().remove(PrefaceInstrumentSettings.ENABLED).commit()
+        assertTrue(PrefaceInstrumentSettings.enabled(context))
     }
 
-    class Car(private val callback: ServiceConnection) {
-        var connected = false
-        fun connect() { connected = true; callback.onServiceConnected(ComponentName("test", "Car"), null) }
-        fun disconnect() { connected = false }
-        fun isConnected() = connected
-        fun getCarManager(name: String): Any { check(name == "property"); return properties }
+    interface Watcher { fun onConnected(); fun onDisConnected() }
+    interface Connectable {
+        fun registerConnectWatcher(watcher: Watcher)
+        fun unregisterConnectWatcher()
+        fun connect()
+        fun disconnect()
+    }
+    class Dim : Connectable {
+        var watcher: Watcher? = null
+        val navigation = Navigation()
+        override fun registerConnectWatcher(watcher: Watcher) { events += "watch"; this.watcher = watcher }
+        override fun unregisterConnectWatcher() { events += "unwatch"; watcher = null }
+        override fun connect() { events += "connect"; if (automaticConnection) watcher!!.onConnected() }
+        override fun disconnect() { events += "disconnect" }
+        fun getNaviInteraction(): Navigation { events += "navigation"; return navigation }
+        fun setPresentationToDimSwitch(app: Int, pkg: String, cls: String, enabled: Boolean) {
+            error("Projection is not part of CarPlay instrument navigation")
+        }
         companion object {
-            var current: Car? = null
-            var properties = Properties()
-            @JvmStatic fun createCar(context: Context, callback: ServiceConnection): Car = Car(callback).also { current = it }
+            val events = mutableListOf<String>()
+            var created = 0
+            var automaticConnection = true
+            var instance = Dim()
+            var failPublish: Exception? = null
+            var failStart: Exception? = null
+            var failStop: Exception? = null
+            @JvmStatic fun create(context: Context): Dim { events += "create"; created++; return instance }
         }
     }
-    class Properties {
-        var config: PropertyConfig? = PropertyConfig()
-        val sent = mutableListOf<ByteArray>()
-        val ids = mutableListOf<Int>()
-        fun getPropertyList(): List<PropertyConfig> = listOfNotNull(config)
-        fun setProperty(type: Class<*>, id: Int, area: Int, value: Any) {
-            check(type == ByteArray::class.java && area == 0)
-            ids += id; sent += value as ByteArray
+    class Navigation {
+        val updates = mutableListOf<Info>()
+        fun notifyTurnByTurnStarted() { Dim.failStart?.let { throw it }; Dim.events += "start" }
+        fun updateNavigationInfo(info: Info) {
+            if (info.getNavigationStatus() != 0) Dim.failPublish?.let { throw it }
+            Dim.events += "update:${info.getNavigationStatus()}"
+            updates += info
         }
-    }
-    class PropertyConfig(private val access: Int = 3, private val type: Class<*> = ByteArray::class.java) {
-        fun getPropertyId() = 762314830
-        fun getAccess() = access
-        fun getPropertyType() = type
-    }
-    class SystemState {
-        companion object {
-            val values = mutableMapOf<String, String>()
-            @JvmStatic fun get(key: String, default: String): String = values[key] ?: default
-        }
-    }
-    class Encoder {
-        companion object {
-            var values = emptyList<Any>()
-            @JvmStatic fun convertNAVTurn2IPK(id: Int): Int = id - 100
-            @JvmStatic fun convertNAVF3(active: Boolean, end: Boolean, arrow: Int, destinationUnit: Int,
-                destination: Float, turnUnit: Int, turn: Float, minutes: Int, road: String): ByteArray {
-                values = listOf(active, end, arrow, destinationUnit, destination, turnUnit, turn, minutes, road)
-                return byteArrayOf(3, 42)
+        fun notifyTurnByTurnStopped() {
+            Dim.events += "stop"
+            for (delay in listOf(0L, 200L, 500L)) {
+                Handler(Looper.getMainLooper()).postDelayed({ Dim.events += "native-clear:$delay" }, delay)
             }
+            Dim.failStop?.let { throw it }
         }
+    }
+    interface Info {
+        fun getNavigationStatus(): Int
+        fun getNavigationTurnId(): Int
+        fun getDistanceToNextGuidancePoint(): Long
+        fun getDistanceToDestination(): Long
+        fun getETA(): Long
+        fun getNextGuidancePointName(): String
+        fun getDrivingDirection(): Int
+        fun getMuteState(): Int
+        fun getDayNightMode(): Int
+        fun getNavigationTurnSVG(): String?
+        fun getLaneInfo(): Array<Any>
+        fun getExtensionInfo(): Any?
+        fun getHighwayExitInfo(): Any?
+        fun getRoadCameraInfo(): Any?
+        fun getServiceAreaInfo(): Any?
+    }
+    interface BadInfo {
+        fun getNavigationStatus(): Int
+        fun getNavigationTurnId(): Int
+        fun getDistanceToNextGuidancePoint(): Long
+        fun getDistanceToDestination(): Long
+        fun getETA(): Long
+        fun getNextGuidancePointName(): String
+        fun getLaneInfo(): Any // Native SDK requires an array.
     }
 }

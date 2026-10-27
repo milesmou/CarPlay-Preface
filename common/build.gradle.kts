@@ -30,6 +30,14 @@ android {
     }
 }
 
+// Release log/report behavior is verified against the real library variant.
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) {
+        (it as com.android.build.api.variant.HasHostTestsBuilder)
+            .hostTests[com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE]!!.enable = true
+    }
+}
+
 dependencies {
     compileOnly(project(":ecarx-mediacenter-api-stubs"))
     testImplementation(project(":ecarx-mediacenter-api-stubs"))

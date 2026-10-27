@@ -11,7 +11,8 @@ import android.media.MediaFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
+import com.shilapi.xcertplay.logging.LogPolicy
 import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.toHexString
@@ -806,15 +807,20 @@ internal class AudioRenderer(
             "partialWrites=$partialWritesThisWindow " +
             "decoderDroppedTotal=$inputDropped outputBuffersTotal=$outputBuffers rebuffers=$rebufferCount " +
             "playbackRate=${clockTrim?.rate ?: -1} ended=$force"
-        Log.i(STATS_TAG, line)
-        report(line)
-        if (format.codec != AudioCodecKind.LPCM) {
+        // Keep routing checks and counter resets above/below active in both variants.
+        if (LogPolicy.detailedEnabled || force || writeErrorsThisWindow > 0) {
+            if (writeErrorsThisWindow > 0) Log.w(STATS_TAG, line)
+            else if (force) Log.event(STATS_TAG, line)
+            else Log.i(STATS_TAG, line)
+            report(line)
+        }
+        if (format.codec != AudioCodecKind.LPCM && (LogPolicy.detailedEnabled || force)) {
             // Keep this separate: the exported diagnostic recorder caps each line at 700 characters.
             val decoderLine = "Audio: decoder stats audioType=${format.audioType} codec=${format.codec} " +
                 "inputQueuedTotal=$inputQueued inputDroppedTotal=$inputDropped " +
                 "shortOpusPacketsTotal=$shortOpusPackets decoderUnavailablePacketsTotal=$decoderUnavailablePackets " +
                 "outputBuffersTotal=$outputBuffers ended=$force"
-            Log.i(STATS_TAG, decoderLine)
+            if (force) Log.event(STATS_TAG, decoderLine) else Log.i(STATS_TAG, decoderLine)
             runCatching { report(decoderLine) }
         }
         statsLastUnderruns = underruns

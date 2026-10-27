@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.media
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 
 /** Five-second video counters that separate network/iPhone gaps from decoder throughput. */
 internal class VideoStats(

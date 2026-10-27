@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.vehicle
 
 import com.shilapi.xcertplay.hud.CarPlayManeuver
 import com.shilapi.xcertplay.iap2.message.Iap2Messages
+import com.shilapi.xcertplay.shared.BuildConfig
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -31,6 +32,20 @@ class PrefaceInstrumentGuidanceTest {
         session.accept(Iap2Messages.buildRaw(0x5201) { u8(1, 1); u16(0x0d, 0); u32(0x0a, distance) })
     }
     private fun status(value: Int) { session.accept(Iap2Messages.buildRaw(0x5201) { u8(1, value) }) }
+
+    @Test fun nativeWritesAndStateEventsSurviveWhileUpdateDetailsFollowTheBuild() {
+        guidance()
+        session.tick()
+        assertEquals(1, backend.sent.size)
+        assertTrue(logs.any { it.contains("route-data received") })
+        assertTrue(logs.any { it.contains("available=true") })
+        assertEquals(BuildConfig.DEBUG, logs.any { it.contains("SDK update submitted") })
+        backend.failure = SecurityException("denied")
+        now += 2_000_000_000L
+        session.tick()
+        assertEquals(1, backend.sent.size)
+        assertTrue(logs.any { it.contains("stopped type=SecurityException") })
+    }
 
     @Test fun confirmedArrowsKeepTheirDirectionAndUnconfirmedOnesAreHidden() {
         for ((apple, expected) in mapOf(1 to 102, 2 to 103, 13 to 104, 14 to 105,
@@ -71,7 +86,7 @@ class PrefaceInstrumentGuidanceTest {
         assertEquals(2, backend.sent.size)
     }
 
-    @Test fun nativeNavigationOrPhonePreventsWritesAndClear() {
+    @Test fun unavailableNativeInterfacePreventsWritesAndClear() {
         guidance(); session.tick()
         backend.available = false
         now += 2_000_000_000; session.tick(); session.close()
@@ -79,7 +94,7 @@ class PrefaceInstrumentGuidanceTest {
         assertEquals(0, backend.clears)
     }
 
-    @Test fun nativeOutputReleasingAllowsFreshGuidanceAgain() {
+    @Test fun nativeInterfaceBecomingReadyAllowsFreshGuidanceAgain() {
         backend.available = false
         guidance(); session.tick()
         assertTrue(backend.sent.isEmpty())

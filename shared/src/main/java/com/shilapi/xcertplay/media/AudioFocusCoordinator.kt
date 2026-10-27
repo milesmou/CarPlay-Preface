@@ -7,7 +7,7 @@ import android.media.AudioTrack
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.compat.AudioFocusRequestCompat
 
 /** AudioTrack's attributes getter is only available from Android 10. */

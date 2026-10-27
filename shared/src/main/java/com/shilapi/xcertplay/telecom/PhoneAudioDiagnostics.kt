@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.telecom
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.util.ArrayDeque
 
 /** Process-local, bounded evidence for report export; contains no call identities or audio. */

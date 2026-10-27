@@ -1,148 +1,255 @@
 package com.shilapi.xcertplay.vehicle
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.ServiceConnection
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
-/**
- * A fixed NAV F3 writer using the installed firmware's encoder and real CarPropertyManager.
- * No SDK NaviInteraction singleton, presentation switch, system-property write or power request.
- */
-internal class PrefaceInstrumentCarBackend(
+/** The native adapter caches navigation against the first DimInteraction's vehicle manager. */
+internal class PrefaceInstrumentSdkHandle {
+    var dim: Any? = null
+    var navigation: Any? = null
+    var watcher: Any? = null
+    var registered = false
+    var connected = false
+    var connecting = false
+    var owner: Any? = null
+    var quietUntilMs = 0L
+}
+
+/** Same instrument-SDK entry point and start/update/stop lifecycle used by NaviDashboardManager. */
+internal class PrefaceInstrumentSdkBackend(
     private val context: Context,
     private val resolve: (String) -> Class<*> = { Class.forName(it) },
     private val diagnostic: (String) -> Unit = {},
     private val currentSession: () -> Boolean = { true },
+    private val sdk: PrefaceInstrumentSdkHandle = applicationSdk,
 ) : PrefaceInstrumentBackend {
     private val main = Handler(Looper.getMainLooper())
-    private val lifecycle = Any()
     @Volatile private var closed = false
-    @Volatile private var connected = false
-    @Volatile private var connectionFailure: Throwable? = null
-    @Volatile private var car: Any? = null
-    private lateinit var carType: Class<*>
-    private lateinit var propertyType: Class<*>
-    private lateinit var encoder: Method
-    private lateinit var convertTurn: Method
-    private lateinit var getProperty: Method
-    private var properties: Any? = null
-    private var lastNativeState: String? = null
+    private var started = false // main thread only
+    private lateinit var dimType: Class<*>
+    private lateinit var connectableType: Class<*>
+    private lateinit var navigationType: Class<*>
+    private lateinit var infoType: Class<*>
+    private lateinit var update: Method
+    private var configured = false
+    private var reportedReady = false
 
-    override fun connect() {
-        carType = resolve("android.car.Car")
-        propertyType = resolve("android.car.hardware.property.CarPropertyManager")
-        val util = resolve("com.ecarx.xui.adaptapi.dim.impl.util.ECarXDIMUtil")
-        val int = Int::class.javaPrimitiveType!!
-        val float = Float::class.javaPrimitiveType!!
-        val bool = Boolean::class.javaPrimitiveType!!
-        encoder = util.getMethod("convertNAVF3", bool, bool, int, int, float, int, float, int, String::class.java)
-        convertTurn = util.getMethod("convertNAVTurn2IPK", int)
-        getProperty = resolve("android.os.SystemProperties").getMethod("get", String::class.java, String::class.java)
-        propertyType.getMethod("setProperty", Class::class.java, int, int, Any::class.java)
-        main.post {
-            synchronized(lifecycle) {
-                if (closed) return@synchronized
-                try {
-                    val connection = object : ServiceConnection {
-                        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) { connected = true }
-                        override fun onServiceDisconnected(name: ComponentName?) { connected = false }
+    override fun connect() = onMain {
+        check(!closed && currentSession()) { "instrument-session-ended" }
+        if (!configured) {
+            dimType = resolve("com.ecarx.xui.adaptapi.diminteraction.DimInteraction")
+            connectableType = resolve("com.ecarx.xui.adaptapi.binder.IConnectable")
+            val watcherType = resolve("com.ecarx.xui.adaptapi.binder.IConnectable\$IConnectWatcher")
+            navigationType = resolve("com.ecarx.xui.adaptapi.diminteraction.INaviInteraction")
+            infoType = resolve("com.ecarx.xui.adaptapi.diminteraction.INaviInteraction\$INavigationInfo")
+            check(watcherType.isInterface && infoType.isInterface) { "instrument-sdk-interface-mismatch" }
+            val methods = infoType.methods.filter { it.declaringClass != Any::class.java }
+            val getters = methods.map { it.name }.toSet()
+            check(getters.all { it in INFO_GETTERS } && INFO_REQUIRED.all { it in getters } && methods.all {
+                it.parameterCount == 0 && when (it.name) {
+                    "getNavigationStatus", "getNavigationTurnId", "getDrivingDirection", "getMuteState", "getDayNightMode" ->
+                        it.returnType == Int::class.javaPrimitiveType
+                    "getDistanceToNextGuidancePoint", "getDistanceToDestination", "getETA" ->
+                        it.returnType == Long::class.javaPrimitiveType
+                    "getNextGuidancePointName", "getNavigationTurnSVG" -> it.returnType == String::class.java
+                    "getLaneInfo" -> it.returnType.isArray
+                    else -> !it.returnType.isPrimitive
+                }
+            }) {
+                "instrument-sdk-navigation-info-mismatch"
+            }
+            update = navigationType.getMethod("updateNavigationInfo", infoType)
+            navigationType.getMethod("notifyTurnByTurnStarted")
+            navigationType.getMethod("notifyTurnByTurnStopped")
+            if (sdk.dim == null) {
+                sdk.dim = dimType.getMethod("create", Context::class.java).invoke(null, context)
+                    ?: error("instrument-sdk-create-unavailable")
+            }
+            check(connectableType.isInstance(sdk.dim)) { "instrument-sdk-connectable-unavailable" }
+            if (sdk.watcher == null) {
+                // The retained watcher must not capture a controller/backend from an old session.
+                val nativeState = sdk
+                val callbackMain = main
+                sdk.watcher = proxy(watcherType) { name, _ ->
+                    check(name == "onConnected" || name == "onDisConnected") { "instrument-sdk-watcher-mismatch" }
+                    val change = {
+                        if (nativeState.registered) {
+                            nativeState.connected = name == "onConnected"
+                            nativeState.connecting = false
+                        }
                     }
-                    car = carType.getMethod("createCar", Context::class.java, ServiceConnection::class.java)
-                        .invoke(null, context, connection) ?: error("car-api-unavailable")
-                    carType.getMethod("connect").invoke(car)
-                } catch (error: Exception) { connectionFailure = error }
-                catch (error: LinkageError) { connectionFailure = error }
+                    if (Looper.myLooper() === callbackMain.looper) change() else callbackMain.post(change)
+                    null
+                }
+            }
+            configured = true
+        }
+        check(!closed && currentSession()) { "instrument-session-ended" }
+        check(sdk.owner == null || sdk.owner === this) { "instrument-sdk-owned-by-another-session" }
+        sdk.owner = this
+        if (!sdk.registered) {
+            val watcherType = resolve("com.ecarx.xui.adaptapi.binder.IConnectable\$IConnectWatcher")
+            sdk.registered = true
+            connectableType.getMethod("registerConnectWatcher", watcherType).invoke(sdk.dim, sdk.watcher)
+        }
+        if (!sdk.connected && !sdk.connecting) {
+            sdk.connecting = true
+            connectableType.getMethod("connect").invoke(sdk.dim)
+        }
+    }
+
+    override fun ready(): Boolean = onMain {
+        if (closed || sdk.owner !== this || !sdk.connected || SystemClock.uptimeMillis() < sdk.quietUntilMs) {
+            return@onMain false
+        }
+        if (sdk.navigation == null) {
+            sdk.navigation = dimType.getMethod("getNaviInteraction").invoke(sdk.dim)
+                ?: error("instrument-sdk-navigation-unavailable")
+            check(navigationType.isInstance(sdk.navigation)) { "instrument-sdk-navigation-type-mismatch" }
+        }
+        if (!reportedReady) {
+            reportedReady = true
+            diagnostic("instrument navigation native SDK connected; state-management=OEM; display-confirmed=false")
+        }
+        true
+    }
+
+    // The SDK owns its navigation/phone bookkeeping. Its output flags are not an admission gate.
+    override fun available(): Boolean = ready()
+
+    override fun publish(guidance: PrefaceInstrumentGuidance) = onMain {
+        check(ready() && currentSession()) { "instrument-session-ended" }
+        check(guidance.turnId in 102..109) { "unconfirmed-instrument-arrow" }
+        if (!started) {
+            navigationType.getMethod("notifyTurnByTurnStarted").invoke(sdk.navigation)
+            started = true
+        }
+        check(!closed && sdk.owner === this && sdk.connected && currentSession()) { "instrument-session-ended" }
+        update.invoke(sdk.navigation, navigationInfo(guidance))
+        Unit
+    }
+
+    override fun clear() = onMain {
+        if (sdk.owner === this && sdk.connected) stopNavigation()
+    }
+
+    private fun stopNavigation() {
+        if (!started) return
+        started = false
+        try {
+            // UNNAVI=0 clears the native adapter's own route state; never pass null info.
+            update.invoke(sdk.navigation, navigationInfo(null))
+        } finally {
+            try { navigationType.getMethod("notifyTurnByTurnStopped").invoke(sdk.navigation) }
+            finally {
+                // Build327 queues native clear callbacks on main at 0/200/500 ms. Complete them
+                // before any replacement route publishes, using the same main message queue.
+                sdk.quietUntilMs = SystemClock.uptimeMillis() + NATIVE_STOP_DRAIN_MS
             }
         }
     }
 
-    override fun ready(): Boolean {
-        connectionFailure?.let { throw IllegalStateException("car-service-connect-failed", it) }
-        val api = car ?: return false
-        if (closed || !connected || carType.getMethod("isConnected").invoke(api) != true) return false
-        if (properties == null) {
-            val manager = carType.getMethod("getCarManager", String::class.java).invoke(api, "property")
-                ?: error("car-property-manager-unavailable")
-            val configs = propertyType.getMethod("getPropertyList").invoke(manager) as? List<*>
-                ?: error("car-property-list-unavailable")
-            val config = configs.filterNotNull().firstOrNull {
-                it.javaClass.getMethod("getPropertyId").invoke(it) == INSTRUMENT_PROPERTY
-            } ?: error("instrument-property-unavailable-or-permission-denied")
-            check((config.javaClass.getMethod("getAccess").invoke(config) as Number).toInt() and 2 != 0) {
-                "instrument-property-not-writable"
-            }
-            check(config.javaClass.getMethod("getPropertyType").invoke(config) == ByteArray::class.java) {
-                "instrument-property-type-mismatch"
-            }
-            properties = manager
-            diagnostic("instrument navigation car-service connected; fixed byte-array property writable")
+    private fun navigationInfo(guidance: PrefaceInstrumentGuidance?): Any = proxy(infoType) { name, method ->
+        when (name) {
+            "getNavigationStatus" -> if (guidance == null) 0 else 1
+            "getNavigationTurnId" -> guidance?.turnId ?: 0
+            "getDistanceToNextGuidancePoint" -> guidance?.distanceMeters?.toLong() ?: 0L
+            "getDistanceToDestination" -> guidance?.remainingMeters ?: 0L
+            "getETA" -> guidance?.remainingSeconds ?: 0L
+            "getNextGuidancePointName" -> guidance?.road.orEmpty()
+            "getNavigationTurnSVG" -> null
+            "getDrivingDirection", "getMuteState", "getDayNightMode" -> 0
+            "getLaneInfo" -> java.lang.reflect.Array.newInstance(
+                method.returnType.componentType ?: error("instrument-sdk-navigation-info-mismatch"), 0)
+            "getExtensionInfo", "getHighwayExitInfo", "getRoadCameraInfo", "getServiceAreaInfo" -> null
+            else -> error("instrument-sdk-navigation-info-mismatch")
         }
-        return true
-    }
-
-    override fun available(): Boolean {
-        // Only read firmware state. A reflection/permission failure propagates and stops this session.
-        fun state(key: String): String = when (getProperty.invoke(null, key, "unknown")) {
-            "false", "0" -> "idle"
-            "true", "1" -> "active"
-            else -> "unknown"
-        }
-        val navigation = state("sys.bicv.navi.status")
-        val phone = state("sys.bicv.phone.status")
-        val summary = "nativeNavigation=$navigation nativePhone=$phone"
-        if (lastNativeState != summary) {
-            diagnostic("instrument navigation $summary")
-            lastNativeState = summary
-        }
-        return navigation == "idle" && phone == "idle"
-    }
-
-    override fun publish(guidance: PrefaceInstrumentGuidance) {
-        val ipk = (convertTurn.invoke(null, guidance.turnId) as Number).toInt()
-        check(ipk in 2..9) { "unconfirmed-instrument-arrow" }
-        val destination = distance(guidance.remainingMeters, 6553.5f)
-        val turn = distance(guidance.distanceMeters.toLong(), 1638.3f)
-        val minutes = (guidance.remainingSeconds / 60 + if (guidance.remainingSeconds % 60 >= 30) 1 else 0)
-            .coerceIn(1, 8191).toInt()
-        val data = encoder.invoke(null, true, false, ipk, destination.first, destination.second,
-            turn.first, turn.second, minutes, guidance.road) as? ByteArray
-            ?: error("instrument-encoder-returned-null")
-        write(data, requireCurrentSession = true)
-    }
-
-    override fun clear() {
-        // The same encoder's routing=false form clears navigation only, never music/phone frames.
-        write(encoder.invoke(null, false, true, 0, 0, 0f, 0, 0f, 0, "") as ByteArray)
-    }
-
-    private fun write(data: ByteArray, requireCurrentSession: Boolean = false) {
-        check(!closed && ready() && available()) { "instrument-output-no-longer-available" }
-        check(data.isNotEmpty()) { "instrument-encoder-returned-empty" }
-        check(!requireCurrentSession || currentSession()) { "instrument-session-ended" }
-        propertyType.getMethod("setProperty", Class::class.java, Int::class.javaPrimitiveType,
-            Int::class.javaPrimitiveType, Any::class.java)
-            .invoke(properties, ByteArray::class.java, INSTRUMENT_PROPERTY, 0, data)
     }
 
     override fun close() {
-        synchronized(lifecycle) { closed = true; connected = false }
-        main.post {
-            synchronized(lifecycle) {
-                val api = car
-                car = null
-                properties = null
-                if (api != null) runCatching { carType.getMethod("disconnect").invoke(api) }
+        if (closed) return
+        closed = true
+        // Cleanup is never cancelled by the publication timeout. It stays ahead of a replacement
+        // connect in the main queue, even if the UI temporarily stops processing messages.
+        val release = Runnable {
+            try { releaseOnMain() }
+            catch (error: Exception) { diagnostic("instrument navigation native release failed type=${error.javaClass.simpleName}") }
+            catch (error: LinkageError) { diagnostic("instrument navigation native release failed type=${error.javaClass.simpleName}") }
+        }
+        if (Looper.myLooper() === main.looper) release.run()
+        else if (!main.post(release)) diagnostic("instrument navigation native release unavailable; main queue stopped")
+    }
+
+    private fun releaseOnMain() {
+        if (sdk.owner !== this) return
+        try {
+            if (sdk.connected) stopNavigation()
+        } finally {
+            started = false
+            sdk.owner = null
+            val delay = (sdk.quietUntilMs - SystemClock.uptimeMillis()).coerceAtLeast(0)
+            main.postDelayed({
+                // A replacement may already have leased the same native instance.
+                if (sdk.owner == null) {
+                    try {
+                        if (sdk.registered) connectableType.getMethod("unregisterConnectWatcher").invoke(sdk.dim)
+                    } catch (error: Exception) {
+                        diagnostic("instrument navigation native watcher release failed type=${error.javaClass.simpleName}")
+                    } finally {
+                        sdk.registered = false
+                        sdk.connected = false
+                        sdk.connecting = false
+                        runCatching { connectableType.getMethod("disconnect").invoke(sdk.dim) }.onFailure {
+                            diagnostic("instrument navigation native disconnect failed type=${it.javaClass.simpleName}")
+                        }
+                    }
+                }
+            }, delay)
+        }
+    }
+
+    private fun proxy(type: Class<*>, invoke: (String, Method) -> Any?): Any =
+        Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { target, method, args ->
+            when (method.name) {
+                "equals" -> target === args?.firstOrNull()
+                "hashCode" -> System.identityHashCode(target)
+                "toString" -> "CarPlay instrument SDK adapter"
+                else -> invoke(method.name, method)
+            }
+        }
+
+    private fun <T> onMain(block: () -> T): T {
+        if (Looper.myLooper() === main.looper) return block()
+        val task = FutureTask(block)
+        check(main.post(task)) { "instrument-sdk-main-unavailable" }
+        try { return task.get(5, TimeUnit.SECONDS) }
+        catch (error: TimeoutException) {
+            task.cancel(false)
+            throw IllegalStateException("instrument-sdk-main-timeout", error)
+        } catch (error: ExecutionException) {
+            val cause = error.cause ?: error
+            when (cause) {
+                is Exception -> throw cause
+                is LinkageError -> throw cause
+                else -> throw IllegalStateException("instrument-sdk-main-failure", cause)
             }
         }
     }
 
-    private fun distance(meters: Long, max: Float): Pair<Int, Float> =
-        if (meters < 1000) 1 to meters.coerceAtLeast(0).toFloat().coerceAtMost(max)
-        else 0 to (if (meters < 10000) ((meters + 50) / 100).toFloat() / 10 else (meters / 1000).toFloat()).coerceAtMost(max)
-
-    private companion object { const val INSTRUMENT_PROPERTY = 762314830 }
+    private companion object {
+        val applicationSdk = PrefaceInstrumentSdkHandle()
+        const val NATIVE_STOP_DRAIN_MS = 550L
+        val INFO_REQUIRED = setOf("getNavigationStatus", "getNavigationTurnId", "getDistanceToNextGuidancePoint",
+            "getDistanceToDestination", "getETA", "getNextGuidancePointName")
+        val INFO_GETTERS = INFO_REQUIRED + setOf("getNavigationTurnSVG", "getDrivingDirection", "getMuteState",
+            "getDayNightMode", "getLaneInfo", "getExtensionInfo", "getHighwayExitInfo", "getRoadCameraInfo", "getServiceAreaInfo")
+    }
 }

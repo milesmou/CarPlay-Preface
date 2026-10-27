@@ -8,7 +8,7 @@ import android.media.AudioManager
 import android.media.audiofx.AcousticEchoCanceler
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.NoiseSuppressor
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
 import com.shilapi.xcertplay.airplay.MicrophoneCounters

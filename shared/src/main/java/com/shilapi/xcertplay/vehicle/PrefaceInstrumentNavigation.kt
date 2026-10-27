@@ -27,7 +27,7 @@ internal class PrefaceInstrumentNavigation(
             timer = worker.scheduleWithFixedDelay({
                 if (!closed && token === session && owner === this) state?.tick()
             }, 0, 500, TimeUnit.MILLISECONDS)
-            diagnostic("instrument navigation enabled for current session; experimental=true")
+            diagnostic("instrument navigation enabled for current session; state-management=OEM-SDK")
         }
     }
 
@@ -69,7 +69,7 @@ internal class PrefaceInstrumentNavigation(
             if (!PrefaceInstrumentSettings.enabled(context)) return null
             val app = context.applicationContext
             return PrefaceInstrumentNavigation({ current ->
-                PrefaceInstrumentCarBackend(app, diagnostic = diagnostic, currentSession = current)
+                PrefaceInstrumentSdkBackend(app, diagnostic = diagnostic, currentSession = current)
             }, diagnostic)
         }
     }

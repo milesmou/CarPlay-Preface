@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.MotionEvent
 import android.view.View
 import com.shilapi.xcertplay.airplay.AirPlayContact

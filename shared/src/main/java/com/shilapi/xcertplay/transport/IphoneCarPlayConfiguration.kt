@@ -5,7 +5,7 @@ import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 
 /**
  * Descriptor-based discovery of the iPhone's CarPlay configuration.

@@ -27,7 +27,7 @@
 | 音频流、焦点、导航混音 | [通话音量残留](CONNECTION_REPORT_2026-10-20_BUILD98_VOLUME.md)、[音频方案](BLUETOOTH_MUSIC_WHEEL.md)、[元数据](PREFACE_MEDIA_METADATA.md) |
 | 车机电话音频 | [Telecom 权限与准入分析](PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md)：1205 曾被拒绝、1206 辅助通话成功，音质改善仍待验证。后续源码移除实验性标志，未保存时默认开启并保留保存值；仅在当前会话采用 CarPlay 音频时请求辅助通话，蓝牙音频保留原车处理，通话状态照常更新；尚未打包。 |
 | CarPlay 通话麦克风补充日志 | [诊断字段与复测](CALL_MICROPHONE_DIAGNOSTICS_2026-10-21.md)、[1206 实车分析](CONNECTION_REPORT_2026-10-21_BUILD1206_MICROPHONE.md)：新字段已有 IHU353G／169 运行证据；手动 ADC 增益在采集启动时被覆盖，采集／上传电平统计一致，辅助通话本轮成功。根因及人工对端听感仍待确认。 |
-| 高德首次顶部按钮失效 | [1206 输入分析](PREFACE_MAP_FIRST_CONTROLS_2026-10-21.md)：用户确认仅连接后首次显示的四个按钮失效，隐藏重显恢复，拖动／缩放正常；左上连续点击已有完整 HID 报告，无直接本地吞键证据。苹果地图未对照，根因和修复均未确认。 |
+| 高德首次顶部按钮失效 | [1208 再次分析](PREFACE_MAP_FIRST_CONTROLS_2026-10-27.md)：用户确认第二次连接、仅隐藏重显顶部按钮恢复；候选顶部 7 次点击的系统坐标与完整 HID 对应，期间无窗口重建，未见本地吞键或发送失败。手机端控件结果与故障／恢复逐次时刻仍缺失，根因和修复未确认；此前见 [1206 分析](PREFACE_MAP_FIRST_CONTROLS_2026-10-21.md)。 |
 | 蓝牙交接、自动暂停、方控跳页 | [构建 100：组件交接生效、助手被拒](CONNECTION_REPORT_2026-10-20_BUILD100_AUDIO.md)、[构建 99 自动暂停与切歌转蓝牙](CONNECTION_REPORT_2026-10-20_BUILD99_AUDIO.md)、[构建 97 原车日志与修正](CONNECTION_REPORT_2026-10-20_BUILD97.md)、[v0.2.20.1 移植](GEELYPLAY_BLUETOOTH_0.2.20.1.md)、[后续修正](BLUETOOTH_WHEEL_RECOVERY_2026-10-19.md)、[构建 91 报告](CONNECTION_REPORT_2026-10-19_BUILD91.md) |
 | 连接入口、取消与自动连接 | [主页优先级](HOME_CONNECTION_PRIORITY.md)、[自动连接](AUTOMATIC_CONNECTION.md)、[蓝牙重连复核](BLUETOOTH_AUTO_RECONNECT_2026-10-16.md) |
 | 连接耗时与提速评估 | [历史时序与源码改动](CONNECTION_STARTUP_TIMING_2026-10-20.md)、[构建 1205 实车报告](CONNECTION_REPORT_2026-10-21_BUILD1205.md)：新建热点准备由旧版 3.390 秒降至约 1.04 秒；完整无线连接 15.720／21.218 秒、复用 6.423 秒，仍有波动。 |
@@ -39,7 +39,7 @@
 
 ## 当前结论
 
-- 高德导航仪表方向链路及 [实验性接入](PREFACE_INSTRUMENT_NAVIGATION_2026-10-26.md)：原厂 `NaviService` 经仪表 SDK 发送 NAV F3；CarPlay 新增默认关闭的“仪表导航提示（实验性）”，复用运行时编码器和固定车辆属性，不操作投屏／电源。已纳入 0.2.2／1208 测试包，权限、原车状态仲裁和实际仪表显示均待实车验证。
+- 高德导航仪表方向链路及 [实验性接入](PREFACE_INSTRUMENT_NAVIGATION_2026-10-26.md)：1208 的 [10-27 运行分析与后续修正](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27.md) 确认两项 sys.bicv 状态为 unknown，输出在写入前被阻止。后续源码改为 `DimInteraction → INaviInteraction` 原厂 SDK 生命周期，移除自定义属性门槛及直写，保留 SDK 准备、权限与会话失效处理；尚未打包，真实 SDK 输出和仪表显示待新包复测。
 
 - 主应用 0.2.0 统一包名为 `com.preface.carplay`，保持原证书，授权组件为 11；改包名不等于取得厂商媒体准入，需重新授权和实车复核。
 - 独立媒体助手已移除。构建 100 的旧包实车日志确认组件 10 完成无线／USB A2DP 交接及退出恢复、一次 NEXT 成功；助手自身仍被拒绝准入。代理退出泄漏告警未在本次修改。

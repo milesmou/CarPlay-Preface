@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.KeyEvent
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 

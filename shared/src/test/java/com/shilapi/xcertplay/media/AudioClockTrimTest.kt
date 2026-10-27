@@ -4,6 +4,7 @@ import android.media.AudioAttributes
 import android.media.AudioTrack
 import com.shilapi.xcertplay.airplay.AudioCodecKind
 import com.shilapi.xcertplay.airplay.AudioFormat
+import com.shilapi.xcertplay.shared.BuildConfig
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -79,6 +80,32 @@ class AudioClockTrimTest {
         assertTrue(reports.toString(), reports.contains("Audio: clock trim off audioType=media rate=47280 result=-3"))
         write(28_800)
         assertEquals(listOf(47_280), RateTrack.rates)
+    }
+
+    @Test fun healthyPeriodicDetailsFollowTheBuildAndStillResetTheirWindow() {
+        set("statsWindowStartNs", 1L)
+        set("writtenFramesThisWindow", 100L)
+        type.getDeclaredMethod("logStatsIfDue", Boolean::class.javaPrimitiveType).apply { isAccessible = true }
+            .invoke(renderer, false)
+        assertEquals(BuildConfig.DEBUG, reports.any { it.startsWith("audio stats") })
+        assertEquals(0L, get("writtenFramesThisWindow"))
+        assertTrue(get("clockTrim") != null)
+        reports.clear()
+        type.getDeclaredMethod("logStatsIfDue", Boolean::class.javaPrimitiveType).apply { isAccessible = true }
+            .invoke(renderer, true)
+        assertTrue(reports.single().contains("writtenFrames=0"))
+        assertTrue(reports.single().contains("ended=true"))
+    }
+
+    @Test fun writeErrorsAreRetainedInBothVariantsAndTheirWindowStillResets() {
+        set("statsWindowStartNs", 1L)
+        set("writeErrorsThisWindow", 1)
+        set("lastWriteErrorCode", AudioTrack.ERROR_INVALID_OPERATION)
+        type.getDeclaredMethod("logStatsIfDue", Boolean::class.javaPrimitiveType).apply { isAccessible = true }
+            .invoke(renderer, false)
+        assertTrue(reports.single().contains("writeErrors=1"))
+        assertEquals(0, get("writeErrorsThisWindow"))
+        assertTrue(get("clockTrim") != null)
     }
 
     @Test fun nothingIsTrimmedBeforeMusicPlays() {

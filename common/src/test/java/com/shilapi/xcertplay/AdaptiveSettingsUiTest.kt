@@ -1101,9 +1101,9 @@ class AdaptiveSettingsUiTest {
 
     @Test
     @Config(sdk = [28], qualifiers = "zh-rCN-w1920dp-h720dp-land-mdpi")
-    fun experimentalInstrumentNavigationSavesForNextConnectionWithoutStoppingCarPlay() {
+    fun firstNavigationSettingDefaultsOnAndSavesWithoutStoppingCarPlay() {
         val settings = com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings
-        assertFalse(settings.enabled(context))
+        assertTrue(settings.enabled(context))
         val screen = openSettings()
         val session = mock(CarPlayController::class.java)
         var stops = 0
@@ -1112,18 +1112,23 @@ class AdaptiveSettingsUiTest {
         CarPlayBackgroundSession.active = true
         try {
             PendingReconnect.clear()
-            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.EXPERIMENTAL)
+            ReflectionHelpers.setField(screen, "settingsCategory", SettingsCategory.NAVIGATION)
             ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
             val title = screen.getString(R.string.settings_instrument_navigation)
-            assertEquals("仪表导航提示（实验性）", title)
-            val toggle = descendants(screen.window.decorView).filterIsInstance<Switch>()
-                .single { it.contentDescription == title }
-            assertFalse(toggle.isChecked)
+            assertEquals("仪表导航提示", title)
+            val toggles = descendants(screen.window.decorView).filterIsInstance<Switch>().toList()
+            val toggle = toggles.first()
+            assertEquals(title, toggle.contentDescription)
+            assertTrue(toggle.isChecked)
             (toggle.parent as View).performClick()
-            assertTrue(settings.enabled(context))
+            assertFalse(settings.enabled(context))
             assertTrue(PendingReconnect.isPending(session))
             assertEquals(0, stops)
             assertSame(session, CarPlayBackgroundSession.snapshot()?.controller)
+            ReflectionHelpers.callInstanceMethod<Unit>(screen, "render")
+            val savedToggle = descendants(screen.window.decorView).filterIsInstance<Switch>()
+                .single { it.contentDescription == title }
+            assertFalse(savedToggle.isChecked)
         } finally {
             CarPlayBackgroundSession.active = false
             CarPlayBackgroundSession.clear()
@@ -1148,6 +1153,7 @@ class AdaptiveSettingsUiTest {
         val advanced = visibleIn(R.string.settings_advanced)
         val connection = visibleIn(R.string.connection)
         val authorization = visibleIn(R.string.settings_authorization)
+        val navigation = visibleIn(R.string.settings_navigation)
 
         for (id in listOf(R.string.settings_authorization_write, R.string.settings_authorization_vpn)) {
             assertTrue(authorization.any { it.startsWith(text(id) + " · ") })
@@ -1173,8 +1179,9 @@ class AdaptiveSettingsUiTest {
             assertFalse(text(it), text(it) in audio)
         }
         assertTrue(text(R.string.right_hand_drive) in vehicle)
-        assertTrue(text(R.string.settings_instrument_navigation) in advanced)
-        for (other in listOf(connection, display, audio, vehicle)) {
+        assertTrue(text(R.string.settings_instrument_navigation) in navigation)
+        assertTrue(navigation.indexOf(text(R.string.settings_instrument_navigation)) < navigation.indexOf(text(R.string.location)))
+        for (other in listOf(connection, display, audio, vehicle, advanced, authorization)) {
             assertFalse(text(R.string.settings_instrument_navigation) in other)
         }
         assertTrue(text(R.string.car_button_in_carplay) in vehicle)

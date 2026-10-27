@@ -8,7 +8,7 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent

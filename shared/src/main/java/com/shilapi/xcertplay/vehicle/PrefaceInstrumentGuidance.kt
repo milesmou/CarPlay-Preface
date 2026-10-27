@@ -4,6 +4,7 @@ import com.shilapi.xcertplay.hud.CarPlayManeuver
 import com.shilapi.xcertplay.hud.CarPlayRouteState
 import com.shilapi.xcertplay.hud.ClusterGuidanceFrame
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import com.shilapi.xcertplay.logging.LogPolicy
 
 /** Only the eight base arrows confirmed by build327's NAVTurn2IPK mapping. */
 internal data class PrefaceInstrumentGuidance(
@@ -30,7 +31,7 @@ internal data class PrefaceInstrumentGuidance(
 internal interface PrefaceInstrumentBackend : AutoCloseable {
     fun connect()
     fun ready(): Boolean
-    /** Rechecked at every write, including clear; unknown/stock navigation/phone yields ownership. */
+    /** Native SDK readiness; the installed SDK owns its phone/navigation state handling. */
     fun available(): Boolean
     fun publish(guidance: PrefaceInstrumentGuidance)
     fun clear()
@@ -74,16 +75,17 @@ internal class PrefaceInstrumentGuidanceSession(
                 backend.connect()
             }
             if (!backend.ready()) {
-                if (clockNs() - connectingSince!! >= 5_000_000_000L) error("car-service-connect-timeout")
+                if (clockNs() - connectingSince!! >= 5_000_000_000L) error("instrument-sdk-connect-timeout")
                 return
             }
+            connectingSince = clockNs()
             val available = backend.available()
             if (lastAvailability != available) {
-                diagnostic("instrument navigation available=$available; native-navigation/phone checks applied")
+                diagnostic("instrument navigation available=$available; state-management=OEM-SDK")
                 lastAvailability = available
             }
             if (!available) {
-                // Another native output may have replaced ours. Do not clear it on teardown.
+                // A native connection or ownership change invalidates our old publication.
                 owned = false
                 last = null
                 return
@@ -94,7 +96,9 @@ internal class PrefaceInstrumentGuidanceSession(
             owned = true
             last = guidance
             lastSentNs = clockNs()
-            diagnostic("instrument navigation NAV-F3 submitted; display-confirmed=false")
+            if (LogPolicy.detailedEnabled) {
+                diagnostic("instrument navigation native SDK update submitted; display-confirmed=false")
+            }
         } catch (error: Exception) {
             fail(error)
         } catch (error: LinkageError) {
@@ -106,11 +110,13 @@ internal class PrefaceInstrumentGuidanceSession(
         failed = true
         var cause = error
         repeat(8) { cause = cause.cause ?: cause }
-        val reason = error.message?.takeIf { it in setOf("car-service-connect-timeout",
-            "car-service-connect-failed", "car-property-manager-unavailable", "car-property-list-unavailable",
-            "instrument-property-unavailable-or-permission-denied", "instrument-property-not-writable",
-            "instrument-property-type-mismatch", "unconfirmed-instrument-arrow", "instrument-encoder-returned-null",
-            "instrument-encoder-returned-empty", "instrument-output-no-longer-available", "instrument-session-ended") } ?: "api-failure"
+        val reason = error.message?.takeIf { it in setOf("instrument-sdk-connect-timeout",
+            "unconfirmed-instrument-arrow", "instrument-session-ended",
+            "instrument-sdk-interface-mismatch", "instrument-sdk-navigation-info-mismatch",
+            "instrument-sdk-create-unavailable", "instrument-sdk-connectable-unavailable",
+            "instrument-sdk-owned-by-another-session", "instrument-sdk-navigation-unavailable",
+            "instrument-sdk-navigation-type-mismatch", "instrument-sdk-main-unavailable",
+            "instrument-sdk-main-timeout", "instrument-sdk-main-failure") } ?: "api-failure"
         diagnostic("instrument navigation stopped type=${cause.javaClass.simpleName} reason=$reason; retry=next-session")
         runCatching { clearOwned() }.onFailure {
             diagnostic("instrument navigation clear failed type=${it.javaClass.simpleName}")
@@ -123,11 +129,12 @@ internal class PrefaceInstrumentGuidanceSession(
             owned = false
             if (backend.ready() && backend.available()) {
                 backend.clear()
-                diagnostic("instrument navigation clear submitted; display-confirmed=false")
+                diagnostic("instrument navigation native SDK stop submitted; display-confirmed=false")
             }
         }
         last = null
         lastSentNs = null
+        connectingSince = null
     }
 
     override fun close() {

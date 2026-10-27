@@ -41,3 +41,9 @@ sealed class CarPlayStatus {
         val usbDirectUnavailable: Boolean = false, val usbNcmTested: Boolean = false,
         val usbVpnUnavailable: Boolean = false) : CarPlayStatus()
 }
+
+/** A Release event keeps failure reasons without dumping hotspot credentials or device details. */
+internal fun CarPlayStatus.retainedDiagnosticMessage(): String = when (this) {
+    is CarPlayStatus.Failed -> "Connection state=Failed retryable=$retryable reason=$message"
+    else -> "Connection state=${javaClass.simpleName}"
+}

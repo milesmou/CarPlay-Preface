@@ -2,8 +2,9 @@
     <string name="settings_free_open_source">This project is free and open source. Source code and issue reports are available on GitHub.</string>
     <string name="settings_github_repository">GitHub: %1$s</string>
     <string name="settings_github_repository_unavailable">Unable to open the link. Visit the repository address in a browser.</string>
-    <string name="settings_instrument_navigation">Instrument navigation prompts (experimental)</string>
-    <string name="settings_instrument_navigation_description">Send CarPlay turn arrows, distance and road names to the Xingrui instrument panel. Off by default; changes apply to the next connection. Requires navigation data from the iPhone and car service access. Native navigation and calls take priority. Unconfirmed arrows are hidden. Vehicle validation is pending.</string>
+    <string name="settings_instrument_navigation_section">Instrument navigation</string>
+    <string name="settings_instrument_navigation">Instrument navigation prompts</string>
+    <string name="settings_instrument_navigation_description">Submit CarPlay turn arrows, distance and road names through the native instrument interface. On by default; saved choices take priority. Changes apply to the next connection. Requires iPhone navigation data and car service access. The native interface handles instrument and call state. Unconfirmed arrows are hidden. Vehicle validation is pending.</string>
     <string name="home_connection_hint">Connect your iPhone to the car’s Bluetooth, or plug it into USB.</string>
     <string name="settings_quick_dismiss_hint">Tap a blank area to return to CarPlay</string>
     <string name="settings_quick_volume">Volume</string>
@@ -342,7 +343,7 @@
     <string name="settings_connection_summary">Phone, cable, wireless and automatic connection</string>
     <string name="settings_display_summary">Appearance, full screen, resolution and frame rate</string>
     <string name="settings_audio_summary">Speaker routing and music buffering</string>
-    <string name="settings_navigation_summary">Share the head-unit location with the iPhone</string>
+    <string name="settings_navigation_summary">Instrument navigation prompts and head-unit location sharing</string>
     <string name="settings_vehicle_summary">Driving side, wheel keys, car button and CarPlay gestures</string>
     <string name="settings_reconnect_pending">Saved. Some changes apply when CarPlay reconnects.</string>
     <string name="settings_reconnect_now">Reconnect now</string>

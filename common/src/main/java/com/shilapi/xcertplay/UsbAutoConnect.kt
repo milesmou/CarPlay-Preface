@@ -78,7 +78,7 @@ internal object UsbAutoConnect {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         if (manual) markManualRequest(launch) else markAutomaticRequest(launch)
         return runCatching { context.startActivity(launch); true }.getOrElse {
-            android.util.Log.w("DiPlayUsbStart", "USB auto-connect launch failed: ${it.javaClass.simpleName}")
+            com.shilapi.xcertplay.logging.CarPlayLog.w("DiPlayUsbStart", "USB auto-connect launch failed: ${it.javaClass.simpleName}")
             wiredFailed(context, attempt)
             true // only an explicit wireless selection releases the failed cable's priority
         }
@@ -105,7 +105,7 @@ internal object UsbAutoConnect {
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
             addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         }, ContextCompat.RECEIVER_EXPORTED) }.onFailure {
-            android.util.Log.w("DiPlayUsbStart", "USB receiver registration failed: ${it.javaClass.simpleName}")
+            com.shilapi.xcertplay.logging.CarPlayLog.w("DiPlayUsbStart", "USB receiver registration failed: ${it.javaClass.simpleName}")
         }
     }
 

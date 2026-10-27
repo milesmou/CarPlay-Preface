@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.airplay
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import java.io.Closeable
 import java.io.File
@@ -132,7 +132,7 @@ class CarPlayMediaEngine(
         val screen = ScreenStream(key, session::logDebug)
         sink.setVideoDiagnosticHandler(type) {
             if (it == "first frame rendered") session.videoFrameRendered()
-            session.logDebug("Video: $it")
+            session.logEvent("Video: $it")
         }
         sink.setVideoRecoveryHandler(type) {
             if (streams[streamKey] === screen) {
@@ -143,7 +143,7 @@ class CarPlayMediaEngine(
                     mapOf("type" to "forceKeyFrame")
                 }
                 val sent = session.sendCommand(command)
-                session.logDebug("Video recovery: requested keyframe sent=$sent")
+                session.logEvent("Video recovery: requested keyframe sent=$sent")
             }
         }
         val port = screen.listen(

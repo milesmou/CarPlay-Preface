@@ -10,6 +10,7 @@ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import com.shilapi.xcertplay.transport.Iap2CsmChannel
 import com.shilapi.xcertplay.transport.Iap2ArtworkTransfer
+import com.shilapi.xcertplay.logging.LogPolicy
 
 /**
  * One immediately readable and writable iAP2 CSM session.
@@ -91,6 +92,7 @@ class Iap2Session private constructor(
     }
 
     private fun emitFrameTrace(direction: Iap2TraceDirection, frame: Iap2Frame) {
+        if (!LogPolicy.detailedEnabled) return
         try {
             emitTrace(Iap2FrameFormatter.format(direction, traceContext, frame))
         } catch (failure: Exception) {
@@ -106,6 +108,7 @@ class Iap2Session private constructor(
     }
 
     private fun emitTrace(message: String) {
+        if (!LogPolicy.detailedEnabled) return
         try {
             onTrace(message)
         } catch (_: Exception) {

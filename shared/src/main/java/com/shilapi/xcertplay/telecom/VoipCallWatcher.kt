@@ -9,7 +9,7 @@ import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import androidx.annotation.RequiresApi
 
 /**

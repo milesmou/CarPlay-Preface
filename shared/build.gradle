@@ -29,9 +29,18 @@ android {
             path = file('src/main/jni/Android.mk')
         }
     }
+    buildFeatures {
+        buildConfig = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+// Exercise the actual Release logging policy without assembling an APK.
+androidComponents {
+    beforeVariants(selector().withBuildType('release')) { variant ->
+        variant.hostTests.get(com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE).enable = true
     }
 }
 dependencies {

@@ -27,7 +27,9 @@ import android.os.SystemClock
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
+import com.shilapi.xcertplay.logging.DiagnosticLevel
+import com.shilapi.xcertplay.logging.LogPolicy
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.PixelCopy
@@ -2789,10 +2791,19 @@ class CarPlayHostActivity : ComponentActivity() {
             }
 
             override fun onDebugLog(message: String) {
+                receiveDiagnostic(DiagnosticLevel.DEBUG, message)
+            }
+
+            override fun onDiagnosticLog(level: DiagnosticLevel, message: String) {
+                receiveDiagnostic(level, message)
+            }
+
+            private fun receiveDiagnostic(level: DiagnosticLevel, message: String) {
+                if (!LogPolicy.enabled(level)) return
                 if (DiagnosticRedactor.redact(message) == null) return
                 if (message.startsWith(CarPlayController.CONNECTION_DIAGNOSTIC_PREFIX + " ")) {
                     // Retain old-controller teardown evidence without accepting its UI/session state.
-                    AsyncDiagnosticLog.append(diagnosticLog, message)
+                    AsyncDiagnosticLog.append(diagnosticLog, message, level = level)
                     return
                 }
                 runOnUiThread {
@@ -2800,11 +2811,11 @@ class CarPlayHostActivity : ComponentActivity() {
                         return@runOnUiThread
                     }
                     DisplayDiagnosticSnapshot.record(this@CarPlayHostActivity, displayDiagnosticAttempt, message)
-                    if (menuOpen) return@runOnUiThread
+                    if (menuOpen && level == DiagnosticLevel.DEBUG) return@runOnUiThread
                     if (message.startsWith(PROTOCOL_TRACE_PREFIX)) {
                         appendFileLog(message)
                     } else {
-                        appendLog(message)
+                        appendLog(message, level)
                     }
                 }
             }
@@ -3844,9 +3855,12 @@ class CarPlayHostActivity : ComponentActivity() {
         else -> getString(R.string.getting_carplay_ready)
     }
 
-    private fun appendLog(message: String) {
+    private fun appendLog(message: String) = appendLog(message, DiagnosticLevel.EVENT)
+
+    private fun appendLog(message: String, level: DiagnosticLevel) {
+        if (!LogPolicy.enabled(level)) return
         val safe = DiagnosticRedactor.redact(message) ?: return
-        sessionLog?.append(formattedLogLine(safe, System.currentTimeMillis()))
+        sessionLog?.append(formattedLogLine(safe, System.currentTimeMillis()), level)
     }
 
     private fun appendFileLog(message: String) {
@@ -3863,7 +3877,7 @@ class CarPlayHostActivity : ComponentActivity() {
             activeLog.reset(
                 "DiPlay log started " +
                     "${SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())} " +
-                    "pid=${Process.myPid()} path=${logFile.absolutePath}",
+                    "pid=${Process.myPid()} path=${logFile.absolutePath} logging=${if (LogPolicy.detailedEnabled) "debug-detailed" else "release-events"}",
             )
         }
         sessionLog = activeLog

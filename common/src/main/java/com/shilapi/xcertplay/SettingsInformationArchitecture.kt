@@ -19,6 +19,7 @@ internal enum class SettingsSection {
     CAR_BUTTON,
     AUDIO_ROUTING,
     AUDIO_SCHEME,
+    INSTRUMENT_NAVIGATION,
     LOCATION,
     EXTERNAL_CONTROLLER,
 }
@@ -35,7 +36,7 @@ internal object SettingsInformationArchitecture {
         ),
         SettingsCategory.DISPLAY to setOf(SettingsSection.DISPLAY_AND_PERFORMANCE),
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_SCHEME, SettingsSection.AUDIO_ROUTING),
-        SettingsCategory.NAVIGATION to setOf(SettingsSection.LOCATION),
+        SettingsCategory.NAVIGATION to setOf(SettingsSection.INSTRUMENT_NAVIGATION, SettingsSection.LOCATION),
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
             SettingsSection.WHEEL_KEYS,

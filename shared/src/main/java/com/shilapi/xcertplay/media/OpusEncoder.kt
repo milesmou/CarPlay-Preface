@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.media
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 
 /**
  * Encodes 20 ms chunks of 48 kHz mono PCM into raw Opus access units for the CarPlay

@@ -18,7 +18,7 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
-    @Test fun experimentalInstrumentNavigationBacksUpOnlyItsSwitch() {
+    @Test fun instrumentNavigationBacksUpOnlyItsSwitch() {
         val values = prefs("diplay_instrument_navigation")
         values.edit().putBoolean("enabled", true).putString("last_road", "private-road").commit()
         val bytes = SettingsBackupCodec.export(context, "test")

@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 
 /** Opens the app after boot; connecting a device is controlled independently by Auto-connect. */

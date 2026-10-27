@@ -2,6 +2,8 @@
 
 分析日期：2026-10-26。范围仅为用户提供的 IHU519G / FS11A1、ECARX_E02_V1.3、Android 9、构建 327 固件，不代替实际车机运行验证。
 
+以下实验实现描述对应已交付的 1208 旧包。用户在 2026-10-27 的实车日志定位到状态门槛问题后，要求按原厂流程修正；当前后续源码已改走仪表 SDK，见 [10-27 分析与源码修正](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27.md)，尚未打包。
+
 ## 结论
 
 导航管理服务为 `ecarx.naviservice.service.NaviService`，包名 `ecarx.naviservice`，位于 `system/priv-app/XSFNaviService/XSFNaviService.apk`。其内部 `NaviDashboardManager`（混淆类 `ecarx.naviservice.a.a`）负责把导航信息交给仪表 SDK。

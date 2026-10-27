@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.update
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy

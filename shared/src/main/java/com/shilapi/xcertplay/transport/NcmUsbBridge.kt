@@ -6,7 +6,7 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbRequest
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.util.ArrayDeque

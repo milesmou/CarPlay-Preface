@@ -6,7 +6,7 @@ import android.net.VpnService
 import android.os.Binder
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.airplay.AirPlayListenerIdentity
 import com.shilapi.xcertplay.airplay.AirPlayTcpAccepted
 import com.shilapi.xcertplay.airplay.isInternalAirPlayPeer

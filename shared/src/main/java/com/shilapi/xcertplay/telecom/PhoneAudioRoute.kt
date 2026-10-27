@@ -2,7 +2,7 @@ package com.shilapi.xcertplay.telecom
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.telecom.PhoneAudioSettings
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService

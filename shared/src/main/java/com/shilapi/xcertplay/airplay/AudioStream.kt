@@ -113,7 +113,7 @@ class AudioStream(
                 val packetNumber = receivedPackets.incrementAndGet()
                 if (wire.size < RTP_HEADER_LEN + TAIL_LEN) {
                     if (packetNumber == 1) {
-                        android.util.Log.w(
+                        com.shilapi.xcertplay.logging.CarPlayLog.w(
                             TAG,
                             "audio stream type=$streamType short packet bytes=${wire.size}",
                         )
@@ -140,7 +140,7 @@ class AudioStream(
                 } catch (error: Exception) {
                     val failureNumber = authenticationFailures.incrementAndGet()
                     if (failureNumber == 1) {
-                        android.util.Log.w(
+                        com.shilapi.xcertplay.logging.CarPlayLog.w(
                             TAG,
                             "audio stream type=$streamType first decrypt failure " +
                                 "wire=${wire.toHexString()}",
@@ -154,14 +154,14 @@ class AudioStream(
                 val rtp = wire.copyOf(RTP_HEADER_LEN) + payload
                 val decryptedNumber = decryptedPackets.incrementAndGet()
                 if (decryptedNumber <= FIRST_PACKET_LOG_COUNT) {
-                    android.util.Log.i(
+                    com.shilapi.xcertplay.logging.CarPlayLog.i(
                         TAG,
                         "audio stream type=$streamType packet=$decryptedNumber sample=$sample " +
                             "wireBytes=${wire.size} payloadBytes=${payload.size} " +
                             "payloadHead=${payload.copyOf(minOf(payload.size, 16)).toHexString()}",
                     )
                 } else if (decryptedNumber % PACKET_LOG_INTERVAL == 0) {
-                    android.util.Log.i(
+                    com.shilapi.xcertplay.logging.CarPlayLog.i(
                         TAG,
                         "audio stream type=$streamType decrypted=$decryptedNumber " +
                             "authFailures=${authenticationFailures.get()}",

@@ -3,7 +3,7 @@ package com.shilapi.xcertplay
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.provider.Settings
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.adb.AdbKeys
 import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.network.CarHotspotSettings

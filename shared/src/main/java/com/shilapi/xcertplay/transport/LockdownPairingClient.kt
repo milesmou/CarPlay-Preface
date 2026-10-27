@@ -1,6 +1,6 @@
 package com.shilapi.xcertplay.transport
 
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.IOException
 import java.security.GeneralSecurityException
 

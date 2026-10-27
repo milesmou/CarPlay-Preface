@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaCodec
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.Surface
 import com.shilapi.xcertplay.airplay.AudioFormat
 import com.shilapi.xcertplay.airplay.AudioStreamId

@@ -22,7 +22,7 @@ JAVA_HOME 指向 JDK，ANDROID_HOME 指向 SDK；或在 Git 忽略的 local.prop
 CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 ```
 
-当前测试版本为 0.2.2／1208，最近正式发布版本为 0.2.1／1204。mobile／automotive 统一版本和包名，避免同包名变体版本倒退；本次仅构建 mobile。升级构建号必须递增。其他按需任务：
+当前测试版本为 0.2.2／1210，最近正式发布版本为 0.2.1／1204。mobile／automotive 统一版本和包名，避免同包名变体版本倒退；本次仅构建 mobile。升级构建号必须递增。其他按需任务：
 
 | 目的 | Gradle 任务 |
 | --- | --- |
@@ -31,6 +31,24 @@ CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 | 完整测试 | 仅用户明确要求时按 [验证说明](TESTING.md) 执行 CI 命令 |
 
 正式版执行 `:mobile:assembleRelease`，保留原始输出及元数据，交付文件命名为 `CarPlay-Preface-<versionName>-<versionCode>.apk`。旧包名不会自动迁移数据，不自动卸载。
+
+## Debug 与 Release 日志
+
+2026-10-27 源码按构建类型区分日志，由 `shared` 对应变体的 `BuildConfig.DEBUG` 决定，不读取机型或已有的屏幕调试显示偏好。日志分级已打入 0.2.2／1210 Debug 测试包，该包使用 `debug-detailed` 并保留详细日志；本次没有构建 Release。历史 1209 APK 仍采用原有日志行为。
+
+| 日志 | Debug | Release |
+| --- | --- | --- |
+| 普通 V／D／I、协议收发和逐次仪表更新 | 保留 | 关闭 |
+| 连接状态、会话开始／结束、仪表可用性及停止原因 | 保留 | 保留 |
+| W／E 与异常堆栈、回退原因 | 保留 | 保留 |
+| 周期视频、健康音频及麦克风统计 | 保留 | 关闭；音频／麦克风结束汇总及错误窗口保留 |
+| 临时 iPhone 认证日志捕获 | Debug 可执行 | 不启动 |
+
+Android 输出统一使用 `logging/CarPlayLog.kt`；新的普通详细日志通过 `i`／`d`／`v`，必须在正式版保留的状态用 `event`，异常用 `w`／`e`。控制器到应用的日志回调带 `DiagnosticLevel`，诊断文件的直接和异步写入使用同一策略并继续脱敏、限长和轮转。报告头部标记 `logging=debug-detailed` 或 `logging=release-events`。原厂服务和系统自身的日志不受该策略控制；ADB 辅助进程的标准输出协议继续保留。
+
+过滤只影响记录，不跳过导航发送、首帧通知、连接状态回调、音频路由检查或统计窗口复位。不自动启用混淆／R8，不因关闭日志改变会话行为。连接失败在正式版保留具体原因及是否重试，会话关闭保留关闭原因；设置页打开时仍记录当前会话的关键事件和异常，旧会话不能向新会话写入普通状态／异常。
+
+`shared`／`common` 提供 Release 单元测试入口，可在不打 APK 的情况下核对实际 Release 变体。2026-10-27 的 84 项定向验证通过：shared Debug 34、Release 26，common Debug 20、Release 4，失败／错误／跳过均为 0。覆盖 Android 日志优先级与异常、文件和异步队列过滤、脱敏、会话身份、设置页期间的错误保留、失败原因、仪表发送，以及音频／麦克风在过滤周期日志后仍查询路由、复位窗口并保留错误与结束汇总。本机命令输出和分组汇总位于 `agent_docs/logging-policy-20261027/final-targeted-tests.log`、`validation-summary.json`。该源码修改阶段未运行全量单元测试、Lint 或完整 CI，未构建、签名或安装 APK，未测量实车日志减量或性能收益。随后按用户要求仅构建 1210 Debug 测试包并核对签名、内置组件、日志策略和覆盖安装，未追加单元测试或完整 CI，详见 [1210 构建核验](ANDROID9_AUTHORIZATION_COMPONENTS.md#0221210-测试包构建核验)。
 
 ## 认证与签名
 

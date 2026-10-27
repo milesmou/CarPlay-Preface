@@ -17,7 +17,7 @@ import android.os.Handler
 import android.os.Build
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.KeyEvent
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.content.ContextCompat
@@ -328,7 +328,7 @@ internal object CarPlayMediaKeys {
         val audio = appContext?.getSystemService(AudioManager::class.java) ?: return
         focusHeld = request.request(audio) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         if (focusHeld) forwardGrantedFocusLocked()
-        Log.i(TAG, "audio focus regained=$focusHeld")
+        Log.event(TAG, "audio focus regained=$focusHeld")
         reportDiagnostic("Media focus regained=$focusHeld")
     }
 
@@ -390,7 +390,7 @@ internal object CarPlayMediaKeys {
             setMetadata(androidMetadata(nowPlaying, shownArtworkLocked()))
             isActive = if (delegated) granted else true
         }
-        Log.i(TAG, "media keys active focusDisabled=$focusDisabled focusGranted=$granted")
+        Log.event(TAG, "media keys active focusDisabled=$focusDisabled focusGranted=$granted")
         reportDiagnostic("Media keys active focusDisabled=$focusDisabled focusGranted=$granted")
     }
 
@@ -421,7 +421,7 @@ internal object CarPlayMediaKeys {
         }
         if (!current) return
         refreshTrackOwnership()
-        Log.i(TAG, "audio focus change=$change")
+        Log.event(TAG, "audio focus change=$change")
         reportDiagnostic("Media focus change=$change")
         // Resolve the matching sink and invoke it outside the media-key monitor. An abandoned
         // request must never mute a newer controller, and these owners must not nest locks.

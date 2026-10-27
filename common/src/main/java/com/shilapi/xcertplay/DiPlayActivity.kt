@@ -26,7 +26,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -214,7 +214,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var manualHotspotStartPending = false
     internal var manualHotspotWorker: (Runnable) -> Unit = { Thread(it, "diplay-manual-hotspot").start() }
     internal var manualHotspotEnable: (Context, () -> Boolean) -> CarHotspotTethering.Result = { context, cancelled ->
-        CarHotspotTethering.enable(context, cancelled, log = { android.util.Log.i("DiPlayHotspot", it) })
+        CarHotspotTethering.enable(context, cancelled, log = { com.shilapi.xcertplay.logging.CarPlayLog.i("DiPlayHotspot", it) })
     }
     private val manualHotspotPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (CarHotspotTethering.permitted(this)) enableManualCarHotspot()
@@ -284,11 +284,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun enforceInterfaceSize(): Boolean {
         val language = AppLocale.enforce(this)
-        if (language) android.util.Log.i("DiPlayUi", "app language re-applied")
+        if (language) com.shilapi.xcertplay.logging.CarPlayLog.i("DiPlayUi", "app language re-applied")
         val override = interfaceOverride ?: return language
         val found = resources.displayMetrics.densityDpi
         if (!InterfaceSize.enforce(resources, override)) return language
-        android.util.Log.i("DiPlayUi", "interface size re-applied: $found -> ${override.densityDpi} dpi")
+        com.shilapi.xcertplay.logging.CarPlayLog.i("DiPlayUi", "interface size re-applied: $found -> ${override.densityDpi} dpi")
         return true
     }
 
@@ -319,7 +319,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         applyWindowAppearance()
         setupError = runCatching { DiPlayBootstrap.ensure(this, AirPlayPersistence.loadMfiTarget(this)) }.exceptionOrNull()?.let {
-            android.util.Log.e("DiPlaySetup", "CarPlay authentication could not be loaded", it)
+            com.shilapi.xcertplay.logging.CarPlayLog.e("DiPlaySetup", "CarPlay authentication could not be loaded", it)
             getString(R.string.setup_error_auth)
         }
         pendingCarHotspotSetup = savedInstanceState?.getBoolean("pending_car_hotspot") ?: false
@@ -1515,6 +1515,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(label(getString(R.string.settings_music_buffer_next_connection), 14, MUTED))
         }
 
+        filteredSection(content, SettingsSection.INSTRUMENT_NAVIGATION,
+            getString(R.string.settings_instrument_navigation_section), R.drawable.ic_dp_navigation) { card ->
+            toggle(card, getString(R.string.settings_instrument_navigation),
+                getString(R.string.settings_instrument_navigation_description),
+                com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.enabled(this)) {
+                com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.save(this, it)
+                markReconnectNeeded()
+            }
+        }
         filteredSection(content, SettingsSection.LOCATION,
             getString(R.string.location), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.report_location_to_iphone),

@@ -2,6 +2,8 @@ package com.shilapi.xcertplay
 
 import java.io.Closeable
 import java.io.File
+import com.shilapi.xcertplay.logging.DiagnosticLevel
+import com.shilapi.xcertplay.logging.LogPolicy
 
 /** Bounded, private diagnostics. Each write is redacted before touching storage. */
 internal class SessionLogFile(val file: File) : Closeable {
@@ -15,7 +17,8 @@ internal class SessionLogFile(val file: File) : Closeable {
             append(header)
         }
     }
-    fun append(line: String) = synchronized(lock) {
+    fun append(line: String, level: DiagnosticLevel = DiagnosticLevel.EVENT) = synchronized(lock) {
+        if (!LogPolicy.enabled(level)) return@synchronized
         if (closed) return@synchronized
         val safe = DiagnosticRedactor.redact(line) ?: return@synchronized
         runCatching {

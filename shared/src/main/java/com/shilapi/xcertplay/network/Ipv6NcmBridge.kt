@@ -1,7 +1,7 @@
 package com.shilapi.xcertplay.network
 
 import android.os.ParcelFileDescriptor
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.transport.EthernetIpv6Codec
 import com.shilapi.xcertplay.transport.NcmUsbBridge
 import java.io.Closeable

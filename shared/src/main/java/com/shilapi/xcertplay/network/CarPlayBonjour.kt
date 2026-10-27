@@ -5,7 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import com.shilapi.xcertplay.airplay.AirPlayConfig
 import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.airplay.AirPlayInfoPlist

@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.media
 
 import com.shilapi.xcertplay.airplay.MicrophoneConfig
+import com.shilapi.xcertplay.logging.LogPolicy
 
 internal enum class MicrophoneFailureStage {
     MIN_BUFFER, ENCODER, RECORDER_CREATION, RECORDER_INITIALIZATION, SOCKET_CREATION,
@@ -89,15 +90,17 @@ internal class MicrophoneCaptureStats(
         val now = nowNs()
         if (!ended && now - windowStart < REPORT_INTERVAL_NS) return
         if (routeType != null) routedDeviceType = runCatching { routeType() }.getOrNull()
-        if (captureLevels.samples > 0 || uplinkLevels.samples > 0) {
+        if (LogPolicy.detailedEnabled && (captureLevels.samples > 0 || uplinkLevels.samples > 0)) {
             emit("Microphone: levels $metadata windowMs=${(now - windowStart).coerceAtLeast(0) / 1_000_000} " +
                 captureLevels.describe("capture") + " " + uplinkLevels.describe("uplink") + " ended=$ended")
         }
-        emit("Microphone: stats $metadata routedDeviceType=${routedDeviceType ?: "unknown"} " +
-            "captureBytes=$capturedBytes reads=$reads zeroReads=$zeroReads readErrors=$readErrors " +
-            "readMaxMs=${readMaxNs / 1_000_000} encodedFrames=$encodedFrames " +
-            "emptyEncodedFrames=$emptyEncodedFrames udpSent=$udpSent sendErrors=$sendErrors " +
-            "sendGapMaxMs=${sendGapMaxNs / 1_000_000} peakDbfs=${peakDbfs(uplinkLevels.peak)} ended=$ended")
+        if (LogPolicy.detailedEnabled || ended || readErrors > 0 || sendErrors > 0) {
+            emit("Microphone: stats $metadata routedDeviceType=${routedDeviceType ?: "unknown"} " +
+                "captureBytes=$capturedBytes reads=$reads zeroReads=$zeroReads readErrors=$readErrors " +
+                "readMaxMs=${readMaxNs / 1_000_000} encodedFrames=$encodedFrames " +
+                "emptyEncodedFrames=$emptyEncodedFrames udpSent=$udpSent sendErrors=$sendErrors " +
+                "sendGapMaxMs=${sendGapMaxNs / 1_000_000} peakDbfs=${peakDbfs(uplinkLevels.peak)} ended=$ended")
+        }
         windowStart = now
         capturedBytes = 0
         reads = 0

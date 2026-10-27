@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import android.widget.Toast
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.airplay.VideoInCar

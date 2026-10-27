@@ -5,7 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.shilapi.xcertplay.logging.CarPlayLog as Log
 import java.io.Closeable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
