@@ -39,7 +39,11 @@
 
 ## 当前结论
 
-- 高德导航仪表方向链路及 [实验性接入](PREFACE_INSTRUMENT_NAVIGATION_2026-10-26.md)：1208 的 [10-27 运行分析与后续修正](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27.md) 确认两项 sys.bicv 状态为 unknown，输出在写入前被阻止。后续源码改为 `DimInteraction → INaviInteraction` 原厂 SDK 生命周期，移除自定义属性门槛及直写，保留 SDK 准备、权限与会话失效处理；尚未打包，真实 SDK 输出和仪表显示待新包复测。
+- 仪表导航 [补齐原厂分项发送](PREFACE_INSTRUMENT_NATIVE_FIELDS_2026-10-29.md)：原厂 `refreshGuideInfo` 在合并信息后还发送整数箭头、距离、ETA、道路名。源码现已补上这组调用和开始／停止状态，保留当前会话及清理屏障，不伪造首帧；尚未打包，169 实际接收与显示待验证。此前只追踪合并输出准备条件，不能据此判定所有分项也需要首帧。
+
+- 原车高德 [仪表准备流程复核](PREFACE_AMAP_INSTRUMENT_FLOW_2026-10-29.md)：已读取固件内 AutoMap APK 及配套 VDEX。参考 327 的扩展渲染事件经协议转为状态 116，NaviService 才设置 V2DIM ready；普通首帧与 Widget 状态 124 不等价。实车 169 的无飞屏转向提示准备流程仍需单独核对，尚未据此修改应用行为。
+
+- 仪表导航 [1210 实车分析](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27_BUILD1210.md)：SDK 连接及 36 次有效数据调用已走通，车辆层也记录了写出；原厂 `firstFrame`／导航仪表准备状态始终为 0，SDK 输出与清除时相同的固定短帧，未带出有效导航内容。当前仍缺原厂有效输出准备流程，仪表显示未修复；169 实际使用 `0x2d700050` 私有属性，与 327 参考固定属性不同，不直接套用。此前 [1208 阻塞与 SDK 修正](PREFACE_INSTRUMENT_NAVIGATION_2026-10-27.md)、[初次接入](PREFACE_INSTRUMENT_NAVIGATION_2026-10-26.md) 分别保留历史事实。
 
 - 主应用 0.2.0 统一包名为 `com.preface.carplay`，保持原证书，授权组件为 11；改包名不等于取得厂商媒体准入，需重新授权和实车复核。
 - 独立媒体助手已移除。构建 100 的旧包实车日志确认组件 10 完成无线／USB A2DP 交接及退出恢复、一次 NEXT 成功；助手自身仍被拒绝准入。代理退出泄漏告警未在本次修改。

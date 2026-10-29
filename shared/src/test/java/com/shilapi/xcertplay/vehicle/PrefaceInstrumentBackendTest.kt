@@ -20,6 +20,7 @@ class PrefaceInstrumentBackendTest {
     private lateinit var handle: PrefaceInstrumentSdkHandle
     private var currentSession = true
     private var navigationInfoType: Class<*> = Info::class.java
+    private var navigationSdkType: Class<*> = Navigation::class.java
     private val resolved = mutableListOf<String>()
     private val guidance = PrefaceInstrumentGuidance(102, 150, "测试道路", 12500, 90)
 
@@ -29,7 +30,7 @@ class PrefaceInstrumentBackendTest {
             "com.ecarx.xui.adaptapi.diminteraction.DimInteraction" -> Dim::class.java
             "com.ecarx.xui.adaptapi.binder.IConnectable" -> Connectable::class.java
             "com.ecarx.xui.adaptapi.binder.IConnectable\$IConnectWatcher" -> Watcher::class.java
-            "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction" -> Navigation::class.java
+            "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction" -> navigationSdkType
             "com.ecarx.xui.adaptapi.diminteraction.INaviInteraction\$INavigationInfo" -> navigationInfoType
             else -> throw ClassNotFoundException(name) // No raw Car API, encoder or SystemProperties.
         }
@@ -39,6 +40,7 @@ class PrefaceInstrumentBackendTest {
         handle = PrefaceInstrumentSdkHandle()
         currentSession = true
         navigationInfoType = Info::class.java
+        navigationSdkType = Navigation::class.java
         resolved.clear()
         Dim.events.clear()
         Dim.created = 0
@@ -47,6 +49,9 @@ class PrefaceInstrumentBackendTest {
         Dim.failPublish = null
         Dim.failStart = null
         Dim.failStop = null
+        Dim.failField = null
+        Dim.afterField = null
+        Dim.failClearStatus = false
     }
 
     private fun connected(): PrefaceInstrumentSdkBackend = backend().also { it.connect(); assertTrue(it.ready()) }
@@ -55,7 +60,9 @@ class PrefaceInstrumentBackendTest {
         val api = connected()
         api.publish(guidance)
         api.publish(guidance.copy(distanceMeters = 120))
-        assertEquals(listOf("create", "watch", "connect", "navigation", "start", "update:1", "update:1"), Dim.events)
+        assertEquals(listOf("create", "watch", "connect", "navigation", "start", "status:1",
+            "update:1", "arrow:102", "nextDistance:150", "eta:90", "destinationDistance:12500", "road",
+            "update:1", "arrow:102", "nextDistance:120", "eta:90", "destinationDistance:12500", "road"), Dim.events)
         val info = Dim.instance.navigation.updates.first()
         assertEquals(1, info.getNavigationStatus())
         assertEquals(102, info.getNavigationTurnId())
@@ -67,7 +74,7 @@ class PrefaceInstrumentBackendTest {
         assertEquals(0, info.getLaneInfo().size)
         assertNull(info.getExtensionInfo())
         api.clear()
-        assertEquals(listOf("update:0", "stop"), Dim.events.takeLast(2))
+        assertEquals(listOf("update:0", "stop", "status:0"), Dim.events.takeLast(3))
         assertEquals(0L, Dim.instance.navigation.updates.last().getDistanceToDestination())
         api.close()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
@@ -80,6 +87,76 @@ class PrefaceInstrumentBackendTest {
         assertTrue(resolved.none { "SystemProperties" in it || "CarProperty" in it || "ECarXDIMUtil" in it })
         assertEquals(1, Dim.instance.navigation.updates.single().getNavigationStatus())
         api.close()
+    }
+
+    @Test fun sendsOriginalMapsIntegerGuidanceFieldsWithoutRequestingProjection() {
+        val api = connected()
+        api.publish(guidance)
+        assertEquals(listOf("arrow" to 102, "nextDistance" to 150, "eta" to 90,
+            "destinationDistance" to 12500, "road" to "测试道路"), Dim.instance.navigation.fields)
+        assertEquals(1, Dim.events.count { it == "status:1" })
+        api.publish(guidance.copy(turnId = 109, remainingMeters = 600, remainingSeconds = 25))
+        assertEquals(listOf("arrow" to 109, "nextDistance" to 150, "eta" to 25,
+            "destinationDistance" to 600, "road" to "测试道路"), Dim.instance.navigation.fields.takeLast(5))
+        assertEquals(1, Dim.events.count { it == "status:1" })
+        api.close()
+    }
+
+    @Test fun perFieldValuesCannotWrapLongDistancesOrEtaIntoNegativeIntegers() {
+        val api = connected()
+        api.publish(guidance.copy(remainingMeters = 0xffffffffL, remainingSeconds = Long.MAX_VALUE))
+        val fields = Dim.instance.navigation.fields.toMap()
+        assertEquals(Int.MAX_VALUE, fields["destinationDistance"])
+        assertEquals(Int.MAX_VALUE, fields["eta"])
+        api.close()
+    }
+
+    @Test fun missingPerFieldContractFailsBeforeCreatingOrStartingNativeSdk() {
+        navigationSdkType = IncompleteNavigation::class.java
+        val api = backend()
+        val failure = assertThrows(IllegalStateException::class.java) { api.connect() }
+        assertEquals("instrument-sdk-guidance-method-mismatch", failure.message)
+        assertTrue(failure.cause is NoSuchMethodException)
+        assertEquals(0, Dim.created)
+        assertTrue(Dim.events.isEmpty())
+        api.close()
+    }
+
+    @Test fun fieldFailureStopsRemainingFieldsAndCleanupStillClearsNativeStatus() {
+        val api = connected()
+        Dim.failField = "eta"
+        val failure = assertThrows(java.lang.reflect.InvocationTargetException::class.java) { api.publish(guidance) }
+        assertTrue(failure.targetException is SecurityException)
+        assertEquals(listOf("arrow", "nextDistance"), Dim.instance.navigation.fields.map { it.first })
+        api.close()
+        assertTrue(Dim.events.containsAll(listOf("update:0", "stop", "status:0")))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertEquals(listOf("unwatch", "disconnect"), Dim.events.takeLast(2))
+    }
+
+    @Test fun invalidatedSessionCannotSendTheRestOfAMultiFieldUpdate() {
+        val api = connected()
+        Dim.afterField = { if (it == "arrow") currentSession = false }
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
+        assertEquals(listOf("arrow"), Dim.instance.navigation.fields.map { it.first })
+        api.close()
+        assertEquals(listOf("update:0", "stop", "status:0"), Dim.events.takeLast(3))
+    }
+
+    @Test fun failedStatusClearStillDrainsNativeStopsBeforeReleasingOrReplacing() {
+        val api = connected()
+        api.publish(guidance)
+        Dim.failClearStatus = true
+        api.close()
+        Dim.failClearStatus = false
+        val replacement = backend()
+        replacement.connect()
+        assertFalse(replacement.ready())
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
+        assertTrue(replacement.ready())
+        replacement.publish(guidance)
+        assertTrue(Dim.events.indexOfLast { it == "native-clear:500" } < Dim.events.indexOfLast { it == "arrow:102" })
+        replacement.close()
     }
 
     @Test fun mustReceiveRealConnectionCallbackBeforeGettingNavigationOrPublishing() {
@@ -160,6 +237,7 @@ class PrefaceInstrumentBackendTest {
         api.publish(guidance)
         Dim.failStop = SecurityException("stop rejected")
         api.close()
+        assertTrue("status:0" in Dim.events)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(550))
         assertEquals(listOf("unwatch", "disconnect"), Dim.events.takeLast(2))
     }
@@ -245,16 +323,39 @@ class PrefaceInstrumentBackendTest {
             var failPublish: Exception? = null
             var failStart: Exception? = null
             var failStop: Exception? = null
+            var failField: String? = null
+            var afterField: ((String) -> Unit)? = null
+            var failClearStatus = false
             @JvmStatic fun create(context: Context): Dim { events += "create"; created++; return instance }
         }
     }
     class Navigation {
         val updates = mutableListOf<Info>()
+        val fields = mutableListOf<Pair<String, Any>>()
+        private var nativeStatus = 0
         fun notifyTurnByTurnStarted() { Dim.failStart?.let { throw it }; Dim.events += "start" }
+        fun notifyNavigationStatus(value: Int) {
+            Dim.events += "status:$value"
+            if (value == 0 && Dim.failClearStatus) throw SecurityException("status clear denied")
+            nativeStatus = value
+        }
         fun updateNavigationInfo(info: Info) {
             if (info.getNavigationStatus() != 0) Dim.failPublish?.let { throw it }
             Dim.events += "update:${info.getNavigationStatus()}"
             updates += info
+            nativeStatus = info.getNavigationStatus()
+        }
+        fun updateTurnByTurnArrow(value: Int) { field("arrow", value) }
+        fun updateDistanceToNextGuidancePoint(value: Int) { field("nextDistance", value) }
+        fun updateETA(value: Int) { field("eta", value) }
+        fun updateDistanceToDestination(value: Int) { field("destinationDistance", value) }
+        fun updateNextGuidancePointName(value: String) { field("road", value) }
+        private fun field(name: String, value: Any) {
+            if (nativeStatus == 0) return
+            if (Dim.failField == name) throw SecurityException("native field denied")
+            Dim.events += if (name == "road") name else "$name:$value"
+            fields += name to value
+            Dim.afterField?.invoke(name)
         }
         fun notifyTurnByTurnStopped() {
             Dim.events += "stop"
@@ -263,6 +364,11 @@ class PrefaceInstrumentBackendTest {
             }
             Dim.failStop?.let { throw it }
         }
+    }
+    class IncompleteNavigation {
+        fun notifyTurnByTurnStarted() {}
+        fun notifyTurnByTurnStopped() {}
+        fun updateNavigationInfo(info: Info) {}
     }
     interface Info {
         fun getNavigationStatus(): Int

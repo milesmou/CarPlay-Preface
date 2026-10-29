@@ -97,7 +97,7 @@ internal class PrefaceInstrumentGuidanceSession(
             last = guidance
             lastSentNs = clockNs()
             if (LogPolicy.detailedEnabled) {
-                diagnostic("instrument navigation native SDK update submitted; display-confirmed=false")
+                diagnostic("instrument navigation native SDK update submitted; output=aggregate+fields; display-confirmed=false")
             }
         } catch (error: Exception) {
             fail(error)
@@ -113,6 +113,7 @@ internal class PrefaceInstrumentGuidanceSession(
         val reason = error.message?.takeIf { it in setOf("instrument-sdk-connect-timeout",
             "unconfirmed-instrument-arrow", "instrument-session-ended",
             "instrument-sdk-interface-mismatch", "instrument-sdk-navigation-info-mismatch",
+            "instrument-sdk-guidance-method-mismatch",
             "instrument-sdk-create-unavailable", "instrument-sdk-connectable-unavailable",
             "instrument-sdk-owned-by-another-session", "instrument-sdk-navigation-unavailable",
             "instrument-sdk-navigation-type-mismatch", "instrument-sdk-main-unavailable",

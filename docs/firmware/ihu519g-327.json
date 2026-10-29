@@ -1,5 +1,249 @@
 {
+  "instrumentNavigationOriginalPerFieldRepair20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_NATIVE_FIELDS_2026-10-29.md",
+    "scope": "IHU519G FS11A1 build327 static sender/adapter evidence and application tests; actual IHU353G build169 output remains unvalidated",
+    "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "originalSenderMethod": "NaviDashboardManager.refreshGuideInfo: ecarx/naviservice/a/a.java:734-762",
+    "previousAnalysisOmittedOriginalPerFieldCalls": true,
+    "previous1210ApkContainsPerFieldRepair": false,
+    "notifyStartAndStopStatus": [
+      1,
+      0
+    ],
+    "updateOrder": [
+      "updateNavigationInfo",
+      "updateTurnByTurnArrow(int)",
+      "updateDistanceToNextGuidancePoint(int)",
+      "updateETA(int)",
+      "updateDistanceToDestination(int)",
+      "updateNextGuidancePointName(String)"
+    ],
+    "turnIdentifiers": "Existing confirmed 102-109; installed SDK chooses encoding",
+    "noNewHeadingLaneOrCameraFieldsWithoutRealData": true,
+    "longToIntegerValues": "Saturated to nonnegative int range for integer-only methods",
+    "completeRequiredMethodContractCheckedBeforeNativeCreation": true,
+    "voidReturnTypesRequiredForAddedMethods": true,
+    "missingMethodDiagnostic": "instrument-sdk-guidance-method-mismatch with method name",
+    "currentSessionOwnerAndConnectionRecheckedBeforeEachWrite": true,
+    "failureStopsRemainingFieldUpdates": true,
+    "cleanupOrder": [
+      "updateNavigationInfo(UNNAVI=0)",
+      "notifyTurnByTurnStopped",
+      "notifyNavigationStatus(0)"
+    ],
+    "laterCleanupAttemptedWhenEarlierStepFails": true,
+    "nativeStopDrainMilliseconds": 550,
+    "nativeIndividualMethodsDoNotReadAggregateFirstFrameInReference": true,
+    "nativePerFieldConversionIncludesHudNamedImplementation": true,
+    "hudNamingProvesNonHudInstrumentReceivesSignals": false,
+    "applicationDirectVehiclePropertyWrite": false,
+    "applicationDirectPresentationPowerOrSystemPropertyWrite": false,
+    "originalAmapReadyOrFirstFrameEventFaked": false,
+    "originalExtendedRenderingFlowImplemented": false,
+    "installedSdkControlsItsStateAndEncoding": true,
+    "debugAndReleaseUseSameBusinessFlow": true,
+    "perUpdateDetailDebugOnly": true,
+    "targetedTests": {
+      "debug": 33,
+      "release": 33,
+      "total": 66,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "targetedTestsUseFakeSdk": true,
+    "fullCiRun": false,
+    "apkBuiltSignedOrInstalled": false,
+    "existingDeliveredApk": "0.2.2/1210 unchanged; new source not packaged",
+    "actual169SdkFieldImplementationsAndVehicleDisplayVerified": false,
+    "localEvidence": "agent_docs/instrument-native-fields-20261029/ targeted-debug-tests.log, targeted-release-tests.log, test-results.json, implementation-summary.json",
+    "evidence": [
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/a/a.java",
+        "bytes": 39806,
+        "sha256": "3308c3092469c73b94907cac6ce5d52281f4d8a1bc8049c8f3089e5aa66f731d"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/nav/NaviInteractionImpl.java",
+        "bytes": 17405,
+        "sha256": "f6f75d353ced5847fc033c9cb1cf1d89f1f8de64f00b70ebf02fd13af53e927f"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/ECarXDimServiceImpl.java",
+        "bytes": 50283,
+        "sha256": "d3abdad1781665ee7650de84614431ce643386d88b79f37b2b03679db516adf6"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/util/ECarXDIMUtil.java",
+        "bytes": 65189,
+        "sha256": "9aed09a1bb73f1af1d7b53be29e378ff6f70d673fbf2e3282c22c52b7aaa6d40"
+      }
+    ]
+  },
+  "instrumentNavigationOriginalAmapReadiness20261029": {
+    "documentation": "docs/PREFACE_AMAP_INSTRUMENT_FLOW_2026-10-29.md",
+    "scope": "IHU519G FS11A1 build327 static evidence; IHU353G build169 behavior is not substituted",
+    "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "apkPackage": "com.autonavi.amapauto",
+    "apkVersionName": "5.0.7.605871",
+    "apkVersionCode": 6030053,
+    "codeSource": "Preoptimized AutoMap.vdex CDEX at offset40; decoded with existing dexlib2",
+    "decompilationLimit": "Quickened virtual calls remain unresolved; constants, switch targets, strings and static/interface references used",
+    "sourceExtraction": "Existing cached system.img app/AutoMap/AutoMap.apk and app/AutoMap/oat/arm64/AutoMap.vdex",
+    "internalMainFirstDraw": 116,
+    "internalExtendedScreenFirstDraw": 200,
+    "protocolAutoStatusMapping": {
+      "200": 116,
+      "116": 200
+    },
+    "presentationVideoOrAuxiliaryScreenStatusZeroConstructsInternalState200": true,
+    "aidlWidgetFirstDrawInternalState": 3026,
+    "aidlWidgetFirstDrawNaviServiceState": 124,
+    "aidlWidgetBinderCallbackAlsoPublishes124": true,
+    "naviServiceReadyState": 116,
+    "onlyReadyCacheValue": 1,
+    "mapStatus9SetsCacheValue": 2,
+    "navigationStart16AloneSetsReady": false,
+    "widget124AloneSetsReady": false,
+    "readyPropagation": "Map callback -> per-map V2DIM cache -> selected-map support/ready -> DimInteraction.setPresentationToDimSwitch -> SDK refreshes last NAV info",
+    "nativeCallbackAction35": "OEM callback forwards DimDisplayMode(2) to selected OEM map; empty callback is not preparation",
+    "firstDrawCallsiteInNativeLibraryFullyTraced": false,
+    "referenceAndActualVehicleFirmwareAreDifferent": true,
+    "actualVehicleFirmware": "IHU353G Android9 API28 build169",
+    "standaloneTurnOnlyPreparationOn169Confirmed": false,
+    "actual169SdkAvailable": false,
+    "vehicleInstrumentDisplayValidated": false,
+    "sdkReadinessOrOemStatusFaked": false,
+    "applicationRuntimeBehaviorChanged": false,
+    "gradleRun": false,
+    "apkBuiltSignedOrInstalled": false,
+    "localEvidence": "agent_docs/firmware/ihu519g-327/catalog/automap-instrument-20261027/readiness-findings-20261029.json",
+    "evidence": [
+      {
+        "path": "system/app/AutoMap/AutoMap.apk",
+        "bytes": 167758944,
+        "sha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc"
+      },
+      {
+        "path": "system/app/AutoMap/oat/arm64/AutoMap.vdex",
+        "bytes": 7828416,
+        "sha256": "33c78415570eb7b6aacc59c43bcb807a8099c5d03976ceaa2b7c5cd80f71608e"
+      },
+      {
+        "path": "catalog/automap-instrument-20261027/amap-readiness-focused.txt",
+        "bytes": 36643,
+        "sha256": "5b2b4c5a9579c79f7e31ccd9c4c10c4f86cfc2eed24df79dfcd4a22f2c542988"
+      },
+      {
+        "path": "decompiled/naviservice/sources/defpackage/ag.java",
+        "bytes": 7196,
+        "sha256": "c7bdaf8105eb2c56f62e8e944f449eb579fdd91bbdb9ead977ad028d4bee8dc3"
+      },
+      {
+        "path": "decompiled/naviservice/sources/defpackage/aq.java",
+        "bytes": 1867,
+        "sha256": "b3531f86ae422a24615e53c6da21ce0d5302d871db3a91f3beec89527ccd4fa4"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/map/a.java",
+        "bytes": 58500,
+        "sha256": "a3b307aa7bdf4b58722030ee44a17a93f2710fe1691c6de509d7085010fd1e4b"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/map/co.java",
+        "bytes": 16972,
+        "sha256": "4d114bcd4351cc2249a6c440400ce01bb2d8063bb866a918117cd342f78d9631"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/map/ck.java",
+        "bytes": 7312,
+        "sha256": "601da73de18e2bf1491b607e9734dd73643c07f9d40ef1c6af45323bdb4fecea"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/map/cg.java",
+        "bytes": 2666,
+        "sha256": "6283da5e27cc7f8a7664316d86928991f1128874eeb5b9ab82ec3607a065c4a2"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/map/amap/j.java",
+        "bytes": 1249,
+        "sha256": "938da74a443cbc897acb1f054403bde3c6750071b29718a0a101139e2046d47f"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/a/a.java",
+        "bytes": 39806,
+        "sha256": "3308c3092469c73b94907cac6ce5d52281f4d8a1bc8049c8f3089e5aa66f731d"
+      },
+      {
+        "path": "decompiled/naviservice/sources/ecarx/naviservice/a/p.java",
+        "bytes": 8143,
+        "sha256": "5695a97c24066c767ab336632904ee6a529d098e3ae28ad3d39e73e0f10c1922"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/DimInteractionImpl.java",
+        "bytes": 6055,
+        "sha256": "b8bdbaa5287e4394465dade738462dff50a1764fec1b0b9fbfe2102ba6e8d075"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/nav/NaviInteractionImpl.java",
+        "bytes": 17405,
+        "sha256": "f6f75d353ced5847fc033c9cb1cf1d89f1f8de64f00b70ebf02fd13af53e927f"
+      },
+      {
+        "path": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/dim/impl/ECarXDimServiceImpl.java",
+        "bytes": 50283,
+        "sha256": "d3abdad1781665ee7650de84614431ce643386d88b79f37b2b03679db516adf6"
+      }
+    ]
+  },
   "schemaVersion": 1,
+  "instrumentNavigationRuntimeReadinessBlockedBuild1210_20261027": {
+    "documentation": "docs/PREFACE_INSTRUMENT_NAVIGATION_2026-10-27_BUILD1210.md",
+    "scope": "IHU353G Android9/API28 system169 runtime only; reference IHU519G FS11A1 build327 remains separate",
+    "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "applicationVersion": "0.2.2",
+    "applicationBuild": 1210,
+    "applicationPid": 28654,
+    "applicationReportSha256": "25c1b641b6b25e14454180fe077b22ddbab1bfa0163c9f563374ee47bb01d052",
+    "mobilelogSha256": "ce371d4da54a21bf59ed4c058b6c152747279657b8c0f1692cadd444d1abfdbf",
+    "mainLogSha256": "86fd27bf80b2296a72b1b616cd65a6d408f4089043eec4440d8060b77b5c84fa",
+    "propertiesSha256": "3dbb7acdde6ad555a4225c97b7640591bc3a028f1a63ba221316a9eefb24c371",
+    "applicationApkSha256": "8e8e1ad32a12715cf23a31fc7195d9aa68eb845a1290290d5119262bc978b720",
+    "currentSessionLogStart": "16:08:47.240",
+    "activeUpdateInterval": "16:09:41.739313-16:11:09.927990",
+    "nativeSdkConnected": true,
+    "applicationAvailable": true,
+    "nativeActiveUpdates": 36,
+    "nativeClears": 2,
+    "applicationNativeUpdateReturns": 36,
+    "applicationNativeSdkFailures": 0,
+    "nativeFirstFrameZeroLogs": 38,
+    "nativeFirstFrameOneLogs": 0,
+    "navigationPreparationProperty": "sys.ecarx.navsyncscreen.status",
+    "navigationPreparationPropertyValue": 0,
+    "preparationStateIsNotCarplayMainVideoFirstFrame": true,
+    "sdkOutputPayload": "[3,10,0] {0,2,0,0,0,0,0,2}",
+    "sdkOutputPayloadCount": 38,
+    "activeAndClearPayloadsIdentical": true,
+    "effectiveRouteContentObservedInOutput": false,
+    "installedSdkVehicleProperty": "0x2d700050 / 762314832 / ID_MCU_CAN_PRIVATE",
+    "reference327VehicleProperty": "0x2d70004e / 762314830",
+    "applicationPrivatePropertyCallsInGuidanceWindow": 44,
+    "halPrivatePropertyCallsInGuidanceWindow": 44,
+    "matchingVehicleShortFrameWritesInGuidanceWindow": 34,
+    "matchedVehicleWriteProvesInstrumentAcknowledgement": false,
+    "apiPermissionRejectionObserved": false,
+    "nativeOutputPreparationStillMissing": true,
+    "completeNativeOutputPreparationFlowValidated": false,
+    "actual169SdkReadinessAndStandaloneTurnPromptPathStillNeedVerification": true,
+    "raw327PropertyFallbackOrFalsePreparationStateAdded": false,
+    "fixed": false,
+    "vehicleInstrumentDisplayValidated": false,
+    "runtimeBehaviorChanged": false,
+    "gradleRun": false,
+    "apkBuiltSignedOrInstalled": false,
+    "localEvidence": "agent_docs/instrument-navigation-build1210-20261027/ sources.json, application-summary.json, runtime-summary.json, runtime-navigation.json, output-path-summary.json and original logs"
+  },
   "loggingPolicyBuild1210Distribution20261027": {
     "documentation": "docs/ANDROID9_AUTHORIZATION_COMPONENTS.md",
     "applicationVersion": "0.2.2",

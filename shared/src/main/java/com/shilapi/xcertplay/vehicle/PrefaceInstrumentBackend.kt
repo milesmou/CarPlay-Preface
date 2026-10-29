@@ -23,7 +23,7 @@ internal class PrefaceInstrumentSdkHandle {
     var quietUntilMs = 0L
 }
 
-/** Same instrument-SDK entry point and start/update/stop lifecycle used by NaviDashboardManager. */
+/** NaviDashboardManager's aggregate and per-field guidance calls, using the installed SDK. */
 internal class PrefaceInstrumentSdkBackend(
     private val context: Context,
     private val resolve: (String) -> Class<*> = { Class.forName(it) },
@@ -39,6 +39,12 @@ internal class PrefaceInstrumentSdkBackend(
     private lateinit var navigationType: Class<*>
     private lateinit var infoType: Class<*>
     private lateinit var update: Method
+    private lateinit var status: Method
+    private lateinit var arrow: Method
+    private lateinit var nextDistance: Method
+    private lateinit var eta: Method
+    private lateinit var destinationDistance: Method
+    private lateinit var nextRoad: Method
     private var configured = false
     private var reportedReady = false
 
@@ -69,6 +75,15 @@ internal class PrefaceInstrumentSdkBackend(
             update = navigationType.getMethod("updateNavigationInfo", infoType)
             navigationType.getMethod("notifyTurnByTurnStarted")
             navigationType.getMethod("notifyTurnByTurnStopped")
+            // Native refreshGuideInfo sends both aggregate info and these individual fields.
+            // Resolve the complete contract before creating an SDK instance or starting a route.
+            val integer = Int::class.javaPrimitiveType!!
+            status = guidanceMethod("notifyNavigationStatus", integer)
+            arrow = guidanceMethod("updateTurnByTurnArrow", integer)
+            nextDistance = guidanceMethod("updateDistanceToNextGuidancePoint", integer)
+            eta = guidanceMethod("updateETA", integer)
+            destinationDistance = guidanceMethod("updateDistanceToDestination", integer)
+            nextRoad = guidanceMethod("updateNextGuidancePointName", String::class.java)
             if (sdk.dim == null) {
                 sdk.dim = dimType.getMethod("create", Context::class.java).invoke(null, context)
                     ?: error("instrument-sdk-create-unavailable")
@@ -117,7 +132,7 @@ internal class PrefaceInstrumentSdkBackend(
         }
         if (!reportedReady) {
             reportedReady = true
-            diagnostic("instrument navigation native SDK connected; state-management=OEM; display-confirmed=false")
+            diagnostic("instrument navigation native SDK connected; output=aggregate+fields; state-management=OEM; display-confirmed=false")
         }
         true
     }
@@ -131,11 +146,37 @@ internal class PrefaceInstrumentSdkBackend(
         if (!started) {
             navigationType.getMethod("notifyTurnByTurnStarted").invoke(sdk.navigation)
             started = true
+            invokeGuidance(status, 1) // Original map-start status 16 becomes NAVIGATION_STATUS_SUCCEED.
         }
-        check(!closed && sdk.owner === this && sdk.connected && currentSession()) { "instrument-session-ended" }
-        update.invoke(sdk.navigation, navigationInfo(guidance))
+        invokeGuidance(update, navigationInfo(guidance))
+        // Build327 NaviDashboardManager.refreshGuideInfo (a.java:734) sends these after
+        // updateNavigationInfo. The integer-arrow path has its own native state and encoder;
+        // it must not be replaced with a fabricated projection/first-frame-ready event.
+        invokeGuidance(arrow, guidance.turnId)
+        invokeGuidance(nextDistance, guidance.distanceMeters.coerceAtLeast(0))
+        invokeGuidance(eta, guidance.remainingSeconds.toSdkInt())
+        invokeGuidance(destinationDistance, guidance.remainingMeters.toSdkInt())
+        invokeGuidance(nextRoad, guidance.road)
         Unit
     }
+
+    private fun guidanceMethod(name: String, parameter: Class<*>): Method {
+        try {
+            return navigationType.getMethod(name, parameter).also {
+                check(it.returnType == Void.TYPE) { "instrument-sdk-guidance-method-mismatch" }
+            }
+        } catch (error: NoSuchMethodException) {
+            diagnostic("instrument navigation native SDK missing method=$name; required=OEM-guidance-fields")
+            throw IllegalStateException("instrument-sdk-guidance-method-mismatch", error)
+        }
+    }
+
+    private fun invokeGuidance(method: Method, value: Any) {
+        check(!closed && sdk.owner === this && sdk.connected && currentSession()) { "instrument-session-ended" }
+        method.invoke(sdk.navigation, value)
+    }
+
+    private fun Long.toSdkInt(): Int = coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
 
     override fun clear() = onMain {
         if (sdk.owner === this && sdk.connected) stopNavigation()
@@ -150,9 +191,12 @@ internal class PrefaceInstrumentSdkBackend(
         } finally {
             try { navigationType.getMethod("notifyTurnByTurnStopped").invoke(sdk.navigation) }
             finally {
-                // Build327 queues native clear callbacks on main at 0/200/500 ms. Complete them
-                // before any replacement route publishes, using the same main message queue.
-                sdk.quietUntilMs = SystemClock.uptimeMillis() + NATIVE_STOP_DRAIN_MS
+                try { status.invoke(sdk.navigation, 0) }
+                finally {
+                    // Build327 queues native clear callbacks on main at 0/200/500 ms. Complete
+                    // them before replacement guidance, even when clear/stop/status fails.
+                    sdk.quietUntilMs = SystemClock.uptimeMillis() + NATIVE_STOP_DRAIN_MS
+                }
             }
         }
     }
