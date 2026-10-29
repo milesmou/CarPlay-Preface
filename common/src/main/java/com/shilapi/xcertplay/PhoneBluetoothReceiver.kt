@@ -81,7 +81,7 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
         PhoneWakeDiagnostics.observe(context, source, "matched")
         PhoneWakeDiagnostics.record(context, "matched")
         val launch = ConnectionAutoStart.stamp(Intent(context, DiPlayActivity::class.java)).apply {
-            putExtra(EXTRA_AUTO_CONNECT, true)
+            putExtra(EXTRA_AUTO_CONNECT, launchToken)
             putExtra(EXTRA_PHONE_ADDRESS, address)
             putExtra(EXTRA_WAKE_ELAPSED, now)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -98,6 +98,8 @@ class PhoneBluetoothReceiver : BroadcastReceiver() {
 
     companion object {
         const val EXTRA_AUTO_CONNECT = "com.preface.carplay.AUTO_CONNECT_SELECTED_PHONE"
+        /** This exported launch must come from this process, alongside its cancellation generation. */
+        internal val launchToken: String = java.util.UUID.randomUUID().toString()
         internal const val EXTRA_PHONE_ADDRESS = "com.preface.carplay.AUTO_CONNECT_PHONE_ADDRESS"
         internal const val EXTRA_WAKE_ELAPSED = "com.preface.carplay.AUTO_CONNECT_WAKE_ELAPSED"
         internal val ACTIONS = mapOf(

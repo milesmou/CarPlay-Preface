@@ -39,6 +39,10 @@ class NcmUsbBridge internal constructor(
     private var sequence = 0
     private var loggedWriteTimeout = false
     private var bulkOutAccepted = false
+    @Volatile var firstBulkOutAcceptedAtNanos: Long? = null
+        private set
+    private val traffic = NcmTrafficCounter()
+    internal fun connectionAttemptSince(port: Int, sinceNanos: Long): Boolean = traffic.connectionAttemptSince(port, sinceNanos)
     private var notReadyFrames = 0
     private val frames = ArrayDeque<ByteArray>()
     private var queuedBytes = 0
@@ -131,12 +135,14 @@ class NcmUsbBridge internal constructor(
         }
         if (!bulkOutAccepted) {
             bulkOutAccepted = true
+            firstBulkOutAcceptedAtNanos = System.nanoTime()
             runCatching { onDiagnostic("NCM bulk-out ready after $notReadyFrames dropped frames") }
         }
         if (loggedWriteTimeout) {
             loggedWriteTimeout = false
             Log.i(IphoneCarPlayConfiguration.TAG, "ncm bulk-out became ready")
         }
+        traffic.sent()
         true
     }
 
@@ -395,6 +401,7 @@ class NcmUsbBridge internal constructor(
             throw failSession("NCM frame queue exceeded its bounds")
         }
         frames.addLast(frame)
+        traffic.received(frame)
         queuedBytes += frame.size
     }
 

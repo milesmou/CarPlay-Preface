@@ -2710,6 +2710,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun createSessionListener(controllerGeneration: Int): AirPlaySessionListener =
         object : AirPlaySessionListener {
+            override val wantsTrace: Boolean get() = false // Diagnostic reports reject TRACE payloads.
             private val diagnosticLog = sessionLog
 
             override fun onSessionActive(session: AirPlaySession) {

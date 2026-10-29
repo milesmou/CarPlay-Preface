@@ -340,7 +340,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         connectionSettingsReturnCategory = savedInstanceState?.getString("connection_settings_return_category")
             ?.let { runCatching { SettingsCategory.valueOf(if (it == "ADVANCED") "EXPERIMENTAL" else it) }.getOrNull() }
         backupForReport = savedInstanceState?.getBoolean("backup_for_report") == true
-        page = (savedInstanceState?.getString("page") ?: intent.getStringExtra("page"))
+        page = (savedInstanceState?.getString("page") ?: requestedPage(intent))
             ?.takeIf { it in setOf("home", "settings", "backup", "wireless-recovery") } ?: "home"
         settingsReturnToCarPlay = savedInstanceState?.getBoolean(EXTRA_SETTINGS_RETURN_TO_CARPLAY)
             ?: (page == "settings" && intent.getBooleanExtra(EXTRA_SETTINGS_RETURN_TO_CARPLAY, false))
@@ -382,7 +382,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         if (isLauncherIntent(intent) && !ConnectionAutoStart.paused && CarPlayBackgroundSession.hasSession()) {
             page = "home"; render(); openProjection(); return
         }
-        page = intent.getStringExtra("page") ?: "home"; render()
+        page = requestedPage(intent) ?: "home"; render()
         handleWirelessRecovery()
         if (consumeBluetoothAutoConnectIntent(intent)) {
             if (initialLaunch) {
@@ -394,9 +394,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
     private fun consumeBluetoothAutoConnectIntent(intent: Intent): Boolean {
-        val requested = intent.getBooleanExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, false)
+        val hasRequest = intent.hasExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT)
+        val requested = intent.getStringExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT) == PhoneBluetoothReceiver.launchToken
         intent.removeExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT)
-        if (!requested) return false
+        if (!hasRequest) return false
+        if (!requested) {
+            initialLaunch = false
+            PhoneWakeDiagnostics.record(this, "activity-request-rejected")
+            return false
+        }
         val phone = intent.getStringExtra(PhoneBluetoothReceiver.EXTRA_PHONE_ADDRESS)
         val age = android.os.SystemClock.elapsedRealtime() -
             intent.getLongExtra(PhoneBluetoothReceiver.EXTRA_WAKE_ELAPSED, Long.MIN_VALUE)
@@ -3524,6 +3530,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private val FOCUS_RING get() = palette.focusRing
 
     companion object {
+        // External launches may open pages without side effects; backup starts its HTTP server.
+        internal fun requestedPage(intent: Intent): String? = intent.getStringExtra("page")
+            ?.takeIf { it in setOf("home", "settings", "wireless-recovery") }
+
         internal const val EXTRA_SETTINGS_RETURN_TO_CARPLAY = "com.preface.carplay.SETTINGS_RETURN_TO_CARPLAY"
         internal fun isLauncherIntent(intent: Intent): Boolean =
             intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&

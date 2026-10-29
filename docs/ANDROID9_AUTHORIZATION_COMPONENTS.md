@@ -57,6 +57,16 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
+## 0.2.2／1211 测试包构建核验
+
+2026-10-29，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功，交付 `CarPlay-Preface-0.2.2-1211-debug.apk`，25,690,358 字节，包名 `com.preface.carplay`。原始 APK 和输出元数据保留；automotive 未构建。主包 SHA-256 为 `2b1369dae5e9580cf491cc7b4f803547d7b1ab66d4acf8a54c6f4b9532f43c5c`，主证书 SHA-256 保持 `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`。
+
+本包包含 [v0.2.22 选择性同步](UPSTREAM_SYNC_0.2.22.md) 及 [原厂仪表合并加分项发送](PREFACE_INSTRUMENT_NATIVE_FIELDS_2026-10-29.md)。核对 DEX 中的音乐时钟、麦克风分包、多指槽位、USB 单次恢复和仪表分项／状态方法，以及最终 USB 签名权限声明。Debug 日志模式为 `debug-detailed`，保留详细日志；本次没有构建 Release。此前源码同步阶段 Debug 431、Release 302 项定向测试通过，此次打包未追加单元测试、主应用全量 Lint 或完整 CI，组件构建依赖检查随任务执行。
+
+内置授权组件为 `com.android.vpndialogs / preface-android9-11 / 11`，SHA-256 `3b80588bdda88dd5f1ab0ab15418612334dc7c1e66a987297d4ed1d31ae6348d`，平台证书保持 `c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8`，共享 UID 为 `android.uid.system`。包内组件与本次签名产物、生成 assets 和最小元数据一致；QQ 媒体输入及 Manifest 参数、配件认证资产核验通过，无媒体助手或额外签名输入入包。
+
+`adb devices -l` 没有在线设备，未安装、未启动模拟器，也未单独安装授权组件或操作系统授权。上述构建和静态核验不代表 IHU353G／169 实车连接、麦克风或仪表显示已修复。本机记录位于 `agent_docs/build1211-20261029/`。
+
 ## 0.2.2／1210 测试包构建核验
 
 2026-10-27，按用户要求仅执行 `:mobile:assembleDebug --console=plain` 成功；mobile／automotive 源码构建号同步递增为 1210，本次只构建 mobile。交付 `CarPlay-Preface-0.2.2-1210-debug.apk`，25,657,534 字节，包名 `com.preface.carplay`，原始 APK 和输出元数据保留。

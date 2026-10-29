@@ -41,7 +41,7 @@ Debug／Release **各 33 项，共 66 项定向验证通过**（每种变体：B
 
 仅执行 `:shared:testDebugUnitTest` 和 `:shared:testReleaseUnitTest`，使用 `--tests '*PrefaceInstrumentBackendTest'`、`--tests '*PrefaceInstrumentGuidanceTest'`、`--tests '*PrefaceInstrumentNavigationTest'` 限定范围。公开树、证据哈希和文档链接另行检查。
 
-源码验证阶段未运行全量 CI，也未构建、签名或安装 APK。已有 **0.2.2／1210 APK 不包含此次源码补齐**，应用版本和构建号没有因源码修改自动变化；提交源码不代表已交付新 APK。
+源码验证阶段未运行全量 CI，也未构建、签名或安装 APK。已有 **0.2.2／1210 APK 不包含此次源码补齐**，应用版本和构建号没有因源码修改自动变化；提交源码不代表已交付新 APK。随后按用户要求，该补齐已纳入 0.2.2／1211 Debug 测试包，DEX 中核对分项调用及状态方法，主签名和内置组件核验通过；无在线设备可安装，169 实车显示仍待验证，见 [1211 构建记录](ANDROID9_AUTHORIZATION_COMPONENTS.md#0221211-测试包构建核验)。
 
 ## 实车复测判断
 

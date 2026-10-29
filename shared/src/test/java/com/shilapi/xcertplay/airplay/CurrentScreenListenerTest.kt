@@ -1,12 +1,16 @@
 package com.shilapi.xcertplay.airplay
 
 import java.io.Closeable
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.SocketAddress
 import java.net.Socket
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +34,8 @@ class CurrentScreenListenerTest {
     /** Records the four video deliveries; the 4-argument frame is recorded on its own, not via the 3-argument default. */
     private class RecordingSink : MediaSink {
         val events: MutableList<Event> = Collections.synchronizedList(mutableListOf())
+        val diagnostics = mutableMapOf<Int, (String) -> Unit>()
+        override fun setVideoDiagnosticHandler(type: Int, handler: (String) -> Unit) { diagnostics[type] = handler }
         override fun onVideoCodec(type: Int, codec: VideoCodec) { events += Event.Codec(type, codec) }
         override fun onVideoConfig(type: Int, codecData: ByteArray) { events += Event.CodecData(type, codecData.toList()) }
         override fun onVideoFrame(type: Int, naluBytes: ByteArray) { events += Event.Frame(type, naluBytes.toList()) }
@@ -106,7 +112,10 @@ class CurrentScreenListenerTest {
     fun onScreenStopsTheReplacedStreamsListenerForTheSameKey() {
         val sink = RecordingSink()
         val engine = CarPlayMediaEngine(sink)
-        val session = testSession()
+        var rendered = 0
+        val session = testSession(listener = object : AirPlaySessionListener {
+            override fun onVideoFrameRendered(session: AirPlaySession) { rendered++ }
+        })
         try {
             withSharedSecret(session)
             val streams = streamsOf(engine)
@@ -115,6 +124,9 @@ class CurrentScreenListenerTest {
             assertNotNull(engine.onScreen(session, 110, mapOf("streamConnectionID" to 1L)))
             val first = streams[mainKey] as ScreenStream
             val firstListener = listenerOf(first)
+            val firstDiagnostic = sink.diagnostics.getValue(110)
+            firstDiagnostic("first frame rendered")
+            assertEquals(1, rendered)
             firstListener.deliverAll()
             assertEquals(expected(110), sink.take())
 
@@ -126,6 +138,11 @@ class CurrentScreenListenerTest {
             val second = streams[mainKey] as ScreenStream
             assertNotSame(first, second)
             val secondListener = listenerOf(second)
+            firstDiagnostic("first frame rendered")
+            sink.diagnostics.getValue(111)("first frame rendered")
+            assertEquals(1, rendered)
+            sink.diagnostics.getValue(110)("first frame rendered")
+            assertEquals(2, rendered)
 
             // The replaced stream's thread was already past its read when it was closed and still delivers.
             firstListener.deliverAll()
@@ -135,6 +152,20 @@ class CurrentScreenListenerTest {
             assertEquals(expected(110, VideoCodec.H264), sink.take())
             clusterListener.deliverAll()
             assertEquals(expected(111), sink.take())
+        } finally {
+            engine.onSessionClosed(session)
+            session.close()
+        }
+    }
+
+    @Test
+    fun aScreenWithoutAControlPeerCannotListen() {
+        val engine = CarPlayMediaEngine(RecordingSink())
+        val session = testSession(socket = Socket())
+        try {
+            withSharedSecret(session)
+            assertNull(engine.onScreen(session, 110, mapOf("streamConnectionID" to 1L)))
+            assertTrue(streamsOf(engine).isEmpty())
         } finally {
             engine.onSessionClosed(session)
             session.close()
@@ -157,8 +188,14 @@ class CurrentScreenListenerTest {
         ScreenStream::class.java.getDeclaredField("listener").apply { isAccessible = true }
             .get(screen) as ScreenStream.Listener
 
-    private fun testSession(): AirPlaySession = AirPlaySession(
-        socket = Socket(),
+    private fun testSession(
+        socket: Socket = object : Socket() {
+            override fun getInetAddress(): InetAddress = InetAddress.getByName("127.0.0.1")
+            override fun getRemoteSocketAddress(): SocketAddress = InetSocketAddress(inetAddress, 7000)
+        },
+        listener: AirPlaySessionListener = object : AirPlaySessionListener {},
+    ): AirPlaySession = AirPlaySession(
+        socket = socket,
         config = AirPlayConfig(
             deviceName = "test",
             deviceId = "02:00:00:00:00:02",
@@ -169,7 +206,7 @@ class CurrentScreenListenerTest {
         identity = AirPlayIdentity.generate(),
         pairings = PairingStore(),
         mfi = null,
-        listener = object : AirPlaySessionListener {},
+        listener = listener,
         media = object : AirPlayMediaHandler {},
     )
 }

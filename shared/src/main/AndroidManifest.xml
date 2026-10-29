@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The USB result PendingIntent runs with this application's signing identity. -->
+    <permission android:name="${applicationId}.USB_PERMISSION_RESULT" android:protectionLevel="signature" />
+    <uses-permission android:name="${applicationId}.USB_PERMISSION_RESULT" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

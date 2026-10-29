@@ -59,7 +59,7 @@ Set `ANDROID_HOME` or `local.properties` if Gradle cannot find the SDK.
 
 ## 版本与上游同步
 
-1. 当前上游参考基线为 **DiPlay v0.2.21（选择性同步，仅音乐积压、软件 Opus 和 USB 重新枚举超时复查三项）**，本次固定来源与排除范围见 `docs/UPSTREAM_SYNC_0.2.21.md`，此前 v0.2.20 选择性移植继续保留，见 `docs/UPSTREAM_SYNC_0.2.20.md`；另选择性移植 **huangwits/DiPlay-Preface v0.2.20.1** 的蓝牙音频流程，来源与差异见 `docs/GEELYPLAY_BLUETOOTH_0.2.20.1.md`，USB/VPN 按用户后续要求从官方 v0.2.20 恢复，见 `docs/USB_VPN_RESTORE_0.2.20.md`；不引入 E01 专属功能。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
+1. 当前上游参考基线为 **DiPlay v0.2.22（选择性同步，通用音频、USB、TCP、触控及协议／入口保护）**，固定来源与范围见 `docs/UPSTREAM_SYNC_0.2.22.md`；保留此前 v0.2.21 三项移植及 v0.2.20 选择性移植，见 `docs/UPSTREAM_SYNC_0.2.21.md`、`docs/UPSTREAM_SYNC_0.2.20.md`；另选择性移植 **huangwits/DiPlay-Preface v0.2.20.1** 的蓝牙音频流程，来源与差异见 `docs/GEELYPLAY_BLUETOOTH_0.2.20.1.md`，USB/VPN 按用户后续要求从官方 v0.2.20 恢复，见 `docs/USB_VPN_RESTORE_0.2.20.md`；不引入 E01 专属功能。本仓库应用版本独立维护，以 `mobile/build.gradle.kts` 中的 `versionName` 为准；中文 `README.md` 记录应用版本和上游基线。
 2. 后续同步上游改动时，必须更新版本记录：按实际同步到的上游发布版本更新中文 `README.md` 及本节的上游基线，并递增 `mobile/build.gradle.kts` 中的 `versionCode`。应用 `versionName` 遵循下一条的发布规则，不得直接覆盖为上游的应用版本号。
 3. 用户指定应用版本时采用指定版本。用户指定本次正式发布版本为 **0.2.1**，在 GitHub 正式发布此版本前，所有开发修改与上游同步均保持 `versionName = "0.2.1"`，不自动递增补丁号。正式发布后，未指定下一版本时默认递增本仓库应用版本的补丁号。`versionCode` 不得回退，新升级构建必须大于上一升级构建，以支持覆盖安装；修改应用版本时同时更新中文 `README.md`。
 4. 如果同步的是尚未发布或零散的上游提交，记录实际同步的提交 SHA 和同步范围，不虚构上游发布版本，也不将部分提交描述为完整同步某个新版本。

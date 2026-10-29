@@ -18,6 +18,24 @@ class SettingsBackupCodecTest {
 
     private fun prefs(name: String) = context.getSharedPreferences(name, Context.MODE_PRIVATE)
 
+    @Test fun pictureAndPrefaceSwitchesRequireKnownKeysAndDeclaredTypesBeforeAnyValueExists() {
+        val names = listOf("carplay_picture", "diplay_phone_audio", "diplay_instrument_navigation", "diplay_media_wheel")
+        names.forEach { prefs(it).edit().clear().commit() }
+        val document = """{"format":"diplay-settings","version":1,"settings":{
+            "carplay_picture":{"brightness":"bad","arbitrary":100},
+            "diplay_phone_audio":{"carplay":"bad","apps":true,"arbitrary":true},
+            "diplay_instrument_navigation":{"enabled":false},
+            "diplay_media_wheel":{"NEXT":"bad","SIRI":231}}}""".toByteArray()
+        val result = SettingsBackupCodec.import(context, document)
+        assertEquals(3, result.applied)
+        assertEquals(5, result.skipped)
+        assertFalse(prefs("diplay_phone_audio").contains("carplay"))
+        assertTrue(com.shilapi.xcertplay.telecom.PhoneAudioSettings.phoneAudioRoute(context))
+        assertTrue(com.shilapi.xcertplay.telecom.PhoneAudioSettings.phoneAudioRouteApps(context))
+        assertFalse(com.shilapi.xcertplay.vehicle.PrefaceInstrumentSettings.enabled(context))
+        assertEquals(231, prefs("diplay_media_wheel").getInt("SIRI", -1))
+    }
+
     @Test fun instrumentNavigationBacksUpOnlyItsSwitch() {
         val values = prefs("diplay_instrument_navigation")
         values.edit().putBoolean("enabled", true).putString("last_road", "private-road").commit()

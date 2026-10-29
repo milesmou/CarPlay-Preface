@@ -37,6 +37,18 @@ class NcmUsbBridgeWriteTimeoutTest {
         assertEquals(listOf(NcmUsbBridge.NOT_READY_WRITE_TIMEOUT_MILLIS, 2_000, 2_000), NcmWriteReplay.timeouts)
     }
 
+    @Test fun theFirstAcceptedFullBlockMarksLinkTimeAndLaterWritesCannotMoveIt() {
+        NcmWriteReplay.results.addAll(listOf(-1, 0, NcmWriteReplay.ALL, NcmWriteReplay.ALL))
+        withBridge { ncm ->
+            repeat(2) { ncm.send(frame, 100); org.junit.Assert.assertNull(ncm.firstBulkOutAcceptedAtNanos) }
+            ncm.send(frame, 100)
+            val first = ncm.firstBulkOutAcceptedAtNanos
+            org.junit.Assert.assertNotNull(first)
+            ncm.send(frame, 100)
+            assertEquals(first, ncm.firstBulkOutAcceptedAtNanos)
+        }
+    }
+
     @Test fun aShorterCallerTimeoutIsKept() {
         NcmWriteReplay.results.add(-1)
         withBridge { ncm -> ncm.send(frame, 5) }

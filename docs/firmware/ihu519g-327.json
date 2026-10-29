@@ -1,4 +1,28 @@
 {
+  "selectiveUpstreamBuild1211Distribution20261029": {
+    "documentation": "docs/ANDROID9_AUTHORIZATION_COMPONENTS.md",
+    "applicationVersion": "0.2.2",
+    "applicationBuild": 1211,
+    "module": "mobile",
+    "task": ":mobile:assembleDebug",
+    "apkSha256": "2b1369dae5e9580cf491cc7b4f803547d7b1ab66d4acf8a54c6f4b9532f43c5c",
+    "apkBytes": 25690358,
+    "mainCertificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
+    "authorizationComponentBuild": 11,
+    "embeddedAuthorizationSha256": "3b80588bdda88dd5f1ab0ab15418612334dc7c1e66a987297d4ed1d31ae6348d",
+    "signatureAndEmbeddedAssetsVerified": true,
+    "instrumentNativeGuidanceFieldsIncluded": true,
+    "upstreamReference": "DiPlay v0.2.22 selective; 28d6002ba00320f0ba745212160b08759e4f60b9",
+    "deliveredVariant": "Debug",
+    "loggingMode": "debug-detailed",
+    "installedDevices": [],
+    "installStatus": "No online device; no emulator started",
+    "authorizationComponentSeparatelyInstalled": false,
+    "additionalUnitTestsRunForBuild": false,
+    "fullCiRun": false,
+    "vehicleValidated": false,
+    "localEvidence": "agent_docs/build1211-20261029/"
+  },
   "instrumentNavigationOriginalPerFieldRepair20261029": {
     "documentation": "docs/PREFACE_INSTRUMENT_NATIVE_FIELDS_2026-10-29.md",
     "scope": "IHU519G FS11A1 build327 static sender/adapter evidence and application tests; actual IHU353G build169 output remains unvalidated",

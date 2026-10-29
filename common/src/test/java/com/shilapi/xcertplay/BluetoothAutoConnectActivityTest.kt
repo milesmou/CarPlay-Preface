@@ -42,7 +42,7 @@ class BluetoothAutoConnectActivityTest {
     }
 
     private fun wake(address: String = phone, at: Long = SystemClock.elapsedRealtime()) = Intent()
-        .putExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, true)
+        .putExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, PhoneBluetoothReceiver.launchToken)
         .putExtra(PhoneBluetoothReceiver.EXTRA_PHONE_ADDRESS, address)
         .putExtra(PhoneBluetoothReceiver.EXTRA_WAKE_ELAPSED, at)
 
@@ -82,6 +82,14 @@ class BluetoothAutoConnectActivityTest {
         assertFalse(accept(wake("AA:BB:CC:DD:EE:FF")))
         assertFalse(accept(wake(at = SystemClock.elapsedRealtime() - 60_001)))
         assertFalse(accept(Intent().putExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, true)))
+    }
+
+    @Test fun forgedBooleanOrWrongTokenCannotStartABluetoothConnection() {
+        assertFalse(accept(wake().putExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, true)))
+        assertFalse(accept(wake().putExtra(PhoneBluetoothReceiver.EXTRA_AUTO_CONNECT, "untrusted")))
+        assertFalse(ReflectionHelpers.getField<Boolean>(activity, "initialLaunch"))
+        assertNull(shadowOf(activity).nextStartedActivity)
+        assertTrue(accept(wake()))
     }
 
     @Test fun selectionOrOptInChangesBeforeQueuedLaunchCancelTheRequest() {

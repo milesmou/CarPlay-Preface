@@ -300,6 +300,9 @@ class CarPlayController(
     private val teardownComplete = CountDownLatch(1)
 
     private val sessionListener = object : AirPlaySessionListener {
+        override val wantsTrace: Boolean
+            get() = LogPolicy.detailedEnabled && (uiListener?.wantsTrace == true ||
+                android.util.Log.isLoggable("DiPlayTrace", android.util.Log.VERBOSE))
         override fun onSessionActive(session: AirPlaySession) {
             val replacement = activeSession !== session
             if (replacement && activeSession != null) synchronized(phoneCalls) { phoneCalls.clear() }
@@ -537,11 +540,48 @@ class CarPlayController(
         return true
     }
 
+    private class PendingMove(val session: AirPlaySession, val token: Any?, var contacts: List<AirPlayContact>)
+    private val touchLock = Any()
+    private var lastTouchSession: AirPlaySession? = null
+    private var lastTouch: List<AirPlayContact>? = null
+    private var pendingMove: PendingMove? = null
+
+    /** Coalesce waiting moves of the same fingers; preserve every press and release. */
     fun sendTouch(contacts: List<AirPlayContact>): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
+        val token = session.mainScreenSessionToken()
+        fun sendCurrent(value: List<AirPlayContact>) {
+            if (!closed && activeSession === session && session.mainScreenSessionToken() === token) {
+                session.sendTouch(value)
+            }
+        }
         return try {
-            touchExecutor.execute { session.sendTouch(contacts) }
+            synchronized(touchLock) {
+                val isMove = lastTouchSession === session && contacts.isNotEmpty() && contacts.all { it.down } &&
+                    lastTouch?.filter { it.down }?.map { it.id }?.toSet() == contacts.map { it.id }.toSet()
+                lastTouchSession = session
+                lastTouch = contacts.toList()
+                val pending = pendingMove
+                if (isMove && pending != null && pending.session === session && pending.token === token) {
+                    pending.contacts = contacts.toList()
+                    return true
+                }
+                if (!isMove) {
+                    pendingMove = null
+                    touchExecutor.execute { sendCurrent(contacts) }
+                } else {
+                    val move = PendingMove(session, token, contacts.toList())
+                    touchExecutor.execute {
+                        val latest = synchronized(touchLock) {
+                            if (pendingMove === move) pendingMove = null
+                            move.contacts
+                        }
+                        sendCurrent(latest)
+                    }
+                    pendingMove = move
+                }
+            }
             true
         } catch (_: Exception) {
             false
@@ -2310,6 +2350,13 @@ class CarPlayController(
                 "wired iAP2 runtime control starting " +
                     "location=${config.identification.locationInformationEnabled}",
             )
+            fun startAgain(): Iap2WiredControlClient.StartAgain {
+                val service = attachedService ?: return Iap2WiredControlClient.StartAgain.DONE
+                if (closed || this.csm !== openedCsm || !service.isAttached()) return Iap2WiredControlClient.StartAgain.DONE
+                val opened = ncm.firstBulkOutAcceptedAtNanos
+                return startup.startAgainDecision(opened,
+                    opened?.let { ncm.connectionAttemptSince(endpoint.airPlayPort, it) } == true)
+            }
             val result = Iap2WiredControlClient(csm, Iap2MfiAuthenticationClient(mfi)).run(
                 identification = config.identification,
                 endpoint = endpoint,
@@ -2318,6 +2365,10 @@ class CarPlayController(
                 locationProvider = locationProvider,
                 onIncoming = ::onRouteFrame,
                 onProgress = { message ->
+                    if (message == Iap2WiredControlClient.START_SESSION_AGAIN_PROGRESS) {
+                        startup.startSessionSentAgain()
+                        eventLog("USB StartSession repeated once after NCM became writable; waiting for AirPlay")
+                    }
                     debugLog("wired $message")
                 },
                 onStartSessionSent = {
@@ -2326,9 +2377,12 @@ class CarPlayController(
                     startup.startSessionSent()
                 },
                 refreshEndpoint = {
-                    if (startup.timedOut()) throw WiredVpnUnavailable("AirPlay did not establish over NCM/VPN within 30 seconds of StartSession")
+                    if (startup.timedOut(startAgain() != Iap2WiredControlClient.StartAgain.DONE)) {
+                        throw WiredVpnUnavailable("AirPlay did not establish over NCM/VPN within the bounded StartSession admission window")
+                    }
                     null
                 },
+                startSessionAgain = ::startAgain,
             )
             onStatus(
                 when (result.terminal) {
@@ -2388,7 +2442,13 @@ class CarPlayController(
         return serviceBindings.withVpnService(service) {
             val listener = object : AirPlaySessionListener by sessionListener {
                 override fun onSessionActive(session: AirPlaySession) {
-                    if (closed || !startup.sessionEstablished()) { session.close(); return }
+                    val opened = ncm.firstBulkOutAcceptedAtNanos
+                    val decision = startup.startAgainDecision(opened, opened?.let {
+                        ncm.connectionAttemptSince(service.boundPort() ?: airPlayConfig.port, it)
+                    } == true)
+                    if (closed || !startup.sessionEstablished(decision != Iap2WiredControlClient.StartAgain.DONE)) {
+                        session.close(); return
+                    }
                     sessionListener.onSessionActive(session)
                 }
 
