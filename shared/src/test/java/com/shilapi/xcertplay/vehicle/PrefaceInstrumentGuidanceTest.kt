@@ -9,6 +9,8 @@ import org.junit.Test
 class PrefaceInstrumentGuidanceTest {
     private class Backend : PrefaceInstrumentBackend {
         var connects = 0
+        var preparations = 0
+        var timeoutNs = 5_000_000_000L
         var closes = 0
         var clears = 0
         var ready = true
@@ -16,6 +18,8 @@ class PrefaceInstrumentGuidanceTest {
         var failure: Exception? = null
         val sent = mutableListOf<PrefaceInstrumentGuidance>()
         override fun connect() { connects++ }
+        override fun prepareSession() { preparations++ }
+        override fun connectionTimeoutNs() = timeoutNs
         override fun ready() = ready
         override fun available() = available
         override fun publish(guidance: PrefaceInstrumentGuidance) { failure?.let { throw it }; sent += guidance }
@@ -72,6 +76,26 @@ class PrefaceInstrumentGuidanceTest {
         session.tick(); session.close()
         assertEquals(0, backend.connects)
         assertEquals(0, backend.clears)
+    }
+
+    @Test fun preparingAnActiveCarplaySessionDoesNotInventNavigationOrWriteTheSdk() {
+        session.prepareSession(); session.tick(); session.close()
+        assertEquals(1, backend.preparations)
+        assertEquals(0, backend.connects)
+        assertEquals(0, backend.clears)
+        assertTrue(backend.sent.isEmpty())
+        assertEquals(1, backend.closes)
+    }
+
+    @Test fun aColdBackgroundPreparationHasABoundedLongerConnectionWindow() {
+        backend.timeoutNs = 20_000_000_000L; backend.ready = false
+        guidance(); session.tick()
+        now = 6_000_000_000L; guidance(); session.tick()
+        assertEquals(0, backend.closes)
+        now = 21_000_000_000L; guidance(); session.tick()
+        assertEquals(1, backend.closes)
+        assertTrue(logs.any { "instrument-sdk-connect-timeout" in it })
+        assertTrue(backend.sent.isEmpty())
     }
 
     @Test fun sendsParsedGuidanceAndLimitsWritesToTwicePerSecond() {

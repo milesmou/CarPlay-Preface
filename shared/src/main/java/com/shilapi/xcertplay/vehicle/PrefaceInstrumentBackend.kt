@@ -47,9 +47,17 @@ internal class PrefaceInstrumentSdkBackend(
     private lateinit var nextRoad: Method
     private var configured = false
     private var reportedReady = false
+    private var awaitingPreparation = false
+    private val preparation = PrefaceAmapPreparation(context, { !closed && currentSession() }, diagnostic)
+
+    override fun prepareSession() = onMain { preparation.start() }
+    override fun connectionTimeoutNs(): Long = preparation.timeoutNs()
 
     override fun connect() = onMain {
         check(!closed && currentSession()) { "instrument-session-ended" }
+        preparation.start()
+        awaitingPreparation = !preparation.ready()
+        if (awaitingPreparation) return@onMain
         if (!configured) {
             dimType = resolve("com.ecarx.xui.adaptapi.diminteraction.DimInteraction")
             connectableType = resolve("com.ecarx.xui.adaptapi.binder.IConnectable")
@@ -122,6 +130,10 @@ internal class PrefaceInstrumentSdkBackend(
     }
 
     override fun ready(): Boolean = onMain {
+        if (closed || !currentSession()) return@onMain false
+        if (!preparation.ready()) return@onMain false
+        if (!configured && awaitingPreparation) connect()
+        if (!configured) return@onMain false
         if (closed || !currentSession() || sdk.owner !== this || !sdk.connected || SystemClock.uptimeMillis() < sdk.quietUntilMs) {
             return@onMain false
         }
@@ -132,7 +144,7 @@ internal class PrefaceInstrumentSdkBackend(
         }
         if (!reportedReady) {
             reportedReady = true
-            diagnostic("instrument navigation native SDK connected; output=aggregate+fields; state-management=OEM; preparation=factory-AMap-required; display-confirmed=false")
+            diagnostic("instrument navigation native SDK connected; output=aggregate+fields; state-management=OEM; preparation=OEM-or-modified-AMap-background; display-confirmed=false")
         }
         true
     }
@@ -221,6 +233,7 @@ internal class PrefaceInstrumentSdkBackend(
     override fun close() {
         if (closed) return
         closed = true
+        preparation.close()
         // Cleanup is never cancelled by the publication timeout. It stays ahead of a replacement
         // connect in the main queue, even if the UI temporarily stops processing messages.
         val release = Runnable {

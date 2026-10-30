@@ -24,10 +24,11 @@ internal class PrefaceInstrumentNavigation(
             owner?.release()
             owner = this
             state = PrefaceInstrumentGuidanceSession(backend { !closed && token === session }, diagnostic = diagnostic)
+            state?.prepareSession()
             timer = worker.scheduleWithFixedDelay({
                 if (!closed && token === session && owner === this) state?.tick()
             }, 0, 500, TimeUnit.MILLISECONDS)
-            diagnostic("instrument navigation enabled for current session; state-management=OEM-SDK; preparation=factory-AMap-required; independent-preparation=false")
+            diagnostic("instrument navigation enabled for current session; state-management=OEM-SDK; preparation=OEM-or-modified-AMap-background; independent-preparation=false")
         }
     }
 

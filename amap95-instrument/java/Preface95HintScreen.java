@@ -36,6 +36,21 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
     private boolean copying;
     private boolean disposed;
     private volatile boolean stopped;
+    private java.util.function.BooleanSupplier backgroundLease;
+
+    public void prepareBackground(java.util.function.BooleanSupplier lease) {
+        backgroundLease = lease;
+    }
+
+    public boolean hasGuidance() {
+        return guidance != null && SystemClock.elapsedRealtime() - guidance.receivedAt < MAX_AGE_MS;
+    }
+
+    public boolean bufferConfirmed() { return validWindow() && gate.ready(); }
+
+    private boolean liveBackground() {
+        return backgroundLease != null && backgroundLease.getAsBoolean();
+    }
     private final Runnable expire = new Runnable() {
         public void run() {
             if (guidance != null && SystemClock.elapsedRealtime() - guidance.receivedAt >= MAX_AGE_MS) {
@@ -87,7 +102,8 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
     }
 
     private boolean validWindow() {
-        return !disposed && !stopped && presentation != null && presentation.isShowing() &&
+        return !disposed && !stopped && (backgroundLease == null || liveBackground()) &&
+                presentation != null && presentation.isShowing() &&
                 display.isValid() && display.getState() == Display.STATE_ON &&
                 manager.k(1001) == this && holder != null && holder.getSurface().isValid();
     }
@@ -109,7 +125,7 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
         // This is an actual Surface generation, never a made-up SDK device ID.
         if (!gate.current(gate.generation(), gate.revision())) gate.openSurface();
         final long lease = gate.generation(), content = gate.revision();
-        final boolean hasGuidance = guidance != null;
+        final boolean hasContent = hasGuidance() || liveBackground();
         final Bitmap expected;
         try { expected = paintFrame(width, height, guidance); }
         catch (RuntimeException | LinkageError error) { fail(error); return; }
@@ -131,7 +147,7 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
                 try { holder.unlockCanvasAndPost(canvas); } catch (RuntimeException ignored) { }
             }
         }
-        if (!posted || !hasGuidance || !validWindow() || gate.ready()) { expected.recycle(); return; }
+        if (!posted || !hasContent || !validWindow() || gate.ready()) { expected.recycle(); return; }
         final Bitmap readback = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         copying = true;
         final Runnable timeout = new Runnable() {
@@ -150,13 +166,14 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
                         if (result != PixelCopy.SUCCESS || !matches(expected, readback)) {
                             throw new IllegalStateException("POSTED_GUIDANCE_READBACK_FAILED_" + result);
                         }
-                        if (guidance == null || SystemClock.elapsedRealtime() - guidance.receivedAt >= MAX_AGE_MS) return;
+                        if (!hasGuidance() && !liveBackground()) return;
                         if (gate.confirm(lease, content, true, true)) {
                             // Existing JSON/status route consumes this actual
                             // window's submitted/read-back guidance. No direct
                             // vehicle property, power or projection calls.
                             AndroidProtocolExe.sendExScreenStatus(0, 1001, 1);
-                            Log.i(TAG, "GUIDANCE_BUFFER_READBACK_CONFIRMED_WINDOW_1001");
+                            Log.i(TAG, liveBackground() ? "BACKGROUND_IDLE_BUFFER_READBACK_CONFIRMED_WINDOW_1001"
+                                    : "GUIDANCE_BUFFER_READBACK_CONFIRMED_WINDOW_1001");
                         }
                     } catch (RuntimeException | LinkageError error) {
                         fail(error);
@@ -188,7 +205,7 @@ public final class Preface95HintScreen extends hl implements SurfaceHolder.Callb
         paint.setColor(Color.WHITE);
         paint.setTextSize(24);
         if (data == null) {
-            canvas.drawText("暂无导航提示", 48, 130, paint);
+            canvas.drawText(liveBackground() ? "CarPlay 导航待命" : "暂无导航提示", 48, 130, paint);
             return bitmap;
         }
         if (data.distance.isEmpty() && data.road.isEmpty()) {

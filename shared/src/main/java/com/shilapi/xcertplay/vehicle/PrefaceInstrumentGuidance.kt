@@ -29,6 +29,8 @@ internal data class PrefaceInstrumentGuidance(
 }
 
 internal interface PrefaceInstrumentBackend : AutoCloseable {
+    fun prepareSession() {}
+    fun connectionTimeoutNs(): Long = 5_000_000_000L
     fun connect()
     fun ready(): Boolean
     /** Native SDK readiness; the installed SDK owns its phone/navigation state handling. */
@@ -54,6 +56,13 @@ internal class PrefaceInstrumentGuidanceSession(
     private var lastAvailability: Boolean? = null
     private var reportedData = false
 
+    fun prepareSession() {
+        if (closed || failed) return
+        try { backend.prepareSession() }
+        catch (error: Exception) { fail(error) }
+        catch (error: LinkageError) { fail(error) }
+    }
+
     fun accept(frame: Iap2Frame) {
         if (!closed && !failed) route.accept(frame.messageId, frame.payload)
     }
@@ -75,7 +84,7 @@ internal class PrefaceInstrumentGuidanceSession(
                 backend.connect()
             }
             if (!backend.ready()) {
-                if (clockNs() - connectingSince!! >= 5_000_000_000L) error("instrument-sdk-connect-timeout")
+                if (clockNs() - connectingSince!! >= backend.connectionTimeoutNs()) error("instrument-sdk-connect-timeout")
                 return
             }
             connectingSince = clockNs()
@@ -117,7 +126,8 @@ internal class PrefaceInstrumentGuidanceSession(
             "instrument-sdk-create-unavailable", "instrument-sdk-connectable-unavailable",
             "instrument-sdk-owned-by-another-session", "instrument-sdk-navigation-unavailable",
             "instrument-sdk-navigation-type-mismatch", "instrument-sdk-main-unavailable",
-            "instrument-sdk-main-timeout", "instrument-sdk-main-failure") } ?: "api-failure"
+            "instrument-sdk-main-timeout", "instrument-sdk-main-failure",
+            "instrument-background-preparation-failed") } ?: "api-failure"
         diagnostic("instrument navigation stopped type=${cause.javaClass.simpleName} reason=$reason; retry=next-session")
         runCatching { clearOwned() }.onFailure {
             diagnostic("instrument navigation clear failed type=${it.javaClass.simpleName}")

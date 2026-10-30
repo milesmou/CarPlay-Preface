@@ -22,6 +22,10 @@ ROOT = common.ROOT
 SOURCE = ROOT / "amap95-instrument"
 OUTPUT = ROOT / "agent_docs/amap-public95-instrument-20261030/working-hints-candidate"
 STUBS = {
+    "a7.java": """import android.content.Context; public class a7 {
+public static a7 c(){throw new UnsupportedOperationException();}
+public void h(Context context){} public boolean d(){return false;} }
+""",
     "hl.java": """import android.content.Context; import android.view.MotionEvent;
 import com.autonavi.amapauto.jni.ViewInfo;
 public abstract class hl { public Context b; public hl(Context c) { throw new UnsupportedOperationException(); }
@@ -141,19 +145,21 @@ def main():
         # Do not layer the public-base replacement identity check over it.
         sources = sorted(p for p in (SOURCE / "java").glob("*.java")
                          if p.name not in ("Preface95PackageIdentity.java", "Preface95CertificatePin.java"))
+        sources += sorted((SOURCE / "protocol").glob("*.java"))
         report["sourceSha256"] = {p.relative_to(ROOT).as_posix(): common.digest(p)
                                   for p in [*sources, *sorted((SOURCE / "tests").glob("*.java")),
                                             SOURCE / "tools/PrepareHintDex.java", Path(__file__).resolve(),
+                                            ROOT / "scripts/verify_amap95_hint_lifecycle.py",
                                             ROOT / "scripts/amap95_instrument_analysis.py"]}
         stub_dir, api_dir, code_dir, test_dir, tool_dir, dex_dir, link_dir = (
             OUTPUT / name for name in ("compile-api-source", "compile-api", "program", "tests", "tools", "payload", "link"))
         for path in (stub_dir, api_dir, code_dir, test_dir, tool_dir, dex_dir, link_dir):
             path.mkdir(exist_ok=True)
-        # Direct generated class files only, with checked parents; never keep
-        # orphaned anonymous classes from an earlier source revision.
+        # Generated class files only, with checked containment; include the
+        # shared protocol package and remove orphaned classes from older revisions.
         for directory in (code_dir, test_dir, tool_dir):
-            for path in directory.glob("*.class"):
-                if path.resolve().parent != directory.resolve() or not path.name.startswith(("Preface95", "PrepareHintDex")):
+            for path in directory.rglob("*.class"):
+                if not path.resolve().is_relative_to(directory.resolve()) or not path.name.startswith(("Preface95", "PrepareHintDex")):
                     raise ValueError("Unexpected generated class path")
                 path.unlink()
         for name, text in STUBS.items():
@@ -168,6 +174,8 @@ def main():
              SOURCE / "java/Preface95FrameGate.java", SOURCE / "tests/Preface95FrameGateTest.java"],
             report, "frame generation test compilation")
         report["frameGateTests"] = run([java, "-cp", test_dir, "Preface95FrameGateTest"], report, "frame generation tests")
+        report["lifecycleTests"] = run([sys.executable, ROOT / "scripts/verify_amap95_hint_lifecycle.py"],
+                                       report, "actual hints owner lifecycle regressions", timeout=60)
         der = ssl.PEM_cert_to_DER_cert((ROOT / "signing/platform-test-key/platform.x509.pem").read_text())
         (OUTPUT / "reviewed-certificate.der").write_bytes(der)
         run([javac, "--release", "8", "-encoding", "UTF-8", "-d", test_dir,
@@ -175,7 +183,7 @@ def main():
             report, "local certificate identity test compilation")
         report["certificatePinTests"] = run([java, "-cp", test_dir, "Preface95CertificatePinTest",
                                               OUTPUT / "reviewed-certificate.der"], report, "local certificate identity tests")
-        program = sorted(code_dir.glob("*.class"))
+        program = sorted(code_dir.rglob("*.class"))
         if not program or any(not p.name.startswith("Preface95") for p in program):
             raise ValueError("Program classes contain non-payload types")
         run([java, "-cp", tools, "com.android.tools.r8.D8", "--min-api", "28", "--lib", platform,

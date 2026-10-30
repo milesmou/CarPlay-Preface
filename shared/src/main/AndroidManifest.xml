@@ -34,6 +34,7 @@
         android:required="false" />
 
     <queries>
+        <package android:name="com.autonavi.amapauto" />
         <package android:name="com.android.bluetooth" />
         <intent>
             <action android:name="android.settings.WIFI_SETTINGS" />

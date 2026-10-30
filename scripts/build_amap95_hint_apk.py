@@ -22,9 +22,9 @@ import verify_amap95_observer as common
 ROOT = common.ROOT
 BASE = ROOT / "agent_docs/amap-public95-instrument-20261030"
 CANDIDATE = BASE / "working-hints-candidate"
-OUTPUT = BASE / "test-apk-06"
-VERSION_CODE = 26000007
-NAME = "AMap-9.5.0.600013-E02-native-hints-26000007-test.apk"
+OUTPUT = BASE / "test-apk-07"
+VERSION_CODE = 26000008
+NAME = f"AMap-9.5.0.600013-E02-native-hints-{VERSION_CODE}-test.apk"
 VOICE_ENTRY = "assets/res/HmiRes/voice_init/tts/voices/nvzhongyin"
 PUBLIC_VOICE_SHA256 = "1810793a5bd40b40652e76abb34870b18ef012e9bb2c510cac64f1a174e6653f"
 

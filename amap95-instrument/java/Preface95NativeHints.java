@@ -1,4 +1,5 @@
 import android.content.Context;
+import com.preface.carplay.instrument.Preface95PreparationProtocol;
 import android.app.Activity;
 import android.app.Application;
 import android.hardware.display.DisplayManager;
@@ -13,7 +14,7 @@ import com.autonavi.extscreen.dto.PresentationConfig;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** In-process hooks for the pinned public 9.5 DEX. No external IPC or APK. */
+/** Rendering owner for the pinned 9.5 DEX and its authenticated background lease. */
 public final class Preface95NativeHints {
     static final String TAG = "Preface95Hints";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -28,7 +29,11 @@ public final class Preface95NativeHints {
     private Preface95HintScreen screen;
     private boolean failed;
     private boolean closed;
+    private Activity mapActivity;
+    private boolean displayListenerRegistered;
     private boolean waitingForDisplay;
+    private Object backgroundOwner;
+    private java.util.function.BooleanSupplier backgroundLive;
     private volatile boolean explicitlyStopped;
     private final DisplayManager.DisplayListener listener = new DisplayManager.DisplayListener() {
         public void onDisplayAdded(int id) { if (id == 1) ensureScreen(); }
@@ -45,47 +50,100 @@ public final class Preface95NativeHints {
         this.manager = manager;
         displays = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
         if (displays == null) throw new IllegalStateException("DISPLAY_SERVICE_MISSING");
-        displays.registerDisplayListener(listener, MAIN);
         if (!(context.getApplicationContext() instanceof Application)) {
-            displays.unregisterDisplayListener(listener);
             throw new IllegalStateException("APPLICATION_CONTEXT_UNAVAILABLE");
         }
+        registerDisplayListener();
         ((Application) context.getApplicationContext()).registerActivityLifecycleCallbacks(lifecycle);
     }
 
     private final Application.ActivityLifecycleCallbacks lifecycle = new Application.ActivityLifecycleCallbacks() {
-        public void onActivityCreated(Activity activity, Bundle state) { }
-        public void onActivityStarted(Activity activity) { }
-        public void onActivityResumed(Activity activity) { }
+        public void onActivityCreated(Activity activity, Bundle state) { attachActivity(activity); }
+        public void onActivityStarted(Activity activity) {
+            // The owner can first be created after this Activity's onCreate.
+            if (mapActivity == null) attachActivity(activity);
+        }
+        public void onActivityResumed(Activity activity) {
+            if (mapActivity == null) attachActivity(activity);
+        }
         public void onActivityPaused(Activity activity) { }
         public void onActivityStopped(Activity activity) { }
         public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
         public void onActivityDestroyed(Activity activity) {
-            String name = activity.getClass().getName();
-            if (activity.isFinishing() && !activity.isChangingConfigurations() &&
-                    ("com.autonavi.amapauto.MainMapActivity".equals(name) ||
-                     "com.autonavi.auto.MainMapActivity".equals(name))) {
+            if (isMapActivity(activity) && (mapActivity == null || mapActivity == activity) &&
+                    activity.isFinishing() && !activity.isChangingConfigurations()) {
+                if (backgroundOwner != null) {
+                    mapActivity = null;
+                    return; // The active CarPlay lease owns the background Surface.
+                }
                 guideEpoch.incrementAndGet();
                 closed = true;
+                mapActivity = null;
                 closeScreen();
-                displays.unregisterDisplayListener(listener);
-                ((Application) activity.getApplication()).unregisterActivityLifecycleCallbacks(this);
+                if (displayListenerRegistered) {
+                    displays.unregisterDisplayListener(listener);
+                    displayListenerRegistered = false;
+                }
+                // Keep this one process-scoped Application observer so a new
+                // Activity can reopen without another engine first-frame event.
+                Log.i(TAG, "MAP_ACTIVITY_CLOSED_GUIDANCE_RELEASED");
             }
         }
     };
+
+    private static boolean isMapActivity(Activity activity) {
+        String name = activity.getClass().getName();
+        return "com.autonavi.amapauto.MainMapActivity".equals(name) ||
+                "com.autonavi.auto.MainMapActivity".equals(name);
+    }
+
+    private void registerDisplayListener() {
+        if (displayListenerRegistered) return;
+        displays.registerDisplayListener(listener, MAIN);
+        displayListenerRegistered = true;
+    }
+
+    private void attachActivity(Activity activity) {
+        if (!isMapActivity(activity) || activity.isFinishing() || mapActivity == activity) return;
+        if (backgroundOwner != null) { mapActivity = activity; return; }
+        if (!closed && mapActivity == null) {
+            mapActivity = activity;
+            return;
+        }
+        // Invalidate queued data/stop/create callbacks from the previous Activity.
+        // Reopening an empty window does not publish READY: new real guidance
+        // still has to be painted and read back by Preface95HintScreen.
+        guideEpoch.incrementAndGet();
+        closeScreen();
+        mapActivity = activity;
+        closed = false;
+        failed = false;
+        explicitlyStopped = false;
+        try {
+            registerDisplayListener();
+            ensureScreen();
+            Log.i(TAG, "MAP_ACTIVITY_REOPENED_WAITING_FOR_NEW_GUIDANCE");
+        } catch (RuntimeException | LinkageError error) { fail(error); }
+    }
 
     public static void onAutoStatus(final int status) {
         // 116 here is the actual main first-draw callback, not external 116.
         // Known native guide-end paths call stopCluster for 9, 12, 34, 308.
         if (status != 116 && status != 9 && status != 12 && status != 34 && status != 308) return;
-        if (status != 116) guideEpoch.incrementAndGet();
+        final long epoch = status == 116 ? guideEpoch.get() : guideEpoch.incrementAndGet();
         MAIN.post(new Runnable() {
             public void run() {
                 try {
+                    if (epoch != guideEpoch.get() || (instance != null && instance.closed)) return;
+                    if (instance != null && instance.backgroundOwner != null) {
+                        // OEM map exit may clear V2DIM even while CarPlay owns
+                        // the Surface. Submit and verify a NEW idle frame.
+                        if (status != 116 && instance.screen != null) instance.screen.clearGuidance();
+                        return;
+                    }
                     if (status == 116) {
                         if (firstMainFrameLogged.compareAndSet(false, true))
                             Log.i(TAG, "MAIN_FIRST_FRAME_RECEIVED");
-                        if (instance != null && instance.closed) instance = null;
                         Preface95NativeHints owner = getOrCreate(a20.l());
                         owner.explicitlyStopped = false;
                         owner.ensureScreen();
@@ -96,6 +154,8 @@ public final class Preface95NativeHints {
             }
         });
     }
+
+    public static void onEngineInitialized() { Preface95BackgroundHost.engineInitialized(); }
 
     public static void onGuide(GuideInfoProtocolData data) {
         if (data == null) return;
@@ -113,6 +173,13 @@ public final class Preface95NativeHints {
                             (instance != null && instance.closed)) { copy.release(); return; }
                     appliedGuide = sequence;
                     Preface95NativeHints owner = getOrCreate(a20.l());
+                    if (owner.backgroundOwner != null) {
+                        if (!copy.navigates()) { copy.release(); return; }
+                        Preface95BackgroundHost.localNavigationStarted();
+                        // Local navigation has priority; the remote lease was invalidated first.
+                        owner.closed = false;
+                        owner.registerDisplayListener();
+                    }
                     owner.ensureScreen();
                     if (owner.screen != null) owner.screen.accept(copy);
                     else copy.release();
@@ -128,9 +195,12 @@ public final class Preface95NativeHints {
     public static boolean tryCreate(final a20 manager, PresentationConfig config) {
         if (config == null || config.deviceId != 1001 ||
                 !"InstrumentPannelLarge".equals(config.pluginName)) return false;
+        final long epoch = guideEpoch.get();
         MAIN.post(new Runnable() {
             public void run() {
                 try {
+                    if (epoch != guideEpoch.get() || (instance != null && instance.closed)) return;
+                    if (instance != null && instance.backgroundOwner != null) return;
                     Preface95NativeHints owner = getOrCreate(manager);
                     owner.explicitlyStopped = false;
                     owner.ensureScreen();
@@ -145,6 +215,9 @@ public final class Preface95NativeHints {
         hl found = manager.k(window);
         if (!(found instanceof Preface95HintScreen)) return false;
         final Preface95HintScreen target = (Preface95HintScreen) found;
+        if (instance != null && instance.backgroundOwner != null && instance.screen == target) {
+            Preface95BackgroundHost.windowStopped();
+        }
         guideEpoch.incrementAndGet();
         if (instance != null && instance.screen == target) instance.explicitlyStopped = true;
         target.requestStop();
@@ -206,7 +279,49 @@ public final class Preface95NativeHints {
         Preface95HintScreen candidate = new Preface95HintScreen(rv.H().z(), display, manager);
         manager.c.add(candidate);
         screen = candidate;
+        if (backgroundOwner != null) candidate.prepareBackground(backgroundLive);
         candidate.s();
+    }
+
+    static void beginBackground(Object token, java.util.function.BooleanSupplier live) {
+        Preface95NativeHints owner = getOrCreate(a20.l());
+        if (owner.backgroundOwner != null && owner.backgroundOwner != token)
+            throw new IllegalStateException("BACKGROUND_ALREADY_OWNED");
+        if (owner.screen != null && owner.screen.hasGuidance())
+            throw new IllegalStateException("LOCAL_NAVIGATION_ACTIVE");
+        if (owner.backgroundOwner == token) { owner.ensureScreen(); return; }
+        guideEpoch.incrementAndGet();
+        owner.closeScreen();
+        if (owner.manager.k(1001) != null) throw new IllegalStateException("OTHER_WINDOW_1001_ACTIVE");
+        owner.backgroundOwner = token;
+        owner.backgroundLive = live;
+        owner.closed = false;
+        owner.failed = false;
+        owner.explicitlyStopped = false;
+        owner.registerDisplayListener();
+        owner.ensureScreen();
+    }
+
+    static int backgroundStatus(Object token) {
+        Preface95NativeHints owner = instance;
+        if (owner == null || owner.backgroundOwner != token || owner.failed || owner.explicitlyStopped)
+            return Preface95PreparationProtocol.FAILED;
+        return owner.screen != null && owner.screen.bufferConfirmed()
+                ? Preface95PreparationProtocol.BUFFER_CONFIRMED : Preface95PreparationProtocol.WAITING;
+    }
+
+    static void endBackground(Object token) {
+        Preface95NativeHints owner = instance;
+        if (owner == null || owner.backgroundOwner != token) return;
+        guideEpoch.incrementAndGet();
+        owner.backgroundOwner = null;
+        owner.backgroundLive = null;
+        owner.closeScreen();
+        if (owner.mapActivity == null) {
+            owner.closed = true;
+            if (owner.displayListenerRegistered) owner.displays.unregisterDisplayListener(owner.listener);
+            owner.displayListenerRegistered = false;
+        }
     }
 
     private void closeScreen() {

@@ -18,8 +18,13 @@ public final class PrepareHintDex {
     static final String PROTOCOL = "Lcom/autonavi/amapauto/jni/protocol/AndroidProtocolExe;";
     static final String CONFIG = "Lcom/autonavi/extscreen/dto/PresentationConfig;";
     static final String HOOK = "LPreface95NativeHints;";
+    static final String JSON_SERVICE = "Lcom/autonavi/amapauto/protocol/service/JsonProtocolService;";
+    static final String INTENT = "Landroid/content/Intent;";
+    static final String BINDER = "Landroid/os/IBinder;";
+    static final String BACKGROUND = "LPreface95BackgroundHost;";
+    static final String SERVICE = "Landroid/app/Service;";
     static final Set<String> VENDOR = new HashSet<>(Arrays.asList(
-            "La20;", "Lhl;", "Lhl$a;", "Ld20;", "Lrv;", "Lob;",
+            "La20;", "La7;", "Lhl;", "Lhl$a;", "Ld20;", "Lrv;", "Lob;",
             GUIDE, PROTOCOL, "Lcom/autonavi/amapauto/jni/ViewInfo;", CONFIG));
 
     static String key(MethodReference method) {
@@ -86,9 +91,59 @@ public final class PrepareHintDex {
         return code;
     }
 
+    static MethodImplementation initialized(Method method) {
+        MutableMethodImplementation code = new MutableMethodImplementation(1);
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_VIRTUAL_RANGE, 0, 1,
+                new ImmutableMethodReference(method.getDefiningClass(), "preface95OriginalInitialized", Collections.emptyList(), "V")));
+        code.addInstruction(new BuilderInstruction35c(Opcode.INVOKE_STATIC, 0, 0, 0, 0, 0, 0,
+                new ImmutableMethodReference(HOOK, "onEngineInitialized", Collections.emptyList(), "V")));
+        code.addInstruction(new BuilderInstruction10x(Opcode.RETURN_VOID));
+        return code;
+    }
+
+    static MethodImplementation bind() {
+        MutableMethodImplementation code = new MutableMethodImplementation(4);
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_STATIC_RANGE, 2, 2,
+                new ImmutableMethodReference(BACKGROUND, "bind", Arrays.asList(SERVICE, INTENT), BINDER)));
+        code.addInstruction(new BuilderInstruction11x(Opcode.MOVE_RESULT_OBJECT, 0));
+        code.addInstruction(new BuilderInstruction10x(Opcode.NOP));
+        code.addInstruction(new BuilderInstruction11x(Opcode.RETURN_OBJECT, 0));
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_VIRTUAL_RANGE, 2, 2,
+                new ImmutableMethodReference(JSON_SERVICE, "preface95OriginalBind", Arrays.asList(INTENT), BINDER)));
+        code.addInstruction(new BuilderInstruction11x(Opcode.MOVE_RESULT_OBJECT, 0));
+        code.addInstruction(new BuilderInstruction11x(Opcode.RETURN_OBJECT, 0));
+        code.replaceInstruction(2, new BuilderInstruction21t(Opcode.IF_EQZ, 0, code.newLabelForIndex(4)));
+        return code;
+    }
+
+    static MethodImplementation destroy() {
+        MutableMethodImplementation code = new MutableMethodImplementation(1);
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_STATIC_RANGE, 0, 1,
+                new ImmutableMethodReference(BACKGROUND, "destroy", Arrays.asList(SERVICE), "V")));
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_VIRTUAL_RANGE, 0, 1,
+                new ImmutableMethodReference(JSON_SERVICE, "preface95OriginalDestroy", Collections.emptyList(), "V")));
+        code.addInstruction(new BuilderInstruction10x(Opcode.RETURN_VOID));
+        return code;
+    }
+
+    static ImmutableMethod unbind() {
+        MutableMethodImplementation code = new MutableMethodImplementation(3);
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_STATIC_RANGE, 1, 2,
+                new ImmutableMethodReference(BACKGROUND, "unbind", Arrays.asList(SERVICE, INTENT), "V")));
+        code.addInstruction(new BuilderInstruction3rc(Opcode.INVOKE_SUPER_RANGE, 1, 2,
+                new ImmutableMethodReference(SERVICE, "onUnbind", Arrays.asList(INTENT), "Z")));
+        code.addInstruction(new BuilderInstruction11x(Opcode.MOVE_RESULT, 0));
+        code.addInstruction(new BuilderInstruction11x(Opcode.RETURN, 0));
+        return new ImmutableMethod(JSON_SERVICE, "onUnbind", Arrays.asList(
+                new ImmutableMethodParameter(INTENT, Collections.emptySet(), null)), "Z", 1,
+                Collections.emptySet(), Collections.emptySet(), code);
+    }
+
     static void verifyPayload(Map<String, ClassDef> original, Map<String, ClassDef> payload) {
         for (ClassDef cls : payload.values()) {
-            if (!cls.getType().startsWith("LPreface95")) throw new IllegalArgumentException("Non-payload class in DEX: " + cls.getType());
+            if (!cls.getType().startsWith("LPreface95") &&
+                    !cls.getType().equals("Lcom/preface/carplay/instrument/Preface95PreparationProtocol;"))
+                throw new IllegalArgumentException("Non-payload class in DEX: " + cls.getType());
             if (original.containsKey(cls.getType())) throw new IllegalArgumentException("Payload class collision");
             for (Method method : cls.getMethods()) {
                 if (method.getImplementation() == null) continue;
@@ -193,6 +248,9 @@ public final class PrepareHintDex {
                 if (cls.getType().equals("Lcz;") && name.equals("l") && before.getParameterTypes().equals(Arrays.asList("Ljava/lang/String;", "Ljava/lang/String;", "[Ljava/lang/Object;"))) name = "preface95OriginalLog";
                 if (cls.getType().equals("La20;") && name.equals("i") && before.getParameterTypes().equals(Arrays.asList(CONFIG))) name = "preface95OriginalCreate";
                 if (cls.getType().equals("La20;") && name.equals("v") && before.getParameterTypes().equals(Arrays.asList("I"))) name = "preface95OriginalStop";
+                if (cls.getType().equals("Lg7;") && name.equals("b") && before.getParameterTypes().isEmpty()) name = "preface95OriginalInitialized";
+                if (cls.getType().equals(JSON_SERVICE) && name.equals("onBind")) name = "preface95OriginalBind";
+                if (cls.getType().equals(JSON_SERVICE) && name.equals("onDestroy")) name = "preface95OriginalDestroy";
                 Method after = findMethod(rewritten, new ImmutableMethodReference(cls.getType(), name,
                         before.getParameterTypes(), before.getReturnType()));
                 if (after == null || before.getAccessFlags() != after.getAccessFlags() || !body(before).equals(body(after))) {
@@ -212,7 +270,7 @@ public final class PrepareHintDex {
         Map<String, ClassDef> original = classes(input), payload = classes(addition);
         verifyPayload(original, payload);
         List<ClassDef> output = new ArrayList<>();
-        int guides = 0, statuses = 0, creates = 0, stops = 0, traces = 0;
+        int guides = 0, statuses = 0, creates = 0, stops = 0, traces = 0, inits = 0, binds = 0, destroys = 0;
         for (ClassDef cls : original.values()) {
             List<Method> methods = new ArrayList<>();
             for (Method method : cls.getMethods()) {
@@ -244,17 +302,35 @@ public final class PrepareHintDex {
                     methods.add(withCode(method, "preface95OriginalLog", method.getImplementation()));
                     methods.add(withCode(method, "l", startupLog()));
                     traces++;
+                } else if (cls.getType().equals("Lg7;") && method.getName().equals("b") && params.isEmpty() && method.getReturnType().equals("V")) {
+                    methods.add(withCode(method, "preface95OriginalInitialized", method.getImplementation()));
+                    methods.add(withCode(method, "b", initialized(method)));
+                    inits++;
+                } else if (cls.getType().equals(JSON_SERVICE) && method.getName().equals("onBind") && params.equals(Arrays.asList(INTENT))) {
+                    methods.add(withCode(method, "preface95OriginalBind", method.getImplementation()));
+                    methods.add(withCode(method, "onBind", bind()));
+                    binds++;
+                } else if (cls.getType().equals(JSON_SERVICE) && method.getName().equals("onDestroy") && params.isEmpty()) {
+                    methods.add(withCode(method, "preface95OriginalDestroy", method.getImplementation()));
+                    methods.add(withCode(method, "onDestroy", destroy()));
+                    destroys++;
                 } else methods.add(method);
+            }
+            if (cls.getType().equals(JSON_SERVICE)) {
+                for (Method method : cls.getMethods()) if (method.getName().equals("onUnbind"))
+                    throw new IllegalArgumentException("Unexpected existing JSON onUnbind");
+                methods.add(unbind());
             }
             output.add(new ImmutableClassDef(cls.getType(), cls.getAccessFlags(), cls.getSuperclass(),
                     cls.getInterfaces(), cls.getSourceFile(), cls.getAnnotations(), cls.getFields(), methods));
         }
-        if (guides != 1 || statuses != 2 || creates != 1 || stops != 1 || traces != 1) throw new IllegalArgumentException("Hook count mismatch");
+        if (guides != 1 || statuses != 2 || creates != 1 || stops != 1 || traces != 1 || inits != 1 || binds != 1 || destroys != 1)
+            throw new IllegalArgumentException("Hook count mismatch");
         output.addAll(payload.values());
         DexPool.writeTo(args[2], new ImmutableDexFile(opcodes, output));
         DexBackedDexFile checked = new DexBackedDexFile(opcodes, Files.readAllBytes(Path.of(args[2])));
         if (checked.getClasses().size() != original.size() + payload.size()) throw new IllegalStateException("Class count changed");
         verifyPreserved(original, classes(checked));
-        System.out.println("Candidate DEX: verified original vendor references; guide=1 status=2 create=1 stop=1 trace=1; base startup and signature bodies preserved; no APK generated");
+        System.out.println("Candidate DEX: verified original vendor references; guide=1 status=2 create=1 stop=1 trace=1 init=1 bind=1 destroy=1 unbind=1; base startup, OEM JSON Binder and signature bodies preserved; no APK generated");
     }
 }

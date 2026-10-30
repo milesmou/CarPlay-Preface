@@ -40,7 +40,7 @@
 
 ## 源码解释与可信程度
 
-已核对当前五份 `amap95-instrument/java/` 源码哈希，均与交付 26000007 的 `test-apk-06/candidate-verification.json` 对应记录一致。不是拿后续不匹配源码解释旧 APK。
+分析时已核对五份 `amap95-instrument/java/` 源码哈希，均与交付 26000007 的 `test-apk-06/candidate-verification.json` 对应记录一致。不是拿后续不匹配源码解释旧 APK。下述行号及缺陷描述对应修复前的交付源码；用户随后要求修复，源码改动见本文末节，26000007 历史 APK 保持不变。
 
 `Preface95NativeHints.java` 的实际行为：
 
@@ -61,3 +61,22 @@
 - 正常导航结束、Activity 退出、Surface 销毁仍应停止和释放；重新开始必须重新取得真实字段、绘制、回读，再走现有准备链，不能忽略退出状态、重放旧 116 或保留过期内容。
 - 分别验证“首次导航 → 结束 → 同进程再导航”“返回桌面保留导航”“彻底退出 → 同进程重开”“车机重启”，然后单独验证 CarPlay 交接。后者需要明确的真实内容所有权和生命周期，不能只延长高德旧租约。
 - 这次已具备 169 实车上的条件成功证据；不扩大为所有固件、所有冷启动或长期稳定性已通过，也不称完整旧原生引擎移植已经完成。
+
+## 用户要求修复后的源码变更
+
+`Preface95NativeHints` 现在保留一个进程级 Application 生命周期观察器。主地图 Activity 明确结束时仍使旧数据失效、停止并移除提示窗口、注销 Display 观察器、释放 Activity 引用；观察器不持有旧 Activity。新的地图 Activity 创建后恢复 Display 观察器并创建空提示窗口，不再依赖引擎重复发送首次绘制事件。
+
+保存当前地图 Activity 身份，后到的旧 Activity 销毁不能关闭替代窗口。替换／恢复时递增数据代次；旧代次的导航副本、首次绘制、停止及窗口创建排队任务均不能重新激活或清空新窗口。普通退到后台保留当前导航；配置重建时建立新窗口并等待新数据；明确窗口停止及当前生命周期内的失败仍阻断自动恢复，下一次真实 Activity 生命周期可以重新开始。
+
+恢复只重建本应用的显示资源，不直接发送准备状态。空内容不能通过准备门槛，必须有新导航字段、当前 Surface 的绘制和 PixelCopy 回读；正常导航结束、过期及退出仍停止。CarPlay 字段仍不共享到高德，本次不新增后台保活或跨应用准备租约，因此高德彻底退出后 CarPlay 独立准备的能力没有变化。
+
+定向验证运行实际 `Preface95NativeHints` 源码，Android、地图管理器和 Surface 使用宿主替身，覆盖七组场景：无首次绘制回调的同进程重开、连续三次退出重开与旧数据释放、替代 Activity 与旧清理竞争、配置重建、后台导航、显式窗口停止与新路线、失败后新生命周期恢复。另编译实际 Android 源码及 DEX，核对固定底包接口和插入点，原有 FrameGate 测试继续执行。这些不等于 Android 真界面、PixelCopy 或实车恢复验收；没有打包、签名或安装新 APK，没有运行全量 CI。
+
+复核命令（不构建 APK）：
+
+```powershell
+python scripts/verify_amap95_hint_lifecycle.py
+python scripts/prepare_amap95_hint_dex.py
+```
+
+DEX 准备步骤已自动调用上述生命周期回归，并将测试脚本哈希纳入来源校验。本机报告分别位于 `agent_docs/amap-public95-instrument-20261030/hint-lifecycle-regression/verification.json` 与 `working-hints-candidate/verification.json`。
