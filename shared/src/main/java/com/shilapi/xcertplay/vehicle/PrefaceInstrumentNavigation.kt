@@ -27,7 +27,7 @@ internal class PrefaceInstrumentNavigation(
             timer = worker.scheduleWithFixedDelay({
                 if (!closed && token === session && owner === this) state?.tick()
             }, 0, 500, TimeUnit.MILLISECONDS)
-            diagnostic("instrument navigation enabled for current session; state-management=OEM-SDK")
+            diagnostic("instrument navigation enabled for current session; state-management=OEM-SDK; preparation=factory-AMap-required; independent-preparation=false")
         }
     }
 

@@ -122,7 +122,7 @@ internal class PrefaceInstrumentSdkBackend(
     }
 
     override fun ready(): Boolean = onMain {
-        if (closed || sdk.owner !== this || !sdk.connected || SystemClock.uptimeMillis() < sdk.quietUntilMs) {
+        if (closed || !currentSession() || sdk.owner !== this || !sdk.connected || SystemClock.uptimeMillis() < sdk.quietUntilMs) {
             return@onMain false
         }
         if (sdk.navigation == null) {
@@ -132,7 +132,7 @@ internal class PrefaceInstrumentSdkBackend(
         }
         if (!reportedReady) {
             reportedReady = true
-            diagnostic("instrument navigation native SDK connected; output=aggregate+fields; state-management=OEM; display-confirmed=false")
+            diagnostic("instrument navigation native SDK connected; output=aggregate+fields; state-management=OEM; preparation=factory-AMap-required; display-confirmed=false")
         }
         true
     }

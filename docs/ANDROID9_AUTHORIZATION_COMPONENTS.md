@@ -55,7 +55,7 @@ python scripts/android9_authorization.py --prepare-signing-inputs --fetch-public
 
 主应用 Debug、Release 和 assembleStandaloneDebug 自动依赖组件 Release 构建、签名和生成 assets。必须包含 `assets/authorization/authorization.apk`、`manifest.json`，核对内置字节 SHA-256、包名、版本、平台证书及元数据，主应用仍用仓库原签名。失败不得交付缺少组件的 APK 或替换旧产物。
 
-签名输入仅在 `agent_docs/android9-authorization/platform-test-key/`，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
+签名输入仅在 `signing/platform-test-key/`，该目录由 Git 忽略，不得入库或放入 APK。Gradle 保留原产物、输出元数据和 authorization-provenance.json。独立组件安装工具还检查实际设备 API、framework-res 平台证书、原厂／未知组件和 UID 迁移；不自动卸载、清数据、降级或修改权限。正常交付由文件管理器手动安装。
 
 ## 0.2.2／1211 测试包构建核验
 
@@ -254,3 +254,44 @@ APK 内的授权组件与本次签名产物字节一致，manifest.json 的哈�
 本包包含蓝牙会话交接、媒体助手、固定文件名覆盖保存及上方按钮／下方音量滑杆布局；滑轨 4 dp、按钮与滑杆触控高度 56 dp。构建后检测到唯一在线设备 `emulator-5558`（API 34），对命名后的主 APK 执行 `adb install -r` 成功，安装后确认 0.1.1 / 100，保留数据。没有单独安装两组件或操作授权。车机仍需用户导出后手动更新授权组件 10、安装媒体助手 1，并验证实际 SDK 准入、音源归属及 A2DP 恢复。
 
 Gradle 原始 APK 与元数据保留，交付文件位于 `mobile/build/outputs/apk/debug/`。构建、签名、嵌入校验和安装完整记录位于本机忽略目录 `agent_docs/build100-20261020/`。
+
+
+## 0.2.2／1212 测试包构建核验
+
+2026-10-29，按用户要求仅执行 `:mobile:assembleDebug --offline --console=plain`。任务成功，依赖自动完成授权组件 11 的 Release 构建、平台签名、校验及 assets 生成；组件自带 vital 检查随依赖执行，未追加主应用单元测试、Lint、其他应用 assemble 或完整 CI。此前源码阶段 shared Debug／Release 各 59 项定向检查通过，不能与本次构建合称完整测试。
+
+| 项目 | 核验值 |
+| --- | --- |
+| 主包 | `CarPlay-Preface-0.2.2-1212-debug.apk`，25,706,794 字节 |
+| 包名 | `com.preface.carplay` |
+| 主包 SHA-256 | `e711b9e1607fe5b11fbc196da40cd4f7640515aa960700d4179745d12a0466c0` |
+| 主证书 SHA-256 | `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`，保持仓库原证书 |
+| 内置组件 | `com.android.vpndialogs`／`preface-android9-11`／11／`android.uid.system` |
+| 内置组件 SHA-256 | `f0a5d136abe892e0b5b1d1c161de774615f6df4e497227b839507535e7ea1c08` |
+| 组件平台证书 SHA-256 | `c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8` |
+
+内置 `authorization.apk`、最小 `manifest.json` 与本次签名输出及生成 assets 一致，包名、版本、共享 UID、证书及哈希核验通过；媒体授权和既有配件认证输入保持一致，主包／平台签名输入未进入资产，没有媒体助手或额外服务 APK。
+
+本包包含主 APK 内的 `:instrument` 私有服务，最终 manifest 明确 `exported=false`，DEX 含服务端、客户端、会话管理及 `SDK_CONNECTED`／SDK 接口失败分类；未打包尚不能初始化的原厂高德引擎库。服务化和地图包环境的应用侧单元验证，不等于无高德环境的独立准备或实车仪表显示已完成。
+
+构建成功并完成签名及内容核验后执行 `adb devices -l`：没有状态为 `device` 的设备，未安装，也未自行启动模拟器。原始 APK、输出元数据及命名后的交付文件均保留于 `mobile/build/outputs/apk/debug/`。完整记录在本机忽略目录 `agent_docs/build1212-20261029/`。
+
+## 0.2.2／1213 测试包构建核验
+
+2026-10-30，327 的固定高德 JSON 准备入口在静态接入验证阶段不能用于主 APK 内的私有引擎，按用户预先授权撤回独立移植部分，详见 [范围与证据](PREFACE_INSTRUMENT_OEM_FALLBACK_2026-10-30.md)。本包恢复直接原厂 SDK 发送，并明确必须由支持仪表功能的原厂高德完成准备；没有生成完全独立包或执行 169 实车独立测试。
+
+源码阶段 shared Debug／Release 各 34 项定向检查通过，随后仅执行 `:mobile:assembleDebug --offline --console=plain`，构建成功；未运行完整 CI 或主应用 Lint。授权组件 11 的生成、签名及内嵌校验仍由现有任务依赖完成，核验本次任务确认有效的输出，未另行替换组件。
+
+| 项目 | 核验值 |
+| --- | --- |
+| 主包 | `CarPlay-Preface-0.2.2-1213-debug.apk`，25,690,338 字节 |
+| 包名 | `com.preface.carplay` |
+| 主包 SHA-256 | `b718a8d01ea743f4d1b7c59963b3c5b165ed871a0e06e6a7ad6fdd7850256a94` |
+| 主证书 SHA-256 | `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`，仓库原证书 |
+| 内置组件 | `com.android.vpndialogs`／`preface-android9-11`／11／`android.uid.system` |
+| 内置组件 SHA-256 | `f0a5d136abe892e0b5b1d1c161de774615f6df4e497227b839507535e7ea1c08` |
+| 组件平台证书 SHA-256 | `c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8` |
+
+最终 manifest／DEX 不含已撤回的仪表服务、客户端、Binder、Host 或进程类；APK 不含原厂仪表库及其资产，仍含原厂 SDK 合并加分项调用、真实导航检查、默认值和原厂高德依赖说明。只内嵌一个授权组件 APK；其内容、元数据与本次有效的签名／生成输出一致。媒体授权和配件认证输入核验通过，签名输入未进入应用资产，没有媒体助手或新外部 IPC。
+
+核验后执行 `adb devices -l`，没有在线设备，未安装，未启动模拟器。保留原始 APK、输出元数据、命名后的交付文件及 SHA-256；完整构建、68 项定向检查汇总、签名／内嵌核验与安装状态位于本机忽略目录 `agent_docs/build1213-20261030/`。

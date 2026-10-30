@@ -1,4 +1,1084 @@
 {
+  "stockAmapTrafficLightRuntimeVerification20261030": {
+    "documentation": "docs/PREFACE_AMAP_TRAFFIC_LIGHT_RUNTIME_2026-10-30.md",
+    "scope": "2023 Xingrui E02 original AMap countdown data verification; actual169 historical logs plus user-authorized original327-code probe on an Android14 emulator",
+    "stockReference": {
+      "firmware": "IHU519G/FS11A1/327",
+      "otaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+      "apkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+      "vdexSha256": "33c78415570eb7b6aacc59c43bcb807a8099c5d03976ceaa2b7c5cd80f71608e"
+    },
+    "historicalLogs": {
+      "uniqueFiles": 97,
+      "examinedEntries": 175,
+      "uniqueBytes": 2052287210,
+      "stockCountdownProtocolMessages": 0,
+      "nativeTrafficLightMarkerLines": 0,
+      "logAbsenceNotProofOfFeatureFailure": true,
+      "observed95": {
+        "version": "9.5.0.600013",
+        "protocol": 80189,
+        "messages": 32,
+        "firstTime": "10-29 17:58:58.867043",
+        "lastTime": "10-29 17:59:29.380952",
+        "redSecondsStart": 84,
+        "redSecondsEnd": 53,
+        "consecutiveIntegerDecrements": true,
+        "sourceFile": "agent_docs/instrument-navigation-amap-success-20261029/mobilelog/APLog_2026_1029_175428__25/main_log_2__2026_1029_180100",
+        "sha256": "a0c11aabcae2327ec11831db7a1ecc70606b0a0ac92acf18685234a4b56a211c",
+        "firstLine": 59318,
+        "lastLine": 99997,
+        "installed95ApkByteHashNotRead": true,
+        "httpResponseAndRealRoadGroundTruthNotEstablishedByProtocolAlone": true
+      }
+    },
+    "emulatorProbe": {
+      "device": "emulator-5554",
+      "androidApi": 34,
+      "nativeBridge": "libhoudini.so",
+      "resolution": [
+        1920,
+        720
+      ],
+      "logicalDensityDpi": 160,
+      "apk": "agent_docs/amap-trafficlight-20261030/runtime-validation/build/AutoMap-5.0.7.605871-327-verify.apk",
+      "sha256": "f6cb78bbbfccf3e39305bb0b72e966c2eb5cf5c7b02007b9b0a075e18b03ceb1",
+      "bytes": 170806433,
+      "versionName": "5.0.7.605871",
+      "versionCode": 6030053,
+      "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+      "allOriginalNonSignaturePayloadsUnchanged": true,
+      "restoredDexSha256": "6a736febda15412873b7259bb1cba1e31078f966427c56e4a985a6d0bf870f13",
+      "originalNativeLibraryCount": 69,
+      "installed": true,
+      "installedHashMatchesBuild": true,
+      "startupSucceeded": false,
+      "missingSystemClass": "com.ecarx.xui.adaptapi.device.Device",
+      "navigationRequestStageReached": false
+    },
+    "originalLiveCountdownOutcome": "undetermined",
+    "originalServerReturnedFailure": false,
+    "noTrafficLightFeaturePatchApplied": true,
+    "noFakeSupplierOrReadyState": true,
+    "noSystemFrameworkModification": true,
+    "noCarplayApkBuiltOrChanged": true,
+    "localEvidence": {
+      "scan": "agent_docs/amap-trafficlight-20261030/runtime-validation/existing-log-assessment.json",
+      "emulator": "agent_docs/amap-trafficlight-20261030/runtime-validation/emulator/startup-assessment.json",
+      "apk": "agent_docs/amap-trafficlight-20261030/runtime-validation/build/verification.json"
+    },
+    "nextEvidenceNeeded": "Original AMap actual E02 navigation run with network available and traffic-light request/response/data-delivery logs; ordinary emulator startup failure cannot establish server availability or a vehicle result."
+  },
+  "public95InstrumentPortAssessment20261030": {
+    "documentation": "docs/PREFACE_AMAP_PUBLIC95_INSTRUMENT_PORT_2026-10-30.md",
+    "scope": "Static assessment of user-supplied public9.5 versus pinned stock327 and previous modified9.5; 2023 Xingrui E02 only",
+    "stockFirmwareOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "stockApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "previousModified95Sha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+    "public95": {
+      "sha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+      "bytes": 154947836,
+      "packageName": "com.autonavi.amapauto",
+      "versionCode": 26000001,
+      "versionName": "9.5.0.600013",
+      "certificateSha256": "b36c0b80cb2417e7fe4c3df01a2d163a7d8443604dd276a2bc1ab0d325102e3e",
+      "apkSignatureVerifiedForApi28": true,
+      "abi": "arm64-v8a"
+    },
+    "nativeLibrariesEqualToPreviousModified95": {
+      "count": 63,
+      "matched": 63
+    },
+    "packageManifestAndAdapterRepositoryAndProjectConfigEqualToPreviousModified95": true,
+    "originalInstrumentNativeModules": [
+      {
+        "name": "libInstrumentPannelLarge.so",
+        "packagedInPublic95": false,
+        "absentNonSystemDependencies": [
+          "libthird_party_libs.so",
+          "libisstts.so",
+          "libifly_aime_gd.so",
+          "libruntime_detector.so",
+          "libGEhpOutput.so",
+          "libARDrive.so",
+          "libGEhp.so",
+          "libGNaviDice.so",
+          "libGEhpIpc.so"
+        ],
+        "undefinedCxxNamesAbsentFromPublic95Exports": [
+          "_ZN2bl15VariantPathWrapC1EPKNS_12IVariantPathE",
+          "_ZN2bl15VariantPathWrapD1Ev",
+          "_ZN2bl20BizPointBusinessInfoC1Ev",
+          "_ZN3alc10ALCManager11getInstanceEv",
+          "_ZN3alc10ALCManager6recordE11ALCLogLevelmPKcS3_iPKtz",
+          "_ZN3alc10ALCManager6recordE11ALCLogLevelmPKcS3_iS3_z",
+          "_ZN3asl9Scheduler10Cancelable6cancelEv",
+          "_ZN3asl9Scheduler3getEi",
+          "_ZN3hsl10PathDetailC1ERKN2bl15VariantPathWrapE",
+          "_ZN3hsl12ThirdManager15SetUITaskThreadEN2bl17UI_TASK_DEVICE_IDEilbPNS_13IUITaskThreadE",
+          "_ZN3hsl12ThirdManager18RemoveUITaskThreadEN2bl17UI_TASK_DEVICE_IDE",
+          "_ZN3hsl13ArNaviMapView11SetWorkModeENS_16tagARWorkingModeEN2bl11MapEngineIDE",
+          "_ZN3hsl13ArNaviMapView23OnClickArTrackRecordBtnEv",
+          "_ZN3hsl13ArNaviMapView23OnClickArTrackReplayBtnERN4dice8String16EN2ar13AROfflineModeE",
+          "_ZN3hsl3HSL9GetHandelEv",
+          "_ZN3hsl8UtilPath11GetInstanceEv",
+          "_ZN7Closure17AsyncCallbackCtrl10syncCancelEv",
+          "_ZN7Closure17AsyncCallbackCtrlC1Eb",
+          "_ZN9Broadcast8internal10dummyBeginEv",
+          "_ZN9Broadcast8internal8dummyEndEv",
+          "_ZN9Broadcast8internal9Publisher3getElPFPvvEPFvS2_E",
+          "_ZN9GNS_FRAME10CGFragment15onPaintFragmentEb",
+          "_ZN9GNS_FRAME10CGFragment16onLayoutFragmentEb",
+          "_ZN9GNS_FRAME10CGFragment18dispatchTouchEventEPNS_11CGViewEventEPPNS_6CGViewE",
+          "_ZN9GNS_FRAME10CGFragment19addFragment2ManagerEPS0_PviRKNS_8CGIntentEiPNS_17CGFragmentManagerE",
+          "_ZN9GNS_FRAME10CGFragment19onChangeDisplayInfoERKNS_13CGDisplayInfoEb",
+          "_ZN9GNS_FRAME10CGFragment19onDisplayInfoChangeERKNS_13CGDisplayInfoE",
+          "_ZN9GNS_FRAME10CGFragment19setCustomAnimationsERKNSt6__ndk16vectorINS_20STGAnimatorBaseInfo_ENS1_9allocatorIS3_EEEES8_",
+          "_ZN9GNS_FRAME10CGFragment25showFragmentOnNormalStackEPS0_RKNS_8CGIntentE",
+          "_ZN9GNS_FRAME10CGFragment30getTheSameTypeOnNormalFragmentEPv",
+          "_ZN9GNS_FRAME10CGFragment9startAnimEv",
+          "_ZN9GNS_FRAME10CGUIObject13getExecutorIdEv",
+          "_ZN9GNS_FRAME10CGUIObject13onRunRunnableEPNS_16CGUIRunnableBaseEmPN3asl12ScopedRefptrINS3_11MessageCtrlEEE",
+          "_ZN9GNS_FRAME13CGAsyncObject11runRunnableEPNS_16CGUIRunnableBaseEmm",
+          "_ZN9GNS_FRAME13CGAsyncObject18addWaitRunRunnableEPNS_16CGUIRunnableBaseE",
+          "_ZN9GNS_FRAME14CGFuncInfoTool11addFuncInfoEmPvPKcS3_",
+          "_ZN9GNS_FRAME14CGFuncInfoTool14removeFuncInfoEmPvPKcS3_",
+          "_ZN9GNS_FRAME16CGUIRunnableBase6cancelEv",
+          "_ZN9GNS_FRAME16CGUIRunnableBase6runEndEPS0_",
+          "_ZN9GNS_FRAME16CGUIRunnableBase8runStartEv",
+          "_ZN9GNS_FRAME16CGUIRunnableBase9moveToRunEPS0_",
+          "_ZN9GNS_FRAME16CGUIRunnableBaseC2EPNS_13CGAsyncObjectEPPv",
+          "_ZN9GNS_FRAME16CGUIRunnableBaseD2Ev",
+          "_ZN9GNS_FRAME17CGFrameSimulation7sendMsgEiiimPN3asl12ScopedRefptrINS1_11MessageCtrlEEE",
+          "_ZN9GNS_FRAME19CGGFrameCrashLogger21exportToAndroidLogCatEPKcS2_jS2_",
+          "_ZN9GNS_FRAME5CGApp12openBackDoorEv",
+          "_ZN9GNS_FRAME6CGView13setBackGroundEN3asl11RefCountPtrINS_10CGDrawableEEE",
+          "_ZN9GNS_FRAME7CGImage17loadImageFromFileER8CGStringibbPS1_",
+          "_ZNK3alc10ALCManager20checkRecordGroupOpenEm",
+          "_ZNK3alc10ALCManager23checkRecordLogLevelOpenE11ALCLogLevel",
+          "_ZNK3hsl10PathDetail15GetPathAccessorEv",
+          "_ZNK3hsl15RouteResultData11GetPathInfoEiRNS_8PathInfoE",
+          "_ZNK7Closure17AsyncCallbackCtrl10afterInvokEb",
+          "_ZNK7Closure17AsyncCallbackCtrl11beforeInvokEv"
+        ]
+      },
+      {
+        "name": "libInstrumentPannelSmall.so",
+        "packagedInPublic95": false,
+        "absentNonSystemDependencies": [
+          "libthird_party_libs.so",
+          "libisstts.so",
+          "libifly_aime_gd.so",
+          "libruntime_detector.so",
+          "libGEhpOutput.so",
+          "libARDrive.so",
+          "libGEhp.so",
+          "libGNaviDice.so",
+          "libGEhpIpc.so"
+        ],
+        "undefinedCxxNamesAbsentFromPublic95Exports": [
+          "_ZN2bl20BizPointBusinessInfoC1Ev",
+          "_ZN3alc10ALCManager11getInstanceEv",
+          "_ZN3alc10ALCManager6recordE11ALCLogLevelmPKcS3_iPKtz",
+          "_ZN3alc10ALCManager6recordE11ALCLogLevelmPKcS3_iS3_z",
+          "_ZN3asl9Scheduler10Cancelable6cancelEv",
+          "_ZN3asl9Scheduler3getEi",
+          "_ZN3hsl12ThirdManager15SetUITaskThreadEN2bl17UI_TASK_DEVICE_IDEilbPNS_13IUITaskThreadE",
+          "_ZN3hsl12ThirdManager18RemoveUITaskThreadEN2bl17UI_TASK_DEVICE_IDE",
+          "_ZN3hsl3HSL9GetHandelEv",
+          "_ZN7Closure17AsyncCallbackCtrl10syncCancelEv",
+          "_ZN7Closure17AsyncCallbackCtrlC1Eb",
+          "_ZN9Broadcast8internal10dummyBeginEv",
+          "_ZN9Broadcast8internal8dummyEndEv",
+          "_ZN9Broadcast8internal9Publisher3getElPFPvvEPFvS2_E",
+          "_ZN9GNS_FRAME10CGFragment15onPaintFragmentEb",
+          "_ZN9GNS_FRAME10CGFragment16onLayoutFragmentEb",
+          "_ZN9GNS_FRAME10CGFragment18dispatchTouchEventEPNS_11CGViewEventEPPNS_6CGViewE",
+          "_ZN9GNS_FRAME10CGFragment19addFragment2ManagerEPS0_PviRKNS_8CGIntentEiPNS_17CGFragmentManagerE",
+          "_ZN9GNS_FRAME10CGFragment19onChangeDisplayInfoERKNS_13CGDisplayInfoEb",
+          "_ZN9GNS_FRAME10CGFragment19onDisplayInfoChangeERKNS_13CGDisplayInfoE",
+          "_ZN9GNS_FRAME10CGFragment19setCustomAnimationsERKNSt6__ndk16vectorINS_20STGAnimatorBaseInfo_ENS1_9allocatorIS3_EEEES8_",
+          "_ZN9GNS_FRAME10CGFragment25showFragmentOnNormalStackEPS0_RKNS_8CGIntentE",
+          "_ZN9GNS_FRAME10CGFragment30getTheSameTypeOnNormalFragmentEPv",
+          "_ZN9GNS_FRAME10CGFragment9startAnimEv",
+          "_ZN9GNS_FRAME10CGUIObject13getExecutorIdEv",
+          "_ZN9GNS_FRAME10CGUIObject13onRunRunnableEPNS_16CGUIRunnableBaseEmPN3asl12ScopedRefptrINS3_11MessageCtrlEEE",
+          "_ZN9GNS_FRAME13CGAsyncObject11runRunnableEPNS_16CGUIRunnableBaseEmm",
+          "_ZN9GNS_FRAME13CGAsyncObject18addWaitRunRunnableEPNS_16CGUIRunnableBaseE",
+          "_ZN9GNS_FRAME14CGFuncInfoTool11addFuncInfoEmPvPKcS3_",
+          "_ZN9GNS_FRAME14CGFuncInfoTool14removeFuncInfoEmPvPKcS3_",
+          "_ZN9GNS_FRAME16CGUIRunnableBase6cancelEv",
+          "_ZN9GNS_FRAME16CGUIRunnableBase6runEndEPS0_",
+          "_ZN9GNS_FRAME16CGUIRunnableBase8runStartEv",
+          "_ZN9GNS_FRAME16CGUIRunnableBase9moveToRunEPS0_",
+          "_ZN9GNS_FRAME16CGUIRunnableBaseC2EPNS_13CGAsyncObjectEPPv",
+          "_ZN9GNS_FRAME16CGUIRunnableBaseD2Ev",
+          "_ZN9GNS_FRAME17CGFrameSimulation7sendMsgEiiimPN3asl12ScopedRefptrINS1_11MessageCtrlEEE",
+          "_ZN9GNS_FRAME19CGGFrameCrashLogger21exportToAndroidLogCatEPKcS2_jS2_",
+          "_ZN9GNS_FRAME5CGApp12openBackDoorEv",
+          "_ZN9GNS_FRAME6CGView13setBackGroundEN3asl11RefCountPtrINS_10CGDrawableEEE",
+          "_ZNK3alc10ALCManager20checkRecordGroupOpenEm",
+          "_ZNK3alc10ALCManager23checkRecordLogLevelOpenE11ALCLogLevel",
+          "_ZNK3hsl15RouteResultData11GetPathInfoEiRNS_8PathInfoE",
+          "_ZNK7Closure17AsyncCallbackCtrl10afterInvokEb",
+          "_ZNK7Closure17AsyncCallbackCtrl11beforeInvokEv"
+        ]
+      },
+      {
+        "name": "libcmb_InstrumentPannelLargePackage.so",
+        "packagedInPublic95": false,
+        "absentNonSystemDependencies": [],
+        "undefinedCxxNamesAbsentFromPublic95Exports": []
+      },
+      {
+        "name": "libcmb_InstrumentPannelSmallPackage.so",
+        "packagedInPublic95": false,
+        "absentNonSystemDependencies": [],
+        "undefinedCxxNamesAbsentFromPublic95Exports": []
+      }
+    ],
+    "sourceEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/jni/protocol/AndroidProtocolExe.java",
+        "sha256": "2a66c092f7af5d5d8844ae9f9c6b45ff6a682769b94c6d45144eed87a7ab14d3",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "sendExScreenStatus": [
+            1097,
+            1099,
+            1109,
+            1119,
+            1125
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/jni/MultiScreenNative.java",
+        "sha256": "cfc66fe65ac0dfc88addba16836e79622ba90995a103496547c561c9fe58b800",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "surfaceCreated": [
+            38,
+            72
+          ],
+          "surfaceDestroyed": [
+            43,
+            74
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/yw.java",
+        "sha256": "6b85b863dad091da635f7bb13285faf426799cf6fbae06944783bc04bf486296",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "registerLibrary(\"InstrumentPannelLarge\"": [
+            151
+          ],
+          "registerLibrary(\"InstrumentPannelSmall\"": [
+            152
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/a20.java",
+        "sha256": "623ca15c9f89bd8ecc927a4e7e7e634caf3ff409df4fb798a2ef4d9671763a8e",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "public void i(PresentationConfig": [
+            112
+          ],
+          "createExtScreen extScreen is null.": [
+            188
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/ab.java",
+        "sha256": "e691fe0fff971377d986667518c6c79d19f2f35c2b38930297e8feaa4bb9f350",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "case 116:": [
+            113
+          ],
+          "i = 116;": [
+            117
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/v70.java",
+        "sha256": "b12f7fd5357ccc58234e1008f50b1c933721addbf67284e30ae0c5a67efb5524",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "case 30801:": [
+            278
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/protocol/model/service/RspTrafficLightsCountdownInfoModel.java",
+        "sha256": "0f64a745fd16435304884687803c80dcc9aac052429841acfd8fc21c15227825",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "setProtocolID(80189)": [
+            39
+          ],
+          "redLightCountDownSeconds": [
+            15,
+            35,
+            61,
+            81,
+            93,
+            100,
+            111,
+            116
+          ],
+          "greenLightLastSecond": [
+            14,
+            38,
+            52,
+            77,
+            93,
+            104,
+            114,
+            120
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/protocol/service/JsonProtocolService.java",
+        "sha256": "7c34cbecb25d12f2a2f7601c581a083c93dcb9e342c33f26f6ed0fd7c554c1e1",
+        "sameSourceAsPreviousModified95IgnoringJadxInputComment": true,
+        "locations": {
+          "class JsonProtocolService": [
+            11
+          ]
+        }
+      }
+    ],
+    "bundledAdapterRepository": {
+      "localPath": "agent_docs/amap-public95-instrument-20261030/decoded/DeviceAdapterRepository.dat.decoded",
+      "sha256": "f7b927211713c4c4a4e1bbc50606a6d6dbe07aa72cf589960e4c787785b18a57",
+      "decodedBytes": 51764,
+      "exactReference327ProductMarkerPresent": false,
+      "exactReference327ChannelMarkerPresent": false,
+      "cloudOrRuntimeAdaptersInspected": false
+    },
+    "stockCertificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+    "stockAndPublic95SignerCertificatesMatch": false,
+    "actual169InstalledCertificateRead": false,
+    "actual169Public95RuntimeTestPerformed": false,
+    "liveTrafficLightDataReceived": false,
+    "instrumentPortImplemented": false,
+    "amapApkPatchedSignedInstalled": false,
+    "carplaySourceOrVersionChanged": false,
+    "independentInstrumentServiceRestored": false,
+    "conclusion": "Public9.5 retains JSON protocol, real Surface lifecycle and countdown model, but all 63 native libraries match previous modified9.5. Original instrument binary plugins still have missing libraries and missing C++ imports; direct copying is not compatible. A 9.5-compatible E02 adapter/plugin or rebuilt integration is required and has not been established. The new public APK has a different certificate from stock327.",
+    "localEvidence": "agent_docs/amap-public95-instrument-20261030/assessment.json"
+  },
+  "stockAmapReplacementSigningAssessment20261030": {
+    "documentation": "docs/PREFACE_AMAP_TRAFFIC_LIGHT_UPGRADE_2026-10-30.md",
+    "apks": [
+      {
+        "input": "stock327",
+        "sha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+        "packageName": "com.autonavi.amapauto",
+        "versionCode": 6030053,
+        "versionName": "5.0.7.605871",
+        "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+        "apkSignatureVerifiedForApi28": true
+      },
+      {
+        "input": "supplied95",
+        "sha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+        "packageName": "com.autonavi.amapauto",
+        "versionCode": 26000001,
+        "versionName": "9.5.0.600013",
+        "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+        "apkSignatureVerifiedForApi28": true
+      }
+    ],
+    "packageNamesMatch": true,
+    "signerCertificatesMatch": true,
+    "reviewedPublicAospSigningInputsMatch": true,
+    "repackNeedsResigning": true,
+    "keepPackageAndCertificateForReplacement": true,
+    "current95VersionCode": 26000001,
+    "proposedNewBuildMustExceedInstalledCode": true,
+    "actual169InstalledCertificateRead": false,
+    "actual169InstalledApkHashRead": false,
+    "replacementApkProduced": false,
+    "amapApkSignedOrInstalled": false,
+    "signatureCompatibilityDoesNotVerifyDataOrTrafficLightOrInstrumentCompatibility": true,
+    "androidReference": "https://developer.android.com/studio/publish/app-signing#considerations"
+  },
+  "stockAmapTrafficLightUpgradeAssessment20261030": {
+    "documentation": "docs/PREFACE_AMAP_TRAFFIC_LIGHT_UPGRADE_2026-10-30.md",
+    "scope": "2023 Xingrui E02; inspect current stock327 and supplied9.5, no APK patch or runtime verification",
+    "stockApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "supplied95ApkSha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+    "stockNativeGblSha256": "680c27b9109270d0e1c9b322f012359f2e387048c8aba5cdf4d61db3a93b13bd",
+    "stockNativeTrafficLightMarkers": {
+      "GuideTrafficLightLayerItem": true,
+      "GuideTrafficLightTimer": true,
+      "countDown=%d": true
+    },
+    "sourceEvidence": [
+      {
+        "path": "agent_docs/instrument-navigation-amap-success-20261029/amap95-decompiled/sources/com/autonavi/amapauto/protocol/model/service/RspTrafficLightsCountdownInfoModel.java",
+        "sha256": "d515b16d8cc6a340e11fc0a68359dcb31fd15ef32b7ad4ecca0ee59f6808646d",
+        "locations": {
+          "private int redLightCountDownSeconds": [
+            15
+          ],
+          "private int trafficLightStatus": [
+            16
+          ],
+          "private int greenLightLastSecond": [
+            14
+          ],
+          "setProtocolID(80189)": [
+            39
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-navigation-amap-success-20261029/amap95-decompiled/sources/defpackage/wh0.java",
+        "sha256": "6af0482a8064abb7de8380dde76a5b139d476888eac368d508b939ed31ad10a0",
+        "locations": {
+          "KEY_TYPE, 60073": [
+            27
+          ],
+          "getRedLightCountDownSeconds()": [
+            30
+          ],
+          "getTrafficLightStatus()": [
+            28
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/protocol/model/service/GuideInfoModel_JsonLubeSerializer.java",
+        "sha256": "578702dc704157bc83c7d762c630c5152d1e079eb044d4e7112ef9118e787483",
+        "locations": {
+          "\"trafficLightNum\"": [
+            46
+          ],
+          "\"routeRemainTrafficLightNum\"": [
+            94
+          ]
+        }
+      }
+    ],
+    "stockJavaModelAbsenceIsNotNativeFeatureAbsence": true,
+    "liveTrafficLightDataReceived": false,
+    "workingFeatureSwitchFound": false,
+    "oemInstrumentCompatibleUpgradeProduced": false,
+    "amapApkPatchedSignedInstalled": false,
+    "carplaySourceOrVersionChanged": false,
+    "originalInstrumentFallbackRetained": true,
+    "officialSources": [
+      "https://auto.amap.com/download",
+      "https://a.amap.com/amapauto/static/bl/500/android/api/classcom_1_1autonavi_1_1gbl_1_1layer_1_1_guide_traffic_light_layer_item.html"
+    ],
+    "conclusion": "Stock327 contains traffic-light layer/timer clues, but no verified real-time data/config/UI chain. Supplied9.5 has explicit countdown protocol models but previously lost instrument preparation. Neither a working stock feature patch nor an instrument-preserving upgrade is established; app version and AutoSDK500 are separate identifiers.",
+    "localEvidence": "agent_docs/amap-trafficlight-20261030/analysis.json"
+  },
+  "instrumentOriginalAmapFallbackBuild1213Distribution20261030": {
+    "packageName": "com.preface.carplay",
+    "versionName": "0.2.2",
+    "versionCode": 1213,
+    "bytes": 25690338,
+    "sha256": "b718a8d01ea743f4d1b7c59963b3c5b165ed871a0e06e6a7ad6fdd7850256a94",
+    "certificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
+    "authorization": {
+      "versionCode": 11,
+      "sha256": "f0a5d136abe892e0b5b1d1c161de774615f6df4e497227b839507535e7ea1c08",
+      "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8"
+    },
+    "instrumentPrivateServiceIncluded": false,
+    "originalAmapPreparationRequired": true,
+    "independentPortWithdrawn": true,
+    "originalInstrumentLibrariesPackaged": false,
+    "originalEngineBootstrapImplemented": false,
+    "gradleTask": ":mobile:assembleDebug",
+    "fullCiRun": false,
+    "vehicleVerified": false,
+    "documentation": "docs/PREFACE_INSTRUMENT_OEM_FALLBACK_2026-10-30.md",
+    "verification": "agent_docs/build1213-20261030/verification.json",
+    "targetedTests": {
+      "Debug": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "Release": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "onlineDeviceCount": 0,
+    "installationAttempted": false,
+    "mainPackageAndSignatureUnchanged": true,
+    "originalSuccessEvidenceRetained": true,
+    "independentApkProduced": false,
+    "independentVehicleTestExecuted": false,
+    "fallbackTrigger": "User-selected stock327 static integration contract rejects same-APK private engine; not an engine boot or vehicle failure claim"
+  },
+  "instrumentIndependentPortWithdrawn20261030": {
+    "documentation": "docs/PREFACE_INSTRUMENT_OEM_FALLBACK_2026-10-30.md",
+    "sourceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "sourceAmapApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "sourceVdexSha256": "33c78415570eb7b6aacc59c43bcb807a8099c5d03976ceaa2b7c5cd80f71608e",
+    "sourceNaviServiceApkSha256": "95ad61714a158e1ee3e1eb829cbd2e11c7d1f0bd1f31e31756efe5ad2359d7d1",
+    "firmware": "IHU519G/FS11A1/327",
+    "actualVehicleFirmware": "IHU353G/169",
+    "userReconfirmedUse327": true,
+    "preparationEndpoint": "com.autonavi.amapauto/com.autonavi.amapauto.protocol.service.JsonProtocolService",
+    "explicitComponentIgnoresCarplayPrivateService": true,
+    "standardBroadcastStateBranchPreparesInstrument": false,
+    "noInstalledAmapSkipsMapCache": true,
+    "samePackage95PassesPackageExistenceCheck": true,
+    "conclusion": "The examined stock327 preparation path cannot receive a same-APK private engine callback under the retained identity/IPC/no-system-modification rules; withdraw this port, not a claim that every possible implementation is impossible",
+    "independentApkProduced": false,
+    "engineInitializationExecuted": false,
+    "vehicleIndependentTestExecuted": false,
+    "confirmedOriginalSuccessRetained": true,
+    "userConditionalFallbackTriggeredBy": "static integration contract rejection in user-selected firmware327",
+    "recoveredDex": {
+      "sha256": "6a736febda15412873b7259bb1cba1e31078f966427c56e4a985a6d0bf870f13",
+      "bytes": 7869772,
+      "classes": 8019,
+      "methodsWithCode": 41748,
+      "dequickenedInstructions": 200685,
+      "restoredCheckCasts": 352,
+      "returnInstructions": 20172,
+      "allQuickeningIndicesConsumed": true,
+      "noOdexInstructionsRemain": true,
+      "standardDexChecksumAndSignatureVerified": true,
+      "jadxExitCode": 3,
+      "jadxReportedErrors": 6,
+      "completeJavaRecoveryClaimed": false
+    },
+    "sourceEvidence": [
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/defpackage/g.java",
+        "sha256": "25edd3730d275f466135b57f295940f146d119dbe7bb08bc7d15172cc38e86cb",
+        "lines": [
+          70,
+          77,
+          78,
+          79
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/defpackage/ab.java",
+        "sha256": "11e119e4eea6f22cf27a9d48ce33908e7f6834b784ace45e1587a10a058f85bc",
+        "lines": [
+          54,
+          60
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/defpackage/ai.java",
+        "sha256": "cd094e0e2d6e9badd9757d04b0d69853946211441dbaf4fc074f4743d3fc1cb8",
+        "lines": [
+          29,
+          30
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/defpackage/ag.java",
+        "sha256": "c7bdaf8105eb2c56f62e8e944f449eb579fdd91bbdb9ead977ad028d4bee8dc3",
+        "lines": [
+          33,
+          36
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/defpackage/aq.java",
+        "sha256": "b3531f86ae422a24615e53c6da21ce0d5302d871db3a91f3beec89527ccd4fa4",
+        "lines": [
+          44,
+          54
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/ecarx/naviservice/map/amap/c.java",
+        "sha256": "b878d3e9052e942266ccb787cadf7ad185ad45ab61d387b3bd575b6942d8d6c1",
+        "lines": [
+          104,
+          242,
+          245,
+          249,
+          253
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/ecarx/naviservice/map/ce.java",
+        "sha256": "db3819ec3cb2e4c63e621c045ae0377c1738f8992ec7c494f414284bf0b04607",
+        "lines": [
+          32,
+          33
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/ecarx/naviservice/map/bh.java",
+        "sha256": "1edae35cef889d1d8bf405862ec4e823f29b69229b5563bfa521e6ef0995454f",
+        "lines": [
+          177,
+          182
+        ]
+      },
+      {
+        "path": "agent_docs/firmware/ihu519g-327/decompiled/naviservice/sources/ecarx/naviservice/d/i.java",
+        "sha256": "18d65ea705207e7b635d142b1e8bd1cb49c53fb13eea1830f7a9628a87b85232",
+        "lines": [
+          51,
+          53
+        ]
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/framework/AutoLoader.java",
+        "sha256": "dbcbad4086c942bccb824aa4fee792421078ef3af69b186e00a6a6051adedbc7",
+        "lines": [
+          109,
+          124,
+          138
+        ]
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/framework/AutoMainThread.java",
+        "sha256": "9f202b78665c11937b5e8b5a526e862edafc431d2934b4aba1f533eee6b151da",
+        "lines": [
+          319,
+          666,
+          689
+        ]
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/framework/LibraryLoaderHelper.java",
+        "sha256": "49802f80273fda4ac30937ef6230f26f7547ba591f235c252c2cc61cce9f41f5",
+        "lines": [
+          274,
+          421,
+          422
+        ]
+      }
+    ]
+  },
+  "instrumentPrivateServiceBuild1212Distribution20261029": {
+    "documentation": "docs/ANDROID9_AUTHORIZATION_COMPONENTS.md#0221212-测试包构建核验",
+    "applicationVersion": "0.2.2",
+    "applicationBuild": 1212,
+    "module": "mobile",
+    "gradleTask": ":mobile:assembleDebug",
+    "sourceBuildCodeAlsoAlignedInAutomotive": true,
+    "automotiveAssembled": false,
+    "apkBytes": 25706794,
+    "apkSha256": "e711b9e1607fe5b11fbc196da40cd4f7640515aa960700d4179745d12a0466c0",
+    "mainCertificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
+    "authorizationComponentBuild": 11,
+    "embeddedAuthorizationSha256": "f0a5d136abe892e0b5b1d1c161de774615f6df4e497227b839507535e7ea1c08",
+    "platformCertificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+    "signatureAndEmbeddedAssetsVerified": true,
+    "serviceProcess": ":instrument",
+    "serviceExported": false,
+    "privateServiceAndSdkConnectedDexMarkersVerified": true,
+    "originalInstrumentLibrariesPackaged": false,
+    "originalEngineBootstrapImplemented": false,
+    "noAmapIndependentPreparationVerified": false,
+    "extraServiceApkAdded": false,
+    "mediaAssistantPresent": false,
+    "additionalUnitTestsOrMainLintRunForBuild": false,
+    "authorizationDependencyVitalChecksRan": true,
+    "fullCiRun": false,
+    "installedDevices": [],
+    "onlineAdbDeviceCount": 0,
+    "emulatorStarted": false,
+    "vehicleValidated": false,
+    "localEvidence": "agent_docs/build1212-20261029/",
+    "verifiedAt": "2026-10-29T19:17:35.716965+08:00"
+  },
+  "instrumentNavigationMapIndependentServiceBoundary20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_SERVICE_2026-10-29.md",
+    "scope": "User goal: preserve one independent service interface with or without OEM AMap; app-side boundary tests and diagnostics only, no independent engine implementation",
+    "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "packaging": "Existing main APK, private :instrument process, same UID",
+    "extraApkModuleOrPackageAdded": false,
+    "exportedIpcOrSignerScopeChanged": false,
+    "installedAmapCodeLoaded": false,
+    "mapPackagePresenceVersionOrEnabledStateIsAdmissionGate": false,
+    "mapStartedInstalledRestoredOrStoppedByApp": false,
+    "connectionStateName": "SDK_CONNECTED",
+    "connectionStateOrdinalUnchanged": true,
+    "privateBinderProtocolVersion": 1,
+    "connectionMeansRendererOrDisplayReady": false,
+    "missingSdkAndContractMismatchDistinguished": true,
+    "permissionDenialCreationAndMainThreadFailuresHaveSafeCodes": true,
+    "arbitraryVendorFailureMessagesReturned": false,
+    "testMapPackageEnvironments": [
+      "absent",
+      "stock-system-5.0.7.605871",
+      "third-party-9.5.0.600013",
+      "third-party-disabled"
+    ],
+    "testsUseFakeInstalledSdkAndSimulatedPackageManager": true,
+    "tests": {
+      "sharedDebug": 59,
+      "sharedRelease": 59,
+      "passed": 118,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "actualNoAmapIndependentPreparationVerified": false,
+    "actualNoAmapInstrumentDisplayVerified": false,
+    "originalEngineBootstrapImplemented": false,
+    "originalLibraryPackagingOrLoadingEnabled": false,
+    "directPropertyPresentationPowerCallsAdded": false,
+    "helperApkAdded": false,
+    "apkBuiltSignedOrInstalled": false,
+    "fullCiOrLintRun": false,
+    "applicationVersionChanged": false,
+    "localEvidence": "agent_docs/instrument-service-map-independence-20261029",
+    "sourceEvidence": [
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceHost.kt",
+        "sha256": "277e40e03640c56948789c734f0eddc0b171aba943d17ed683c3520f7ac5b230"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceBackend.kt",
+        "sha256": "526d5d4e07a77918226ac2ac1c27cf617602b85cb290ee674e5ae3219a3b192a"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentGuidance.kt",
+        "sha256": "323bd050a4686dc3d141ef3e752d0b997337a71012b29459527edd84d0ae3f64"
+      },
+      {
+        "path": "shared/src/test/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentBackendTest.kt",
+        "sha256": "e497ed56118e30311d61e3bd8bda2161ddf63559986c30b039dff9aff4ec346e"
+      },
+      {
+        "path": "shared/src/test/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceFailureTest.kt",
+        "sha256": "22339f8f1f6e84442c03a0c9bb4d3385adcb56936e8ece34728e895a267878b9"
+      }
+    ]
+  },
+  "instrumentNavigationPrivateServiceImplementation20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_SERVICE_2026-10-29.md",
+    "scope": "Main APK private instrument service source changes and host tests; original stock327 native engine bootstrap remains incomplete",
+    "sourceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "sourceAmapApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "userRequestedImplementation": true,
+    "serviceImplemented": true,
+    "serviceProcess": ":instrument",
+    "serviceExported": false,
+    "serviceUsesSameApkUidAndSignature": true,
+    "callerUidAndProtocolAndBinderOwnerValidated": true,
+    "orderedSequenceAndGuidanceValidated": true,
+    "maximumPendingUpdates": 1,
+    "clientHeartbeatMilliseconds": 1000,
+    "leaseExpiryMilliseconds": 5000,
+    "clientBinderDeathReleasesResources": true,
+    "sessionReplacementInvalidatesWritesBeforeQueuedCleanup": true,
+    "existingNative550msCleanupBarrierPreserved": true,
+    "mainProcessNoLongerConstructsInstrumentSdk": true,
+    "secondaryProcessSkipsBluetoothUsbAndMediaStartup": true,
+    "businessBackend": "Installed DimInteraction/INaviInteraction SDK; aggregate and fields; no in-process fallback",
+    "binderAcceptedUpdateIsNotLoggedAsSdkCompletion": true,
+    "perUpdateCompletionDebugOnly": true,
+    "leaseEndSummaryRetained": true,
+    "independentNativeEngineBootstrapImplemented": false,
+    "originalLibrariesStagedLocally": 28,
+    "originalLibrariesBytes": 91694752,
+    "originalLibrariesLoadedAtRuntime": false,
+    "originalLibrariesPackagedByDefault": false,
+    "libraryVerificationIsNotPreBuildDependency": true,
+    "libraryInputManifest": "docs/firmware/automap-327-instrument-libraries.json",
+    "importScript": "scripts/original_instrument_assets.py",
+    "localLibraryDirectory": "agent_docs/runtime-original-instrument/",
+    "nativeBootstrapBlocker": "StartupInstrumentPannel requires the original engine CGFrameSimulation/MultiScreenService initialization and real renderer callbacks; no callable complete initialization contract has been established",
+    "serviceReadyMeansSdkConnectedNotRendererOrDisplay": true,
+    "independentPreparationOrColdStartVerified": false,
+    "vehicleSdkAdmissionFromNewProcessVerified": false,
+    "readyStateFaked": false,
+    "directPropertyPresentationPowerCallsAdded": false,
+    "authorizationComponentExpanded": false,
+    "extraHelperApkAdded": false,
+    "tests": {
+      "sharedDebug": 50,
+      "sharedRelease": 50,
+      "commonStartup": 2,
+      "pythonInputs": 6,
+      "passed": 108,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "additionalExistingCommonRegression": {
+      "total": 26,
+      "failed": 12,
+      "sameTwelveFailuresWithOriginalRuntimeEntry": true,
+      "comparison": "agent_docs/instrument-service-implementation-20261029/common-regression-comparison.json"
+    },
+    "multipleTaskFilterAttemptCancelled": true,
+    "fullCiRun": false,
+    "lintRun": false,
+    "apkBuiltSignedOrInstalled": false,
+    "applicationVersionUnchanged": "0.2.2/1211",
+    "delivered1211ApkIncludesService": false,
+    "localEvidence": "agent_docs/instrument-service-implementation-20261029",
+    "sourceEvidence": [
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentService.kt",
+        "sha256": "4bce0adcc1acaa0a62e67808ba2949a18fcf0300582567d9d3f56a47917b2dd6"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceBackend.kt",
+        "sha256": "56a0ed71af0ec110c79c46f8ee83f2e1b47bfc696f5e101d7376c6df0dc1ddf4"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceHost.kt",
+        "sha256": "d758a7c00dc8562852a9e8ee0d2dc7f979d19705581d60b7cff16f8adb273160"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentServiceProtocol.kt",
+        "sha256": "3f65caa0e6a7756a14ffa283ff3714332e6a4485ee20357cc29a3224126ae2aa"
+      },
+      {
+        "path": "shared/src/main/java/com/shilapi/xcertplay/vehicle/PrefaceInstrumentProcess.kt",
+        "sha256": "b8474478ec26d977f83d401c6e319d2153d6a7455e99f0172d533e97ec80f08d"
+      },
+      {
+        "path": "scripts/original_instrument_assets.py",
+        "sha256": "920e1208b9e14e086a9235c542031352bb0c6116177d057397e39fb348f5f881"
+      },
+      {
+        "path": "docs/firmware/automap-327-instrument-libraries.json",
+        "sha256": "30eb18796d95a379008467771d6897c2a5fb6f2b2e3e1b80be413952b0a67244"
+      }
+    ]
+  },
+  "instrumentNavigationStandaloneServiceFeasibility20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_AMAP95_COMPARISON_2026-10-29.md",
+    "scope": "User-requested feasibility of hosting stock327 AMap instrument plugins in a separate service; no implementation or Android runtime test",
+    "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "stockApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "rootModules": [
+      "libInstrumentPannelLarge.so",
+      "libInstrumentPannelSmall.so",
+      "libcmb_InstrumentPannelLargePackage.so",
+      "libcmb_InstrumentPannelSmallPackage.so"
+    ],
+    "packagedTransitiveLibraries": 28,
+    "packagedTransitiveUncompressedBytes": 91694752,
+    "dependencyScope": "DT_NEEDED closure only; excludes Java, resources, dlopen and JNI glue",
+    "startupExports": [
+      "StartupInstrumentPannelLarge",
+      "StartupInstrumentPannelSmall"
+    ],
+    "startupCalls": "hsl::MultiScreenService then GNS_FRAME::CGPackage::startupInUI with CGFrameSimulation argument",
+    "directJavaJniExportsInInstrumentLibraries": false,
+    "standaloneProcessAvoidsMixingOldAnd95NativeLibraries": true,
+    "standaloneProcessProvesOemReady": false,
+    "preferredPackagingIfValidated": "Service in dedicated process within main APK; retain main signature and same UID; do not add another embedded helper APK",
+    "serviceWouldUseOnlyCurrentCarplayRoute": true,
+    "thirdPartyAmap95ForwardingImplemented": false,
+    "oldEngineIndependentStartupVerified": false,
+    "realRendererReadinessVerified": false,
+    "oemAdmissionWithServiceIdentityVerified": false,
+    "carplayStandaloneColdStartVerified": false,
+    "serviceImplemented": false,
+    "binariesAddedToPublicTree": false,
+    "runtimeCodeChanged": false,
+    "apkBuiltSignedOrInstalled": false,
+    "readinessFaked": false,
+    "localEvidence": "agent_docs/instrument-navigation-amap-success-20261029",
+    "evidence": [
+      {
+        "path": "standalone-service-dependency-summary.json",
+        "sha256": "175f22e96e38fbcf493de7c2c031e864621c6413d2cb0ab0e8e1c2c9d97f1c81"
+      },
+      {
+        "path": "startup-instrument-small.txt",
+        "sha256": "5cb4643aecfc5cf4a3e07a218a00fb544defffc320ca55c2bbf5c2cbf87c799a"
+      },
+      {
+        "path": "startup-instrument-large.txt",
+        "sha256": "18d6c119fc539b8156b9fc6dbc38d505e6f4e392701a42d1a1423dc07e3801a3"
+      }
+    ]
+  },
+  "instrumentNavigationStockReadySuccessAndAmap95Comparison20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_AMAP95_COMPARISON_2026-10-29.md",
+    "scope": "IHU353G Android9/API28 build169 runtime; user-authorized IHU519G build327 static reference; supplied third-party AMap9.5 APK",
+    "staticReferenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "userAuthorized327Reference": true,
+    "staticReferenceIsNotExactRuntimeFirmware": true,
+    "applicationVersion": "0.2.2",
+    "applicationBuild": 1211,
+    "stockAmapRuntimeVersion": "5.0.7.606132",
+    "stockAmapRuntimeBuild": 6042743,
+    "staticAmapReferenceVersion": "5.0.7.605871",
+    "staticAmapReferenceBuild": 6030053,
+    "applicationReportSha256": "84ccdbfc260bd0493a3399e5e766decec677a1fc097f2431e6f3a6504b16f5c1",
+    "archiveSha256": "1437f4246185f931fead1fd46c6ab80896afe78a7c20e011828692262cdf45f4",
+    "archiveCrcVerified": true,
+    "preparationEventTime": "2026-10-29 17:51:45.335754",
+    "nativePreparationChain": "OEM SDK state116 -> V2DIM cache1 -> real ready:true -> installed SDK presentation status -> CarPlay firstFrame1",
+    "realExtensionBroadcast": {
+      "keyType": 10117,
+      "screenWindow": 1001,
+      "screenStatus": 0,
+      "screenMode": 1
+    },
+    "carplaySuccessfulProcesses": [
+      {
+        "pid": 17002,
+        "validAggregateFrames": 12,
+        "clearFrames": 2,
+        "firstFrameOneCount": 14
+      },
+      {
+        "pid": 4878,
+        "validAggregateFrames": 30,
+        "clearFrames": 2,
+        "firstFrameOneCount": 32
+      }
+    ],
+    "nonblankCarplayAggregateFrames": 42,
+    "clearFrames": 4,
+    "userConfirmedVisibleInstrumentDisplay": true,
+    "successfulDisplayDependsOnStockAmapPreparation": true,
+    "packetLevelInstrumentAcknowledgementCaptured": false,
+    "independentColdStartVerified": false,
+    "upgradedAmapVersion": "9.5.0.600013",
+    "suppliedAmapVersionCode": 26000001,
+    "suppliedAmapApkBytes": 171896158,
+    "suppliedAmapApkSha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+    "suppliedApkIsIdenticalToInstalledBytesVerified": false,
+    "upgradedMapExitMakesReadyFalseAt": "2026-10-29 17:58:41",
+    "upgradedOemFirstFrameZeroCount": 20,
+    "upgradedOrdinaryFirstDrawProtocolState": 200,
+    "upgradedInstrumentReady116Observed": false,
+    "amap95SendExScreenStatusPresent": true,
+    "amap95Internal200MapsToProtocol116": true,
+    "amap95AidlWidget3026DoesNotEqualReady116": true,
+    "stockFourInstrumentLibrariesPackagedInSuppliedAmap95": false,
+    "oldLargeAndSmallLibrariesEachHaveMissingPackagedDependencies": 9,
+    "oldLargeAndSmallCxxImportsAbsentFromParsed95Exports": [
+      54,
+      45
+    ],
+    "elfScope": "Static packaged ELF only; excludes unparseable/protected images, downloaded plugins and runtime library availability",
+    "copiedOldBinariesCompatibleOrIndependentlyUsable": false,
+    "allAmap95InstrumentCapabilityRemovedProven": false,
+    "earliestMissingRendererOrAdapterConditionConfirmed": false,
+    "jadxExitCode": 1,
+    "jadxReportedErrors": 4,
+    "jadxReportedWarnings": 107,
+    "jadxErrors": "Reported nodes concern Base64 encoder methods; no claim of error-free full decompilation",
+    "directSystemPropertyVehiclePropertyOrPresentationSwitchAdded": false,
+    "readinessEventFabricated": false,
+    "standalonePortImplemented": false,
+    "applicationRuntimeCodeChanged": false,
+    "apkBuiltSignedOrInstalled": false,
+    "gradleOrFullCiRun": false,
+    "localEvidence": "agent_docs/instrument-navigation-amap-success-20261029",
+    "localEvidenceHashes": [
+      {
+        "path": "amap95-decompiled/sources/com/autonavi/amapauto/jni/protocol/AndroidProtocolExe.java",
+        "bytes": 51280,
+        "sha256": "af18ff769d804074de4836081d99c0ec7e7f97a2dc4c102a5eaa7c1fff415a70"
+      },
+      {
+        "path": "amap95-decompiled/sources/defpackage/ab.java",
+        "bytes": 10144,
+        "sha256": "46ba4df0f1e5a94db6b57f8deccfb1f2a41ed1182232444c66d6cc954c254b7e"
+      },
+      {
+        "path": "amap95-decompiled/sources/defpackage/a20.java",
+        "bytes": 16125,
+        "sha256": "dfaceede2a6a855b15c95c392f9d4b05687e5419019a28e86b268a8dc1c33984"
+      },
+      {
+        "path": "amap95-decompiled/sources/defpackage/yw.java",
+        "bytes": 14719,
+        "sha256": "30e60306b95e41d8793b54b97d6ddc30e261b2d671d85aeecc2526a04b877711"
+      },
+      {
+        "path": "amap95-decompiled/sources/defpackage/v70.java",
+        "bytes": 44074,
+        "sha256": "c4001ba73338001fa30bc45870d160b74b931f77acac29a7c06022edd4c54c0d"
+      },
+      {
+        "path": "amap95-decompiled/sources/com/autonavi/amapauto/jni/MultiScreenNative.java",
+        "bytes": 2435,
+        "sha256": "e7687c502463be83e614c21895753be44c63b471def3ce4274a09f0b1efc6a1e"
+      },
+      {
+        "path": "native-compatibility-summary.json",
+        "bytes": 10356,
+        "sha256": "13454d57492cf76e99d0748e5b5f6ee2f46df46cdbeba312584ddbeec4c419bc"
+      },
+      {
+        "path": "carplay-success-output-summary.json",
+        "bytes": 1885,
+        "sha256": "75dd0ef1c49b161df47163649b533b07434ea0a37fddf6587b7deddcaf6f7cf1"
+      }
+    ]
+  },
+  "instrumentNavigationBuild1211Runtime20261029": {
+    "documentation": "docs/PREFACE_INSTRUMENT_NAVIGATION_2026-10-29_BUILD1211.md",
+    "applicationVersion": "0.2.2",
+    "applicationBuild": 1211,
+    "actualDevice": "IHU353G Android9/API28 build169; wireless",
+    "actualApplicationPid": 7125,
+    "currentApplicationSessionStart": "2026-10-29 16:43:59.794",
+    "staticReference": "IHU519G FS11A1 build327; not the current runtime firmware",
+    "staticReferenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+    "applicationReportSha256": "145b291bc4ae54f81d7176da5aaa7394e7a4ec7e2c653288c54a31d9ec8bb744",
+    "archiveSha256": "4ee4bdf1f93582f3194d902027980e348a950b58a4fc7285a908ffe0aaa8d77c",
+    "archiveCrcVerified": true,
+    "eDriveDisconnectedAndRecopied": true,
+    "mainLog": "APLog_2026_1027_161423__23/main_log_2__2026_1029_164708",
+    "mainLogSha256": "424b21413f5df23bf6bbf977cf8c11f69c9ef468cfe57777c634c4122a7e5b44",
+    "aggregateAndPerFieldUpdates": 24,
+    "eachOfFivePerFieldMethodsCalled": 24,
+    "nativeClears": 3,
+    "navigationStatusOneCalls": 3,
+    "navigationStatusZeroCalls": 3,
+    "inputTurnIds": [
+      109,
+      103
+    ],
+    "nativeFirstFrameZeroCount": 27,
+    "nativeFirstFrameOneCount": 0,
+    "aggregateOutputVariants": 1,
+    "aggregateOutput": "[3,10,0] {0,2,0,0,0,0,0,2}",
+    "arrowProperty": "0x2e700163",
+    "arrowApplicationCalls": 24,
+    "arrowHalCalls": 24,
+    "matchingArrowVehicleWriteLogEntries": 13,
+    "matchingBlankAggregateVehicleWriteLogEntries": 15,
+    "propertyRejectionCandidatesInWindow": 0,
+    "successfulStockNavigationComparisonPresent": false,
+    "instrumentDisplayConfirmed": false,
+    "userReportsStillNoDisplay": true,
+    "perFieldWritesAreNotSufficientToConfirmDisplay": true,
+    "exact169PreparationAndConsumptionPathStillNeedsEvidence": true,
+    "sdkStateOrFirstFrameFabricated": false,
+    "applicationRuntimeCodeChanged": false,
+    "apkBuiltSignedOrInstalledThisAnalysis": false,
+    "gradleOrFullCiRun": false,
+    "localEvidence": "agent_docs/instrument-navigation-build1211-20261029/",
+    "nextEvidence": "Same device build169 stock AMap navigation with instrument visibly working, plus matching SDK/NaviService/AMap and VDEX/ODEX"
+  },
   "selectiveUpstreamBuild1211Distribution20261029": {
     "documentation": "docs/ANDROID9_AUTHORIZATION_COMPONENTS.md",
     "applicationVersion": "0.2.2",
@@ -325,7 +1405,9 @@
     "savedFalseAndTruePreserved": true,
     "appliesAtNextConnection": true,
     "freeOpenSourceNoticeAndRepositoryIncluded": true,
-    "installedDevices": ["emulator-5558"],
+    "installedDevices": [
+      "emulator-5558"
+    ],
     "installMode": "adb install -r; data retained; installed version queried",
     "authorizationComponentSeparatelyInstalled": false,
     "previousSourceTargetedTestsPassed": 39,
@@ -351,7 +1433,14 @@
     "appliesAtNextConnection": true,
     "interruptsCurrentSessionOnSave": false,
     "nativeSdkAndPermissionHandlingChangedByUiMove": false,
-    "targetedTests": {"shared": 26, "common": 13, "total": 39, "failures": 0, "errors": 0, "skipped": 0},
+    "targetedTests": {
+      "shared": 26,
+      "common": 13,
+      "total": 39,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
     "validationSummary": "agent_docs/instrument-navigation-ui-20261027/validation-summary.json",
     "vehicleValidated": false,
     "apkBuiltSignedOrInstalled": false,
@@ -378,7 +1467,14 @@
     "defaultEnabledAtSdkRepairStage": false,
     "latestUiAndDefaultRecord": "instrumentNavigationUiAndDefault20261027",
     "appliesAtNextConnection": true,
-    "targetedTests": {"shared": 26, "common": 13, "total": 39, "failures": 0, "errors": 0, "skipped": 0},
+    "targetedTests": {
+      "shared": 26,
+      "common": 13,
+      "total": 39,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
     "testsUseFakeNativeSdk": true,
     "publicTreeCheckPassed": true,
     "fullCiRun": false,
@@ -406,7 +1502,10 @@
     "carServiceAndPropertyConfigurationChecksPassed": true,
     "nativeNavigationState": "unknown",
     "nativePhoneState": "unknown",
-    "requiredPropertyKeysAbsentFromCurrentSnapshot": ["sys.bicv.navi.status", "sys.bicv.phone.status"],
+    "requiredPropertyKeysAbsentFromCurrentSnapshot": [
+      "sys.bicv.navi.status",
+      "sys.bicv.phone.status"
+    ],
     "outputAvailable": false,
     "navF3SubmittedMessages": 0,
     "directBlockingCauseConfirmed": "Native navigation/phone unknown states cause available() to return false before publish()",
@@ -434,7 +1533,10 @@
     "candidateTopTapPairs": 7,
     "candidateInterval": "13:24:00-13:24:18",
     "hidDownUpCoordinatesMatchSystemInputRounded": true,
-    "systemInputToPreWriteHidTraceMs": {"min": 6.045, "max": 15.337},
+    "systemInputToPreWriteHidTraceMs": {
+      "min": 6.045,
+      "max": 15.337
+    },
     "localSettingsGestureOrWriteFailureObservedInCandidateInterval": false,
     "hostWindowRebuiltOrSessionRestartedInCandidateInterval": false,
     "exactFailureAndRecoveryTimesUserConfirmed": false,
@@ -480,15 +1582,32 @@
     "transport": "Current controller iAP2 route data -> installed ECarXDIMUtil NAV F3 encoder -> real CarPropertyManager, fixed property 762314830",
     "requestedPermission": "android.car.permission.CAR_VENDOR_EXTENSION",
     "permissionAutomaticallyGranted": false,
-    "confirmedBaseTurnIds": [102, 103, 104, 105, 106, 107, 108, 109],
+    "confirmedBaseTurnIds": [
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109
+    ],
     "unknownAndUnconfirmedArrowsHidden": true,
     "systemPropertyWritesOrPresentationPowerCalls": false,
-    "nativeStateChecks": ["sys.bicv.navi.status", "sys.bicv.phone.status"],
+    "nativeStateChecks": [
+      "sys.bicv.navi.status",
+      "sys.bicv.phone.status"
+    ],
     "unknownNativeStateBlocksOutput": true,
     "instrumentRouteRetainedAcrossDisconnect": false,
     "apiFailureRetriesWithinSameSession": false,
     "localEvidence": "agent_docs/firmware/ihu519g-327/decompiled/adapter/; details and source hashes in documentation",
-    "targetedTests": {"shared": 20, "common": 13, "failures": 0, "errors": 0},
+    "targetedTests": {
+      "shared": 20,
+      "common": 13,
+      "failures": 0,
+      "errors": 0
+    },
     "backendTestsUseFakeCarApiAndEncoder": true,
     "validationSummary": "agent_docs/instrument-navigation-20261026-validation.json",
     "fullCiRun": false,
@@ -545,7 +1664,14 @@
     "releaseDelayAndFailureBackoffPreserved": true,
     "otherAppsVoipOptionRemainsIndependent": true,
     "otherAppsVoipDefaultEnabled": false,
-    "targetedTests": {"shared": 69, "common": 17, "total": 86, "failures": 0, "errors": 0, "skipped": 0},
+    "targetedTests": {
+      "shared": 69,
+      "common": 17,
+      "total": 86,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
     "fullCiRun": false,
     "localEvidence": "agent_docs/phone-audio-mode-20261021/",
     "apkBuiltSignedOrInstalled": false,
@@ -657,7 +1783,10 @@
     "scope": "2023 Preface E02 diagnostic instrumentation only; reference IHU519G build327 and historical IHU353G system169 observations remain separate",
     "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
     "referenceTelecomApkSha256": "21c06b7a60f71e5eb60e55c39ed91fa21b870633f5f4f4d39e7dfa22f8fed5c5",
-    "evidence": ["docs/PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md", "docs/CONNECTION_REPORT_2026-10-21_BUILD1205.md"],
+    "evidence": [
+      "docs/PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md",
+      "docs/CONNECTION_REPORT_2026-10-21_BUILD1205.md"
+    ],
     "levels": "five-second and final windows; peak, RMS, sample count and nonzero/above-minus50dBFS permille before and after optional application processing; capture is already potentially HAL-processed",
     "route": "start/end and changes sampled at most once per second; public numeric state, own positive recording session only; clientSilenced unknown on API28",
     "telecom": "read-only admission query, setting timestamps and separate callback/security/timeout results; newest48 process-local events included in report",
@@ -681,24 +1810,82 @@
     "documentation": "docs/PREFACE_PHONE_AUDIO_TELECOM_2026-10-21.md",
     "scope": "IHU519G FS11A1 build327 Telecom APK/DEX static evidence, correlated separately with IHU353G system169 build1205 runtime",
     "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
-    "telecomApk": {"path": "system/priv-app/Telecom/Telecom.apk", "bytes": 5040192, "sha256": "21c06b7a60f71e5eb60e55c39ed91fa21b870633f5f4f4d39e7dfa22f8fed5c5"},
-    "telecomDex": {"entry": "classes.dex", "bytes": 2155888, "sha256": "699c7bb80998b359275aabaa7a91ac61cee45563bd916de1c2c83de93d7e5bab", "adler32Matches": true, "embeddedSha1Matches": false, "rawBytesModified": false},
-    "permission": {"name": "android.permission.MANAGE_OWN_CALLS", "protectionLevel": 0, "frameworkManifestLines": [1214, 1215, 1216], "applicationDeclares": true, "registerAndPlaceEnforceIt": true, "runtimeDenialObserved": false},
+    "telecomApk": {
+      "path": "system/priv-app/Telecom/Telecom.apk",
+      "bytes": 5040192,
+      "sha256": "21c06b7a60f71e5eb60e55c39ed91fa21b870633f5f4f4d39e7dfa22f8fed5c5"
+    },
+    "telecomDex": {
+      "entry": "classes.dex",
+      "bytes": 2155888,
+      "sha256": "699c7bb80998b359275aabaa7a91ac61cee45563bd916de1c2c83de93d7e5bab",
+      "adler32Matches": true,
+      "embeddedSha1Matches": false,
+      "rawBytesModified": false
+    },
+    "permission": {
+      "name": "android.permission.MANAGE_OWN_CALLS",
+      "protectionLevel": 0,
+      "frameworkManifestLines": [
+        1214,
+        1215,
+        1216
+      ],
+      "applicationDeclares": true,
+      "registerAndPlaceEnforceIt": true,
+      "runtimeDenialObserved": false
+    },
     "selfManagedTelecomImplementationPresent": true,
     "selfManagedAccountAutomaticallyEnabledInReference": true,
     "bindConnectionServicePermissionProtectsServiceRatherThanGrantingAppPrivilege": true,
     "referenceAdmissionRule": "makeRoomForOutgoingCall rejects a new non-emergency auxiliary call when an existing outgoing call is DIALING (state3), rather than SELECT_PHONE_ACCOUNT (state2)",
-    "verifiedDex": {"selectedMethods": 12, "instructionBoundariesValidated": true, "conditionalTargetsValidated": true, "makeRoomCodeOffset": 1024484, "getStateUnit": 85, "compareAgainst2Unit": 89, "rejectBranchUnit": 90, "falseReturnUnit": 110, "startOutgoingCodeOffset": 1027280, "admissionInvokeUnit": 271, "notifyFailureInvokeUnit": 311},
+    "verifiedDex": {
+      "selectedMethods": 12,
+      "instructionBoundariesValidated": true,
+      "conditionalTargetsValidated": true,
+      "makeRoomCodeOffset": 1024484,
+      "getStateUnit": 85,
+      "compareAgainst2Unit": 89,
+      "rejectBranchUnit": 90,
+      "falseReturnUnit": 110,
+      "startOutgoingCodeOffset": 1027280,
+      "admissionInvokeUnit": 271,
+      "notifyFailureInvokeUnit": 311
+    },
     "decompilerLimit": "Whole APK reports2 errors including PhoneAccountRegistrar XML deserialization; that failed method is not used; selected admission methods independently inspected in original DEX",
     "runtimeCorrelation": "11:22:53.501 makeRoomForOutgoingCall lists new self-managed call and OEM HFP DIALING call, followed by CS_BOUND and CREATE_CONNECTION_FAILED",
     "userDialerClarification": "User pressed the wheel phone key earlier, which opened OEM dialer; no subsequent OEM dialing operation. HFP state must not be described as a second real user-initiated call or proof of SCO audio routing",
-    "wheelDialerRuntimeEvidence": {"phoneKeyDown": "11:13:48.675", "phoneKeyUp": "11:13:48.809", "rcallBroadcast": "11:13:48.811", "oemMainActivityStart": "11:13:48.824", "dialerCreated": "11:13:49.028", "laterModeSamples": ["11:13:53.789 mode0 scoOff", "11:14:44.640 mode0 scoOff"], "dialerPageDoesNotEstablishOngoingCall": true, "dialerPageCausedExperimentalFailureProven": false},
-    "hfpBeforeAuxiliaryRequest": {"callsetupIndication": "11:22:53.227", "hfpDialingEvent": "11:22:53.356", "auxiliaryAccountRegistration": "11:22:53.461", "auxiliaryFailure": "11:22:53.513", "oemCallingUiUpdate": "11:22:53.541"},
+    "wheelDialerRuntimeEvidence": {
+      "phoneKeyDown": "11:13:48.675",
+      "phoneKeyUp": "11:13:48.809",
+      "rcallBroadcast": "11:13:48.811",
+      "oemMainActivityStart": "11:13:48.824",
+      "dialerCreated": "11:13:49.028",
+      "laterModeSamples": [
+        "11:13:53.789 mode0 scoOff",
+        "11:14:44.640 mode0 scoOff"
+      ],
+      "dialerPageDoesNotEstablishOngoingCall": true,
+      "dialerPageCausedExperimentalFailureProven": false
+    },
+    "hfpBeforeAuxiliaryRequest": {
+      "callsetupIndication": "11:22:53.227",
+      "hfpDialingEvent": "11:22:53.356",
+      "auxiliaryAccountRegistration": "11:22:53.461",
+      "auxiliaryFailure": "11:22:53.513",
+      "oemCallingUiUpdate": "11:22:53.541"
+    },
     "zeroPhoneCallsToggleOnlyScenarioEstablishedByThisLog": false,
     "runtimeRefusalInterpretation": "Strongly consistent with call admission/state limit rather than missing MANAGE_OWN_CALLS or absent Telecom mechanism",
     "actualIhu353gTelecomBinaryCompared": false,
     "experimentalRequestSucceeded": false,
-    "userAudioModeComparison": {"bluetoothAudioCall": "Remote party hears normally", "carplayAudioCall": "Remote party cannot hear or voice quiet", "bluetoothHfpAudioOnObserved": true, "weakAudioRecordEpisodesAllCarplayAudioMode": true, "transportAndAudioModeAreDifferentDimensions": true},
+    "userAudioModeComparison": {
+      "bluetoothAudioCall": "Remote party hears normally",
+      "carplayAudioCall": "Remote party cannot hear or voice quiet",
+      "bluetoothHfpAudioOnObserved": true,
+      "weakAudioRecordEpisodesAllCarplayAudioMode": true,
+      "transportAndAudioModeAreDifferentDimensions": true
+    },
     "stockMicrophoneProcessingEffectVerified": false,
     "quietMicrophoneRootCauseProvenByThisRefusal": false,
     "localEvidence": "agent_docs/firmware/ihu519g-327/catalog/telecom-analysis-20261021/ and decompiled/telecom/; runtime raw logs remain in agent_docs/vehicle-20261021-build1205/",
@@ -715,10 +1902,16 @@
     "mobilelogSha256": "f06d98ec8535d1fde93e74db21dd58b623f1f7ac0f3a310fb8f0f4c929c9cda5",
     "apkSha256": "46114a8a3aecb847348a29c88129e2e766bdd147457f43ae0c289f1973b48139",
     "historicalBuild1202LogsSeparated": true,
-    "freshHotspotReadyMs": [1037, 1040],
+    "freshHotspotReadyMs": [
+      1037,
+      1040
+    ],
     "historicalBuild1202FreshHotspotReadyMs": 3390,
     "hotspotPreparationImprovementObserved": true,
-    "freshWirelessToFirstFrameMs": [15720, 21218],
+    "freshWirelessToFirstFrameMs": [
+      15720,
+      21218
+    ],
     "retainedHotspotWirelessToFirstFrameMs": 6423,
     "historicalBuild1202RetainedHotspotWirelessToFirstFrameMs": 4307,
     "stableOverallConnectionSpeedupProven": false,
@@ -726,12 +1919,25 @@
     "callMicrophone": {
       "userSymptom": "Bluetooth-audio calls sound normal to remote party; CarPlay-audio calls cannot be heard or sound quiet",
       "audioModeOfAllThreeCaptureEpisodes": "CarPlay audio; USB versus wireless denotes transport, not the Bluetooth audio setting",
-      "bluetoothAudioComparison": {"time": "approximately11:20:15-35", "userResult": "normal remote voice", "carBluetoothRoute": true, "nativeOutput": true, "applicationTelephonyMicStarts": 0, "halHfpEnabled": true, "hfpAudioOn": true, "localEvidence": "agent_docs/vehicle-20261021-build1205/audio-mode-comparison.json and bluetooth-audio-call-route.txt"},
+      "bluetoothAudioComparison": {
+        "time": "approximately11:20:15-35",
+        "userResult": "normal remote voice",
+        "carBluetoothRoute": true,
+        "nativeOutput": true,
+        "applicationTelephonyMicStarts": 0,
+        "halHfpEnabled": true,
+        "hfpAudioOn": true,
+        "localEvidence": "agent_docs/vehicle-20261021-build1205/audio-mode-comparison.json and bluetooth-audio-call-route.txt"
+      },
       "episodes": 3,
       "source": "VOICE_COMMUNICATION",
       "routedDeviceType": 15,
       "halInput": "0x80000004 builtin_Mic_SingleMic",
-      "uplinkPackets": [3238, 390, 3600],
+      "uplinkPackets": [
+        3238,
+        390,
+        3600
+      ],
       "readErrors": 0,
       "sendErrors": 0,
       "quietLevelsObservedInBothLpcmAndOpus": true,
@@ -779,7 +1985,9 @@
       "mainCertificateUnchanged": true,
       "embeddedAuthorizationVersion": 11,
       "embeddedAuthorizationVerified": true,
-      "installedDevices": ["emulator-5558"],
+      "installedDevices": [
+        "emulator-5558"
+      ],
       "preservedApplicationData": true,
       "localEvidence": "agent_docs/build1205-20261021/verification.json and install-results.json"
     },
@@ -793,11 +2001,19 @@
     "documentation": "docs/PREFACE_WIRELESS_VIDEO_2026-10-20.md",
     "scope": "Static IHU519G build327 firmware analysis, compared separately with historical IHU353G system169 build100 runtime; later user-reported MTK low-latency vehicle check without abnormalities, no new instrumented measurements",
     "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
-    "priority": ["H264 hardware plus direct SurfaceView output", "HEVC hardware comparison", "MTK-specific low-latency comparison"],
+    "priority": [
+      "H264 hardware plus direct SurfaceView output",
+      "HEVC hardware comparison",
+      "MTK-specific low-latency comparison"
+    ],
     "conditionalPriority": "If actual hotspot is 2.4GHz and system supports 5GHz, user-configured manual hotspot comparison; do not force temporary hotspot configuration",
     "userRequestedVideoDefaults20261020": {
       "source": "Direct user request to enable efficient video, direct video output and MTK low-latency decoding by default",
-      "defaultsWhenUnset": {"hevc_enabled": true, "direct_video_output": true, "mtk_decoder_tuning": true},
+      "defaultsWhenUnset": {
+        "hevc_enabled": true,
+        "direct_video_output": true,
+        "mtk_decoder_tuning": true
+      },
       "savedUserChoicesTakePriority": true,
       "hevcHardwareFallbackRetained": true,
       "mtkDecoderCapabilityChecksAndFallbackRetained": true,
@@ -812,8 +2028,13 @@
     },
     "videoOptionUserFeedback20261020": {
       "source": "After screenshot discussion and report of a test without problems, user explicitly corrected the tested option to MTK-specific low-latency decoding",
-      "testedOptions": ["settings_mtk_decoder_tuning"],
-      "labelRemovalOptions": ["settings_direct_video_output", "settings_mtk_decoder_tuning"],
+      "testedOptions": [
+        "settings_mtk_decoder_tuning"
+      ],
+      "labelRemovalOptions": [
+        "settings_direct_video_output",
+        "settings_mtk_decoder_tuning"
+      ],
       "reportedResult": "No problems during the vehicle test",
       "initialMisattributionToOrdinaryLowLatencyCorrected": true,
       "ordinaryLowLatencyVehicleTestConfirmed": false,
@@ -835,9 +2056,20 @@
     "performanceMetadata": {
       "path": "vendor/etc/media_codecs_performance.xml",
       "sha256": "701e603c710001b21a5f42ebb86ac7ae9da726a53811ae543208b0bbb1b17225",
-      "lines": [124, 128, 130, 135],
-      "avc1920x1080MeasuredFrameRateRange": [113, 248],
-      "hevc1920x1080MeasuredFrameRateRange": [125, 276],
+      "lines": [
+        124,
+        128,
+        130,
+        135
+      ],
+      "avc1920x1080MeasuredFrameRateRange": [
+        113,
+        248
+      ],
+      "hevc1920x1080MeasuredFrameRateRange": [
+        125,
+        276
+      ],
       "verification": "Vendor metadata only; not a runtime benchmark, constant60fps guarantee or proof HEVC is faster"
     },
     "legacyMtkLowLatency": {
@@ -866,14 +2098,28 @@
       "vendorDecNoReorderModeExtensionStringPresent": true,
       "noReorderMediaFormatBridgeVerified": false,
       "applicationMtkDiagnosticLabelIsNotSystemReadback": true,
-      "localEvidence": ["catalog/video-latency-binary-strings.json", "catalog/video-acodec-configure-arm64.txt"]
+      "localEvidence": [
+        "catalog/video-latency-binary-strings.json",
+        "catalog/video-acodec-configure-arm64.txt"
+      ]
     },
     "runtimeBaseline": {
       "applicationReportSha256": "08742387ae94b4dd01d77f57862b70f355e88d7dc3dade32db13b8fb754262d6",
-      "lines": [5339, 5343, 5531, 5533, 5678, 5749, 5755],
+      "lines": [
+        5339,
+        5343,
+        5531,
+        5533,
+        5678,
+        5749,
+        5755
+      ],
       "decoder": "OMX.MTK.VIDEO.DECODER.AVC",
       "surface": "TextureView",
-      "dimensions": [1920, 720],
+      "dimensions": [
+        1920,
+        720
+      ],
       "requestedFps": 60,
       "operatingRate": 60,
       "mtkTuning": "off",
@@ -953,7 +2199,10 @@
     "referenceAction": "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRCallAction.java:13-14,19-28,33-42; ordinary sendBroadcast, short0/long1",
     "referenceActionSha256": "236bd1843201da3b610b2a75c7546036789ce2d5699e4e10cdb2b973cc95e766",
     "referenceOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
-    "existingCarPlayCommandMethods": ["CarPlayController.answerCall", "CarPlayController.endCall"],
+    "existingCarPlayCommandMethods": [
+      "CarPlayController.answerCall",
+      "CarPlayController.endCall"
+    ],
     "existingCallState": "iAP2 0x4155 parsed by CarPlayCallState and exposed through NavigationOutputs.carPlayCall",
     "wheelToCarPlayPhoneCommandsImplemented": false,
     "exclusiveKeyConsumptionOrBroadcastAbortEstablished": false,
@@ -1045,7 +2294,10 @@
   "audioHandoffAssistantSourceRepair20261020": {
     "documentation": "docs/AUDIO_HANDOFF_MEDIA_ASSISTANT_2026-10-20.md",
     "scope": "Source repair following IHU353G system169 build99 logs; reference327 remains static evidence, no new vehicle validation",
-    "userAuthorized": ["Session-scoped selected-iPhone A2DP disconnect and restoration in authorization component", "Separate platform-signed media assistant, verifying its own admission first"],
+    "userAuthorized": [
+      "Session-scoped selected-iPhone A2DP disconnect and restoration in authorization component",
+      "Separate platform-signed media assistant, verifying its own admission first"
+    ],
     "sourceApplicationVersion": "0.1.1 / 100",
     "sourceAuthorizationComponentVersion": 10,
     "sourceMediaAssistantVersion": 1,
@@ -1066,7 +2318,12 @@
       "primarySourceAdmissionPreferred": true,
       "admission": "Actual installed SDK onAPIReady plus non-null own registration token, followed by actual requestPlay result; no forced readiness, token or playback acceptance",
       "sourceIdentity": "Own helper package and Context; main application launch PendingIntent checked against actual caller UID",
-      "commands": ["PLAY", "PAUSE", "NEXT", "PREVIOUS"],
+      "commands": [
+        "PLAY",
+        "PAUSE",
+        "NEXT",
+        "PREVIOUS"
+      ],
       "ipc": "Fixed packages and certificates, actual sending UID, same user, version, service state and per-binding nonce; asynchronous requests with stale-generation rejection",
       "voiceFocusBluetoothVpnAppOpsAuthorityAdded": false,
       "vendorSdkOrThirdPartyLicenseBundled": false,
@@ -1077,7 +2334,10 @@
       "mainApkIncludesBothSeparateSignedComponents": "Verified in build100; embedded APK bytes, manifests, hashes, versions and platform signatures match current signed component10 and assistant1 outputs",
       "helperAssetPath": "assets/media-assistant/media-assistant.apk",
       "export": "Existing save action verifies both APKs then exports separately to Download for manual installation; verified staged copies replace same-named files, identical files deduplicated, installed unknown packages preserved, no downgrade or installer launch",
-      "fixedExportFileNames": ["Preface-Android9-Authorization.apk", "Preface-Media-Assistant.apk"],
+      "fixedExportFileNames": [
+        "Preface-Android9-Authorization.apk",
+        "Preface-Media-Assistant.apk"
+      ],
       "replaceSameNamedDifferentContentFile": "User explicitly requested 2026-10-20; no version or collision suffix in exported filenames",
       "fixedExportNamesRegressionTestsPassed": 69,
       "signingInputs": "Existing verified public platform inputs stay local; main signing unchanged; public credential whitelist unchanged",
@@ -1117,23 +2377,74 @@
     "mainEvidence": {
       "file": "main_log_5__2026_1020_125530",
       "sha256": "96b61b31506b0aa292cb7e0450588a63905bfaa5e1b8edc5aeb63d43e45a84a7",
-      "hiddenConnectAccessAndHandoffFailureLines": [156315, 156318],
-      "applicationFocusGrantedLines": [158281],
-      "bluetoothFocusLossAndAvrcpPauseLines": [158241, 158246, 158287, 158293, 158314],
-      "repeatNoFocusPauseLines": [188378, 188381, 188404],
-      "vendorMediaAdmissionDeniedLines": [120665, 120669, 120672, 120681],
-      "oemNextAndAvrcpNextPlayLines": [196444, 196584, 196594, 196675, 196744],
-      "bluetoothReclaimsFocusLines": [196640, 196766],
-      "nativeBluetoothSourceAndPlaybackLines": [196819, 196902, 197095]
+      "hiddenConnectAccessAndHandoffFailureLines": [
+        156315,
+        156318
+      ],
+      "applicationFocusGrantedLines": [
+        158281
+      ],
+      "bluetoothFocusLossAndAvrcpPauseLines": [
+        158241,
+        158246,
+        158287,
+        158293,
+        158314
+      ],
+      "repeatNoFocusPauseLines": [
+        188378,
+        188381,
+        188404
+      ],
+      "vendorMediaAdmissionDeniedLines": [
+        120665,
+        120669,
+        120672,
+        120681
+      ],
+      "oemNextAndAvrcpNextPlayLines": [
+        196444,
+        196584,
+        196594,
+        196675,
+        196744
+      ],
+      "bluetoothReclaimsFocusLines": [
+        196640,
+        196766
+      ],
+      "nativeBluetoothSourceAndPlaybackLines": [
+        196819,
+        196902,
+        197095
+      ]
     },
     "systemEvidence": {
       "file": "sys_log_9__2026_1020_125639",
-      "parallelKeyDispatchLines": [58663, 58664],
-      "applicationAudioFalseBluetoothAudioTrueLines": [58672, 58673]
+      "parallelKeyDispatchLines": [
+        58663,
+        58664
+      ],
+      "applicationAudioFalseBluetoothAudioTrueLines": [
+        58672,
+        58673
+      ]
     },
-    "reproducedAcrossTransports": ["WIRELESS AAC", "WIRED LPCM", "WIRED LPCM"],
-    "applicationNextTimes": ["12:46:25.088", "12:48:53.194", "12:54:14.285"],
-    "nativeBluetoothFocusGrantTimes": ["12:46:25.279564", "12:48:53.314074", "12:54:14.440003"],
+    "reproducedAcrossTransports": [
+      "WIRELESS AAC",
+      "WIRED LPCM",
+      "WIRED LPCM"
+    ],
+    "applicationNextTimes": [
+      "12:46:25.088",
+      "12:48:53.194",
+      "12:54:14.285"
+    ],
+    "nativeBluetoothFocusGrantTimes": [
+      "12:46:25.279564",
+      "12:48:53.314074",
+      "12:54:14.440003"
+    ],
     "currentMediaStatsCount": 11,
     "allCurrentMediaStatsWriteErrorsDecoderDropsRebuffersZero": true,
     "analysis": "A2DP handoff fails with hidden connect access and retains Bluetooth; native Bluetooth sends PAUSE on loss or absence of focus; OEM parallel NEXT sends AVRCP NEXT and PLAY then reclaims focus while CarPlay media admission remains denied",
@@ -1151,16 +2462,44 @@
     "applicationReportSha256": "f68de79ffeb292e6b4018775e8144edad73488eb9b579d3ee8842cab150b7a58",
     "measurement": "Controller transport start to first rendered video frame; application launch before controller start excluded",
     "successfulAttempts": [
-      {"attempt": 1, "transport": "WIRELESS", "totalMs": 18173, "startSessionToFirstTcpMs": 8989},
-      {"attempt": 2, "transport": "WIRED", "totalMs": 22352, "startSessionToFirstTcpMs": 9394},
-      {"attempt": 3, "transport": "WIRED", "totalMs": 18566, "startSessionToFirstTcpMs": 11243},
-      {"attempt": 5, "transport": "WIRED", "totalMs": 16731, "startSessionToFirstTcpMs": 13283}
+      {
+        "attempt": 1,
+        "transport": "WIRELESS",
+        "totalMs": 18173,
+        "startSessionToFirstTcpMs": 8989
+      },
+      {
+        "attempt": 2,
+        "transport": "WIRED",
+        "totalMs": 22352,
+        "startSessionToFirstTcpMs": 9394
+      },
+      {
+        "attempt": 3,
+        "transport": "WIRED",
+        "totalMs": 18566,
+        "startSessionToFirstTcpMs": 11243
+      },
+      {
+        "attempt": 5,
+        "transport": "WIRED",
+        "totalMs": 16731,
+        "startSessionToFirstTcpMs": 13283
+      }
     ],
     "wirelessHotspotPreparationMs": 3524,
     "cancelledAttemptExcluded": 4,
-    "usbObservedNotAcceptedFrameCounts": [6, 7, 7],
+    "usbObservedNotAcceptedFrameCounts": [
+      6,
+      7,
+      7
+    ],
     "usbFailedFramesProvenCauseOfDelay": false,
-    "evaluationCandidates": ["USB early packet and endpoint readiness timing", "Existing validated temporary-hotspot reuse", "Overlap independent wireless initialization while preserving cancellation and ownership"],
+    "evaluationCandidates": [
+      "USB early packet and endpoint readiness timing",
+      "Existing validated temporary-hotspot reuse",
+      "Overlap independent wireless initialization while preserving cancellation and ownership"
+    ],
     "runtimeCodeChanged": false,
     "newApkBuiltSignedInstalled": false,
     "speedupVehicleVerified": false,
@@ -1199,9 +2538,19 @@
     "applicationReportSha256": "f68de79ffeb292e6b4018775e8144edad73488eb9b579d3ee8842cab150b7a58",
     "vehicleMobilelogZipSha256": "458463790cb5ad8b8423b59dacb87b9a72886eaab2901b918089f86cc84f34b7",
     "vehicleEvidenceFile": "APLog_2026_1020_114526__11/main_log_5__2026_1020_120036",
-    "physicalVoiceLines": [64395, 64559],
-    "adapterVoiceLines": [64648, 65135],
-    "broadcastLines": [65731, 64409, 64455],
+    "physicalVoiceLines": [
+      64395,
+      64559
+    ],
+    "adapterVoiceLines": [
+      64648,
+      65135
+    ],
+    "broadcastLines": [
+      65731,
+      64409,
+      64455
+    ],
     "observed": "Physical298 maps to200231 and OEM voice broadcast reaches native assistant; application remains in mode3 with no music focus",
     "sourceBlockers": [
       "Retained communication mode makes inCall true, addressed by the preceding volume fix",
@@ -1218,7 +2567,10 @@
     "referenceVoiceSource": "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVoiceAssistAction.java:39-49",
     "referenceVoiceSourceSha256": "d060a3daef9ebc319bf03a33f62380602122f023b1aaf8649e31a8d8e93a62b6",
     "targetedUnitTestsPassed": 82,
-    "regressionApiLevels": [28, 33],
+    "regressionApiLevels": [
+      28,
+      33
+    ],
     "fullCiRun": false,
     "newApkBuiltSignedInstalled": false,
     "siriFixVehicleVerified": false,
@@ -1232,7 +2584,14 @@
     "vehicleMobilelogZipSha256": "458463790cb5ad8b8423b59dacb87b9a72886eaab2901b918089f86cc84f34b7",
     "installedApkSha256": "86d99867015b383bc3e886278724c9f1fcd742653140e5f96d38c4dc994dc689",
     "userFeedback": "Bluetooth and CarPlay track changes both work; volume keys only adjust call volume",
-    "applicationEvidenceLines": [372, 403, 504, 587, 663, 1660],
+    "applicationEvidenceLines": [
+      372,
+      403,
+      504,
+      587,
+      663,
+      1660
+    ],
     "vehicleEvidenceDirectory": "APLog_2026_1020_114526__11/",
     "modePermissionDenial": {
       "file": "main_log_1__2026_1020_114950",
@@ -1241,11 +2600,25 @@
     },
     "systemCallEnd": {
       "file": "sys_log_8__2026_1020_120036",
-      "lines": [51831, 51832, 51861]
+      "lines": [
+        51831,
+        51832,
+        51861
+      ]
     },
     "volumeEvents": {
       "file": "main_log_5__2026_1020_120036",
-      "lines": [40174, 41069, 41137, 41298, 41494, 41963, 42367, 42721, 42956],
+      "lines": [
+        40174,
+        41069,
+        41137,
+        41298,
+        41494,
+        41963,
+        42367,
+        42721,
+        42956
+      ],
       "observed": "STREAM_VOICE_CALL 17 through 9; app diagnostics retain mode3 and music volume8"
     },
     "sourceFix": "Release own communication mode with MODE_NORMAL on microphone stop/start failure and sink close; never replay a previously observed global call mode; system retains other active callers",
@@ -1368,7 +2741,14 @@
   "authorizationOtherApps20261019": {
     "scope": "Component8 source change only; main0.1.1/97 unbuilt; no new firmware availability claim",
     "documentation": "docs/ANDROID9_AUTHORIZATION_COMPONENTS.md",
-    "existingConsentCategories": ["VPN", "WRITE_SETTINGS", "SYSTEM_ALERT_WINDOW", "REQUEST_INSTALL_PACKAGES", "PACKAGE_USAGE_STATS", "accessibility services"],
+    "existingConsentCategories": [
+      "VPN",
+      "WRITE_SETTINGS",
+      "SYSTEM_ALERT_WINDOW",
+      "REQUEST_INSTALL_PACKAGES",
+      "PACKAGE_USAGE_STATS",
+      "accessibility services"
+    ],
     "targets": "Installed enabled unsuspended current-user apps with required permission/service declarations; identity pinned by UID/version/certificate",
     "vpnTarget": "Framework getCallingPackage only; enabled exported BIND_VPN_SERVICE service; no package selector or Intent extra override",
     "writeAndOverlay": "Standard Settings intents with or without package URI; explicit confirmation, policy checks and app-op readback; overlay does not require WRITE_SETTINGS",
@@ -1470,7 +2850,12 @@
     "oemRegistrationOrSourceOwnershipConfirmed": false,
     "nativeBluetoothAppMediaCommandsObserved": false,
     "nativePlayingQueryFailure": "NoSuchMethodException; selected device found before hidden isA2dpPlaying reflection by corresponding source; not proof of pause cause",
-    "nativeIphonePlayToPauseIntervalsMs": [712, 935, 864, 908],
+    "nativeIphonePlayToPauseIntervalsMs": [
+      712,
+      935,
+      864,
+      908
+    ],
     "nativeRealA2dpPlayingConfirmed": false,
     "nativeSelectedOemSourceKnown": false,
     "platformConnectResultObserved": false,
@@ -1654,8 +3039,15 @@
     "platformSignedFlagCodeOffset": 4146760,
     "sinkServiceConnectCodeOffset": 1422466,
     "sinkBinderConnectCodeOffset": 1422066,
-    "sinkServiceQueryCodeOffsets": [1423080, 1423166, 1422598],
-    "componentPermissionsAdded": ["BLUETOOTH", "BLUETOOTH_ADMIN"],
+    "sinkServiceQueryCodeOffsets": [
+      1423080,
+      1423166,
+      1422598
+    ],
+    "componentPermissionsAdded": [
+      "BLUETOOTH",
+      "BLUETOOTH_ADMIN"
+    ],
     "componentBridge": "Authenticated Messenger, current user and fixed CarPlay signers; only selected bonded A2DP sink connect when main connect method unavailable in native output; no disconnect/HFP/pairing/adapter/source changes",
     "connectionConfirmation": "Actual selected-peer profile CONNECTED, never request acceptance",
     "bluetoothAudioModes": "Only display TAKE; audio formats/features/SETUP remain disabled",
@@ -1905,7 +3297,9 @@
     "targetedCommonTestsPassed": 39,
     "targetedPythonTestsPassed": 9,
     "mainApkBuilt": true,
-    "installedMainApkDevices": ["emulator-5558"],
+    "installedMainApkDevices": [
+      "emulator-5558"
+    ],
     "runtimePreview": "1920x720 landscape; Android 14 API34 emulator; physical 240dpi, application Preface 160dpi, font100; stock VpnDialogs preserved",
     "layoutTestPreviews": "1920x720 landscape; full/compact font150 and RTL fake installable state; not installed-APK screenshots",
     "componentInstalledOnVehicle": false,
@@ -1932,7 +3326,10 @@
       "com.android.vpndialogs.ConfirmDialog",
       "android.settings.action.MANAGE_WRITE_SETTINGS with package URI"
     ],
-    "eligiblePackages": ["com.shihab.diplay", "com.shihab.diplay.hudtest"],
+    "eligiblePackages": [
+      "com.shihab.diplay",
+      "com.shihab.diplay.hudtest"
+    ],
     "eligiblePackageCertificateSha256": "75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8",
     "authorizationOnlyAfterUserConfirmation": true,
     "createsVpnOrTun": false,
@@ -1943,7 +3340,14 @@
     "targetedInstallerTestsPassed": 9,
     "previewSource": "Robolectric native fake-backend renders, 1920x720 landscape, 160/480 dpi, font150, RTL; not installed-APK screenshots",
     "releaseBuiltAndSignatureVerified": true,
-    "onlineDevices": [{"serial": "emulator-5558", "androidApi": 34, "installed": false, "reason": "API mismatch; stock component preserved"}],
+    "onlineDevices": [
+      {
+        "serial": "emulator-5558",
+        "androidApi": 34,
+        "installed": false,
+        "reason": "API mismatch; stock component preserved"
+      }
+    ],
     "vehicleInstalled": false,
     "vehicleVerified": false,
     "fullCiRun": false
@@ -1969,7 +3373,13 @@
     "otaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
     "reportSha256": "5f26a07272b370e78a4afbaf2f6cf236df5bdd39433eccd9cd7abade41f71647",
     "reportFailure": "ActivityNotFoundException launching com.android.vpndialogs/com.android.vpndialogs.ConfirmDialog; before TUN establishment",
-    "reportEvidenceLines": [90, 1837, 1844, 1847, 1849],
+    "reportEvidenceLines": [
+      90,
+      1837,
+      1844,
+      1847,
+      1849
+    ],
     "referenceConfirmDialogComponent": "com.android.vpndialogs/com.android.vpndialogs.ConfirmDialog",
     "vpnDialogsFilenameInSystemVendorInventory": false,
     "allApkPackageNamesAudited": false,
@@ -1983,7 +3393,10 @@
     "kernelConfigSha256": "2770ff03962342dd80e0a2a963c4d13b08745ee2146b313f58310e1faac5e39a",
     "kernelConfigTun": "CONFIG_TUN=y",
     "kernelConfigIpv6": "CONFIG_IPV6=y",
-    "kernelConfigEvidenceLines": { "tun": 1868, "ipv6": 617 },
+    "kernelConfigEvidenceLines": {
+      "tun": 1868,
+      "ipv6": 617
+    },
     "localKernelRecheckCommand": "python agent_docs/firmware/inspect_vpn_boot.py",
     "platformCertificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
     "matchesAospAndroid9PlatformTestCertificate": true,
@@ -2112,14 +3525,19 @@
     "documentation": "docs/SYSTEM_AUTHORIZATION.md",
     "applicationVersion": "0.1.1",
     "versionCode": 77,
-    "manualActions": ["android.settings.action.MANAGE_WRITE_SETTINGS for this package", "VpnService.prepare consent"],
+    "manualActions": [
+      "android.settings.action.MANAGE_WRITE_SETTINGS for this package",
+      "VpnService.prepare consent"
+    ],
     "automaticVpnPreparation": false,
     "startsVpnServiceOrTun": false,
     "changesUsbTransport": false,
     "targetedTestsPassed": 37,
     "mobileDebugAssembled": true,
     "apkSha256": "691b0b8987ed778c817db86f69c0de606ce82fa7491884ebfc0c7e02cbc05e5e",
-    "installedDevices": ["emulator-5558"],
+    "installedDevices": [
+      "emulator-5558"
+    ],
     "currentApplicationVehicleVerified": false
   },
   "linkcoAudioPlayback20261016": {
@@ -2131,18 +3549,29 @@
     "userConfirmedReferenceAudioAndTrackControlWorking": true,
     "applicationVersion": "0.1.1",
     "versionCode": 76,
-    "mediaAndNavigationDefaultStreams": [3, 12],
+    "mediaAndNavigationDefaultStreams": [
+      3,
+      12
+    ],
     "normalRelativeGain": 1,
     "navigationMusicGain": 0.3,
     "callAndSiriMusicGain": 0,
     "priorityEvidence": "actual PCM playback and bounded drain tail; negotiated stream alone does not mute music",
     "focusDefault": "enabled unless saved false; renderer and media keys share grant; saved media-focus opt-out retained",
     "oemRegistration": "existing process MusicClient/token under actual application package; ready/requestPlay still required",
-    "excluded": ["dongle USB protocol", "reference native libraries", "reference package identity and signing", "periodic source stealing", "automatic iPhone play on focus gain"],
+    "excluded": [
+      "dongle USB protocol",
+      "reference native libraries",
+      "reference package identity and signing",
+      "periodic source stealing",
+      "automatic iPhone play on focus gain"
+    ],
     "targetedTestsPassed": 163,
     "mobileDebugAssembled": true,
     "apkSha256": "43d5a724ebb81d034d1f441dc6e9bce3cd14daeeac93c3d01687bfd0a4d4d23a",
-    "installedDevices": ["emulator-5554"],
+    "installedDevices": [
+      "emulator-5554"
+    ],
     "currentApplicationVehicleVerified": false
   },
   "geelyPlayBluetoothPort20261016": {
@@ -2158,11 +3587,18 @@
     "restoreScope": "only app-disconnected still-bonded selected phone; bounded retries; shared owners checked",
     "e02BluetoothOutputPreference": "existing car_bluetooth_audio; frozen per connection; never suppress native A2DP in this mode",
     "audioResourceDeclaration": "screen 1 and audio 2 match source; formats and SETUP remain disabled in native Bluetooth output mode",
-    "excluded": ["USB and VPN by explicit user steering", "E01 system components", "model gates", "reference application signing and license activation"],
+    "excluded": [
+      "USB and VPN by explicit user steering",
+      "E01 system components",
+      "model gates",
+      "reference application signing and license activation"
+    ],
     "targetedTestsPassed": 158,
     "mobileDebugAssembled": true,
     "apkSha256": "8d6dead90a01fd069b63ecfe57931828951bc8ed3dcec616a3b372e603d9537f",
-    "installedDevices": ["emulator-5554"],
+    "installedDevices": [
+      "emulator-5554"
+    ],
     "vehiclePlaybackVerified": false
   },
   "build74Report20261016": {
@@ -2176,9 +3612,18 @@
     "wirelessSessionsObserved": 2,
     "wirelessEndsObserved": "both application initiated disconnect; no spontaneous loss in the recorded windows",
     "oneManualReconnectRetainedHotspotConfirmed": true,
-    "wirelessShutdownWaitMillis": [1076, 1075],
+    "wirelessShutdownWaitMillis": [
+      1076,
+      1075
+    ],
     "bluetoothAutoPauseConfirmedByUser": true,
-    "bluetoothPlayToPauseMillis": [780, 813, 922, 2418, 2984],
+    "bluetoothPlayToPauseMillis": [
+      780,
+      813,
+      922,
+      2418,
+      2984
+    ],
     "bluetoothPlaybackSuccessConfirmed": false,
     "oemMediaApi": "SDK 351 ready=false before registration; rejection cause unknown",
     "usbNormalPath": "MFi accepted; owned cdc_ncm usb0 and IPv6 listener ready; one StartSession, no accepted TCP for 30 seconds",
@@ -2205,7 +3650,13 @@
     "defaultNavigationStream": 12,
     "routing": "actual registered output first, then frozen current sink configuration; automatic/unknown uses existing media fallback",
     "volumeStorage": "system stream volume only; no application gain or menu rollback",
-    "checks": ["call and priority voice", "current Bluetooth audio mode", "service and stream range", "route changes during drag", "read back actual volume"],
+    "checks": [
+      "call and priority voice",
+      "current Bluetooth audio mode",
+      "service and stream range",
+      "route changes during drag",
+      "read back actual volume"
+    ],
     "sharedRoute": "synchronize both sliders and explain shared system volume",
     "bluetoothNavigation": "disabled; media slider uses system media stream",
     "targetedTestsPassed": 62,
@@ -2221,7 +3672,12 @@
     "userRequestedReuseAfterManualDisconnect": true,
     "idleReservationScope": "current application process; old controller and Activity callbacks detached",
     "validateBeforeReuse": "reservation active, original interface present, original address still assigned",
-    "releaseOn": ["full application exit", "reset temporary hotspot", "running task removed", "start USB or manual hotspot mode"],
+    "releaseOn": [
+      "full application exit",
+      "reset temporary hotspot",
+      "running task removed",
+      "start USB or manual hotspot mode"
+    ],
     "targetedTestsPassed": 40,
     "apkBuilt": true,
     "vehicleVerified": false,
@@ -2262,7 +3718,10 @@
     "scope": "Application fixes for all six reviewed issues; not firmware capability or vehicle proof",
     "documentation": "docs/WHEEL_MEDIA_LEARNING.md",
     "targetedTestsPassed": 151,
-    "crossEntryRegressionApiLevels": [28, 33],
+    "crossEntryRegressionApiLevels": [
+      28,
+      33
+    ],
     "temporarySuppressionRetainsGrantedSource": true,
     "actualSourceLossRequiresRealPlaybackRequest": true,
     "semanticCommandsDoNotUsePhysicalBindings": true,
@@ -2287,15 +3746,26 @@
     "documentation": "docs/WHEEL_MEDIA_LEARNING.md",
     "firmwareOtaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
     "referenceApkSha256": "01852eec09a7710448f2247cc65105320513a086c3150520ddda091735286de5",
-    "actions": ["previous", "next", "siri"],
+    "actions": [
+      "previous",
+      "next",
+      "siri"
+    ],
     "configuration": "learn / restore default / disable app forwarding; applies without reconnect",
     "learningTimeoutMillis": 10000,
     "persistence": "diplay_media_wheel; key codes only",
-    "status": ["request accepted", "observer callback count", "OEM source registered and playback ownership"],
+    "status": [
+      "request accepted",
+      "observer callback count",
+      "OEM source registered and playback ownership"
+    ],
     "exclusiveInterceptionConfirmed": false,
     "obsoleteSiriSchemeRemoved": true,
     "obsoleteSiriPreferencesReadOrMigrated": false,
-    "windowSiriReleaseRegressionVerifiedApi": [28, 33],
+    "windowSiriReleaseRegressionVerifiedApi": [
+      28,
+      33
+    ],
     "targetedTestsPassed": 95,
     "vehicleVerified": false,
     "apkBuilt": false
@@ -2382,11 +3852,28 @@
   "followupMediaUsbDiagnosticImplementation": {
     "scope": "Application diagnostic implementation only; new runtime evidence pending",
     "documentation": "docs/MEDIA_USB_DIAGNOSTICS_2026-10-15.md",
-    "media": ["read-only package and service resolution", "init and callback timing/thread", "register and requestPlay outcomes", "fixed exception categories", "bounded own-process SDK log categories on first ready=false"],
+    "media": [
+      "read-only package and service resolution",
+      "init and callback timing/thread",
+      "register and requestPlay outcomes",
+      "fixed exception categories",
+      "bounded own-process SDK log categories on first ready=false"
+    ],
     "vendorCrossProcessLogs": "unavailable",
-    "bluetooth": ["A2DP Sink connection and playing broadcasts", "AVRCP Controller and Headset Client events", "bounded audio snapshots and role aggregate queries"],
+    "bluetooth": [
+      "A2DP Sink connection and playing broadcasts",
+      "AVRCP Controller and Headset Client events",
+      "bounded audio snapshots and role aggregate queries"
+    ],
     "oemCurrentSourceMeasured": false,
-    "usb": ["bringup stage timing", "outgoing neighbor protocol counters", "other local address TCP row count with unverified ownership", "DHCP option 53 type counts", "CDC link and speed notification summary", "claim and alternate outcome"],
+    "usb": [
+      "bringup stage timing",
+      "outgoing neighbor protocol counters",
+      "other local address TCP row count with unverified ownership",
+      "DHCP option 53 type counts",
+      "CDC link and speed notification summary",
+      "claim and alternate outcome"
+    ],
     "reportBuildCodeRecorded": true,
     "connectionPolicyChange": false,
     "fullCiRun": false,
@@ -2402,15 +3889,91 @@
     "applicationVersionCode": "not_recorded_in_report",
     "documentation": "docs/CONNECTION_REPORT_2026-10-15_5.md",
     "userObservation": "CarPlay play and wheel next both result in OEM Bluetooth music playback",
-    "oemMediaCenter": {"path": "package-music-client", "sdkVersion": 351, "ready": false, "phase": "before-registration", "registerAttemptObserved": false, "requestPlayAcceptedObserved": false, "failureReason": "not_recorded"},
-    "carPlayAudio": {"receivedAndDecoded": true, "playbackHeadAdvanced": true, "audioTrackDeviceType": 2, "oemSelectedSourceMeasured": false},
-    "shortPlayingIntervalsMs": [1524, 1424, 1023, 1127],
-    "wheelNext": {"appCommands": 2, "pairedBroadcastEchoesSuppressed": 2, "foregroundStopAfterEach": true, "oemAvrcpCommandMeasured": false},
-    "usb": {"driver": "cdc_ncm", "ipv6Ready": true, "listenerPort": 7000, "airPlayTcpAccepted": 0, "selectedInterfaceIcmp6InNs": 1, "selectedInterfaceIcmp6InNa": 1},
-    "rawNcmTest": {"usbInTransfers": 1, "usbInBytes": 372, "ntb16Blocks": 1, "ipv4Headers": 1, "udpDhcp4Headers": 1, "ipv6": 0, "outCalls": 3, "outFull": 0, "outNegative": 3, "outLastReturn": -1, "outEffectiveTimeoutMs": 20, "bidirectionalConfirmed": false},
-    "temporaryHotspot": {"sessionsEstablished": 2, "manualVersusAutomaticJoin": "not_recorded", "creationFailures": ["generic_error"]},
+    "oemMediaCenter": {
+      "path": "package-music-client",
+      "sdkVersion": 351,
+      "ready": false,
+      "phase": "before-registration",
+      "registerAttemptObserved": false,
+      "requestPlayAcceptedObserved": false,
+      "failureReason": "not_recorded"
+    },
+    "carPlayAudio": {
+      "receivedAndDecoded": true,
+      "playbackHeadAdvanced": true,
+      "audioTrackDeviceType": 2,
+      "oemSelectedSourceMeasured": false
+    },
+    "shortPlayingIntervalsMs": [
+      1524,
+      1424,
+      1023,
+      1127
+    ],
+    "wheelNext": {
+      "appCommands": 2,
+      "pairedBroadcastEchoesSuppressed": 2,
+      "foregroundStopAfterEach": true,
+      "oemAvrcpCommandMeasured": false
+    },
+    "usb": {
+      "driver": "cdc_ncm",
+      "ipv6Ready": true,
+      "listenerPort": 7000,
+      "airPlayTcpAccepted": 0,
+      "selectedInterfaceIcmp6InNs": 1,
+      "selectedInterfaceIcmp6InNa": 1
+    },
+    "rawNcmTest": {
+      "usbInTransfers": 1,
+      "usbInBytes": 372,
+      "ntb16Blocks": 1,
+      "ipv4Headers": 1,
+      "udpDhcp4Headers": 1,
+      "ipv6": 0,
+      "outCalls": 3,
+      "outFull": 0,
+      "outNegative": 3,
+      "outLastReturn": -1,
+      "outEffectiveTimeoutMs": 20,
+      "bidirectionalConfirmed": false
+    },
+    "temporaryHotspot": {
+      "sessionsEstablished": 2,
+      "manualVersusAutomaticJoin": "not_recorded",
+      "creationFailures": [
+        "generic_error"
+      ]
+    },
     "laterWirelessBackend": "Manual hotspot",
-    "evidenceLines": {"oemReady": [53, 57, 834, 839], "carPlayAudio": [1153, 1161, 1184, 1454], "wheel": [1169, 1179, 1205, 1211], "usbIpv6Control": [689, 707], "rawNcm": [780, 805]}
+    "evidenceLines": {
+      "oemReady": [
+        53,
+        57,
+        834,
+        839
+      ],
+      "carPlayAudio": [
+        1153,
+        1161,
+        1184,
+        1454
+      ],
+      "wheel": [
+        1169,
+        1179,
+        1205,
+        1211
+      ],
+      "usbIpv6Control": [
+        689,
+        707
+      ],
+      "rawNcm": [
+        780,
+        805
+      ]
+    }
   },
   "separateRuntimeReport20261015": {
     "scope": "User IHU353G Android 9 API 28 report only; not validation of this IHU519G OTA or all E02 firmware.",
@@ -2420,20 +3983,102 @@
     "applicationVersionName": "0.1.1",
     "applicationVersionCode": "not_recorded_in_report",
     "documentation": "docs/CONNECTION_REPORT_2026-10-15.md",
-    "oemMediaCenter": {"stage": "api-not-ready", "registered": false, "sourceOwned": false, "rejectionReason": "not_recorded"},
-    "automaticPause": {"shortPlayingIntervalsMs": [1505, 1127, 1462, 1121, 1122], "appPauseCommandObserved": false, "bluetoothAvrcpCause": "not_confirmed"},
-    "usb": {"interface": "usb0", "driver": "cdc_ncm", "ipv6": "ready", "listenerPort": 7000, "authentication": "accepted", "airPlayTcpAccepted": 0},
-    "rawNcmTest": {"usbInTransfers": 2, "usbInBytes": 744, "ntb16Blocks": 2, "ipv6": 0, "unsupported": 2, "txAttempts": 3, "txAccepted": 0, "bidirectionalConfirmed": false},
+    "oemMediaCenter": {
+      "stage": "api-not-ready",
+      "registered": false,
+      "sourceOwned": false,
+      "rejectionReason": "not_recorded"
+    },
+    "automaticPause": {
+      "shortPlayingIntervalsMs": [
+        1505,
+        1127,
+        1462,
+        1121,
+        1122
+      ],
+      "appPauseCommandObserved": false,
+      "bluetoothAvrcpCause": "not_confirmed"
+    },
+    "usb": {
+      "interface": "usb0",
+      "driver": "cdc_ncm",
+      "ipv6": "ready",
+      "listenerPort": 7000,
+      "authentication": "accepted",
+      "airPlayTcpAccepted": 0
+    },
+    "rawNcmTest": {
+      "usbInTransfers": 2,
+      "usbInBytes": 744,
+      "ntb16Blocks": 2,
+      "ipv6": 0,
+      "unsupported": 2,
+      "txAttempts": 3,
+      "txAccepted": 0,
+      "bidirectionalConfirmed": false
+    },
     "followupUsbDiagnostics": {
       "scope": "Application diagnostics only; new runtime evidence pending, no firmware capability claim",
-      "rawPath": ["bounded header-only Ethernet and protocol classification", "OUT API return, effective timeout and elapsed time", "endpoint properties and format-query result length", "split sample/result lines"],
+      "rawPath": [
+        "bounded header-only Ethernet and protocol classification",
+        "OUT API return, effective timeout and elapsed time",
+        "endpoint properties and format-query result length",
+        "split sample/result lines"
+      ],
       "systemPath": "Allowlisted per-interface IPv6 protocol counters and deltas, checked against selected interface index",
       "connectionPolicyChange": false,
       "documentation": "docs/USB_VPN_RESTORE_0.2.20.md"
     },
-    "temporaryHotspot": {"userConfirmedAllSuccessfulConnectionsWereManualJoins": true, "validReservationReusedOnFirstTimeout": true, "channelKnown": false, "creationFailures": ["generic_error", "incompatible_wifi_mode"]},
+    "temporaryHotspot": {
+      "userConfirmedAllSuccessfulConnectionsWereManualJoins": true,
+      "validReservationReusedOnFirstTimeout": true,
+      "channelKnown": false,
+      "creationFailures": [
+        "generic_error",
+        "incompatible_wifi_mode"
+      ]
+    },
     "laterWirelessBackend": "Manual hotspot",
-    "evidenceLines": {"sourceNotRegistered": [10, 54, 61, 1499, 1501], "trackDispatchAndEcho": [1973, 1974, 1975], "phonePause": [1848, 1852, 2054, 2056], "usbReady": [999, 1007, 1008, 1020, 1021], "rawNcmResult": [1159, 1166], "hotspotReused": [145, 157], "laterManualBackend": [1273, 1538]}
+    "evidenceLines": {
+      "sourceNotRegistered": [
+        10,
+        54,
+        61,
+        1499,
+        1501
+      ],
+      "trackDispatchAndEcho": [
+        1973,
+        1974,
+        1975
+      ],
+      "phonePause": [
+        1848,
+        1852,
+        2054,
+        2056
+      ],
+      "usbReady": [
+        999,
+        1007,
+        1008,
+        1020,
+        1021
+      ],
+      "rawNcmResult": [
+        1159,
+        1166
+      ],
+      "hotspotReused": [
+        145,
+        157
+      ],
+      "laterManualBackend": [
+        1273,
+        1538
+      ]
+    }
   },
   "cacheRoot": "agent_docs/firmware/ihu519g-327",
   "source": {
@@ -2471,7 +4116,10 @@
     "usbChannel": 6,
     "usbAuthenticationBusinessId": 19,
     "observedNetworkBranch": "Nearby UsbNcmChannel kernel NIC and socket path",
-    "observedInterfaceNames": ["ncm0_reserved", "wwan0"],
+    "observedInterfaceNames": [
+      "ncm0_reserved",
+      "wwan0"
+    ],
     "observedAddressFamily": "IPv4",
     "interfaceConfigurationApi": "INetworkManagementService",
     "vpnCreationInExaminedNcmBranch": "not_found",
@@ -2479,8 +4127,32 @@
     "setCurrentFunctionGate": "SDK_INT >= 10000; not enabled for reference Android 9",
     "nearbyApkSha256": "c3ce640924c7e39b6be75d9cadfa53f6e876de8f44c3efd6ae55013fd0579406",
     "lowerServiceEvidence": [
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/f.java", "lines": [72, 88, 99, 167, 307, 448, 462], "sha256": "1c399587d5f5f177f4250714b8574ade3ec8f5a07df3b560d833c5a2cd75cf39"},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/a.java", "lines": [39, 45, 49, 51, 98, 111, 115], "sha256": "294031cd5f4c854930effc95058153c0bd0accc1232c9af7d7fe50dbc4eac4e6"}
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/f.java",
+        "lines": [
+          72,
+          88,
+          99,
+          167,
+          307,
+          448,
+          462
+        ],
+        "sha256": "1c399587d5f5f177f4250714b8574ade3ec8f5a07df3b560d833c5a2cd75cf39"
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/channel/e/a/a.java",
+        "lines": [
+          39,
+          45,
+          49,
+          51,
+          98,
+          111,
+          115
+        ],
+        "sha256": "294031cd5f4c854930effc95058153c0bd0accc1232c9af7d7fe50dbc4eac4e6"
+      }
     ],
     "evidence": [
       "catalog/manifests/HiCarHMI.txt",
@@ -2510,22 +4182,95 @@
     "hasConditionalRestorePreviousConfiguration": true,
     "mayReuseMatchingActiveHiCarHotspot": true,
     "defaultNearbyWifiConnectMode": 1,
-    "declaredPrivilegedPermissions": ["android.permission.OVERRIDE_WIFI_CONFIG", "android.permission.CONNECTIVITY_INTERNAL", "android.permission.TETHER_PRIVILEGED", "android.permission.WRITE_SECURE_SETTINGS"],
+    "declaredPrivilegedPermissions": [
+      "android.permission.OVERRIDE_WIFI_CONFIG",
+      "android.permission.CONNECTIVITY_INTERNAL",
+      "android.permission.TETHER_PRIVILEGED",
+      "android.permission.WRITE_SECURE_SETTINGS"
+    ],
     "servicePermission": "com.huawei.permission.NEARBY_OPERATOR_FUNCTION",
     "servicePermissionProtectionLevelRaw": "0x3",
     "thirdPartyAccess": "not_verified_identity_permission_and_provider_signature_checks_exist",
     "applicationAdoption": "none_public_local_only_hotspot_policy_retained",
     "evidence": [
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/d/a.java", "lines": [63, 131, 219, 233, 464, 497, 500, 572, 622], "sha256": "abc723f6ce6aea52edf6217c1b5f0782cb847bd3a5431839db8b58a5c5489b5a"},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/channel/p2p/l.java", "lines": [74, 82, 105], "sha256": "be1c55eef945ddd642cd86b7924a77b438b4ac24d7c17b2026debf40396d63e1"},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/transfertype/resource/j.java", "lines": [110, 120, 124], "sha256": "efb2a448429d24c96af0887966cbb57466081703f56de0c1f92098c448b054d4"},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/controller/NearbyController.java", "lines": [42, 319, 503, 616], "sha256": "50e249464b8674037ae969fa8e4217d6ab64d38be9e9ca0e4a7e7357e0c81645"},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/controller/h.java", "lines": [107, 118, 122]},
-      {"path": "decompiled/nearby/sources/com/huawei/nearby/f.java", "lines": [54, 60]},
-      {"path": "catalog/manifests/HwNearbyCar.txt", "lines": [3, 35, 36, 72, 73]},
-      {"path": "system/etc/permissions/hicar-privapp-permissions-platform.xml", "sha256": "29685b61cf60882dfe122b2f98da204e258a322dd7fa02ae366d79a11aea847a"}
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/d/a.java",
+        "lines": [
+          63,
+          131,
+          219,
+          233,
+          464,
+          497,
+          500,
+          572,
+          622
+        ],
+        "sha256": "abc723f6ce6aea52edf6217c1b5f0782cb847bd3a5431839db8b58a5c5489b5a"
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/channel/p2p/l.java",
+        "lines": [
+          74,
+          82,
+          105
+        ],
+        "sha256": "be1c55eef945ddd642cd86b7924a77b438b4ac24d7c17b2026debf40396d63e1"
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/transfertype/resource/j.java",
+        "lines": [
+          110,
+          120,
+          124
+        ],
+        "sha256": "efb2a448429d24c96af0887966cbb57466081703f56de0c1f92098c448b054d4"
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/controller/NearbyController.java",
+        "lines": [
+          42,
+          319,
+          503,
+          616
+        ],
+        "sha256": "50e249464b8674037ae969fa8e4217d6ab64d38be9e9ca0e4a7e7357e0c81645"
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/controller/h.java",
+        "lines": [
+          107,
+          118,
+          122
+        ]
+      },
+      {
+        "path": "decompiled/nearby/sources/com/huawei/nearby/f.java",
+        "lines": [
+          54,
+          60
+        ]
+      },
+      {
+        "path": "catalog/manifests/HwNearbyCar.txt",
+        "lines": [
+          3,
+          35,
+          36,
+          72,
+          73
+        ]
+      },
+      {
+        "path": "system/etc/permissions/hicar-privapp-permissions-platform.xml",
+        "sha256": "29685b61cf60882dfe122b2f98da204e258a322dd7fa02ae366d79a11aea847a"
+      }
     ],
-    "pendingValidation": ["Permissions actually granted on device", "HiCar hotspot lifecycle and restore outcomes", "Reported IHU353G firmware and Settings UI behavior"]
+    "pendingValidation": [
+      "Permissions actually granted on device",
+      "HiCar hotspot lifecycle and restore outcomes",
+      "Reported IHU353G firmware and Settings UI behavior"
+    ]
   },
   "wiredCarPlayNetworkPolicy": {
     "updatedAt": "2026-10-14",
@@ -2561,7 +4306,16 @@
       "neighborReadTimeoutMillis": 250,
       "readOnly": true,
       "exportsAddressesOrDeviceIdentifiers": false,
-      "fields": ["interface_ownership_driver_and_state", "endpoint_matches_bind", "ipv6_address_flags", "proc_ipv6_routes", "neighbor_state_counts", "tcp_listener_and_handshake_counts", "rx_tx_counters_and_deltas", "iap2_start_to_tcp_and_session_timing"],
+      "fields": [
+        "interface_ownership_driver_and_state",
+        "endpoint_matches_bind",
+        "ipv6_address_flags",
+        "proc_ipv6_routes",
+        "neighbor_state_counts",
+        "tcp_listener_and_handshake_counts",
+        "rx_tx_counters_and_deltas",
+        "iap2_start_to_tcp_and_session_timing"
+      ],
       "unavailableSourceIsNotZero": true,
       "finalSnapshotIsCachedWithAge": true,
       "afterBuild57IntegrationFix": "Controller uses asynchronous per-line snapshots and USB listener TCP identity; host honors nonretryable failure",
@@ -2583,12 +4337,39 @@
     "evidenceLine": 31,
     "interface": "android.hardware.input.IInputManager.requestKeysInterception",
     "callback": "android.hardware.input.IKeyEventObserver.onKeyEvent(boolean,int)",
-    "hicarRequestedKeys": [298, 85, 86, 87, 88, 89, 90, 5, 6, 19, 20, 21, 22, 23],
-    "applicationRequestedKeys": [85, 87, 88, 298, 304, 305],
+    "hicarRequestedKeys": [
+      298,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      5,
+      6,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "applicationRequestedKeys": [
+      85,
+      87,
+      88,
+      298,
+      304,
+      305
+    ],
     "applicationPhysicalTrackRequest": {
       "updatedAt": "2026-10-14",
       "verification": "implementation_candidate_only_vehicle_validation_pending",
-      "standardOnlyFallbackOnRejection": [85, 87, 88, 298],
+      "standardOnlyFallbackOnRejection": [
+        85,
+        87,
+        88,
+        298
+      ],
       "physicalKeyMappingEvidence": "decompiled/adapter/sources/com/ecarx/xui/adaptapi/input/impl/KeyMapAdapterApi.java:94-97",
       "hicarSdkRequestsPhysicalTrackKeys": false,
       "blocksOemMediaBroadcastOnReportedIhu353g": "not_verified"
@@ -2605,11 +4386,33 @@
     "bytes": 10114868,
     "sha256": "5d19a5aa3f1c4f8b7f90ea18ee44b52e1e3b32ef748d6d9af5c86a1546506571",
     "methods": [
-      {"name": "InputManagerService.requestKeysInterception", "absoluteCodeOffset": 4701750, "registrationInstructionUnit": 9},
-      {"name": "KeyEventDispatcherUtil.dispatcherAllEvent", "absoluteCodeOffset": 4705458, "broadcastInstructionUnits": [2, 9, 15, 23]},
-      {"name": "KeyEventDispatcherUtil.dispatcherAllEventIgnoreIaService", "absoluteCodeOffset": 4705530},
-      {"name": "KeyEventDispatcherUtil.dispatcherMediaKey", "absoluteCodeOffset": 4705772},
-      {"name": "KeyEventDispatcherUtil.isLinkCarAppMediaFocus", "absoluteCodeOffset": 4704426}
+      {
+        "name": "InputManagerService.requestKeysInterception",
+        "absoluteCodeOffset": 4701750,
+        "registrationInstructionUnit": 9
+      },
+      {
+        "name": "KeyEventDispatcherUtil.dispatcherAllEvent",
+        "absoluteCodeOffset": 4705458,
+        "broadcastInstructionUnits": [
+          2,
+          9,
+          15,
+          23
+        ]
+      },
+      {
+        "name": "KeyEventDispatcherUtil.dispatcherAllEventIgnoreIaService",
+        "absoluteCodeOffset": 4705530
+      },
+      {
+        "name": "KeyEventDispatcherUtil.dispatcherMediaKey",
+        "absoluteCodeOffset": 4705772
+      },
+      {
+        "name": "KeyEventDispatcherUtil.isLinkCarAppMediaFocus",
+        "absoluteCodeOffset": 4704426
+      }
     ],
     "ordinaryObserverRegistrationGuaranteesExclusiveHandling": false,
     "dispatchBehavior": "Callback list broadcast plus OEM interactive-service and selected-link-app media-focus branches",
@@ -2627,7 +4430,10 @@
       "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVoiceAssistAction.java",
       "decompiled/input/sources/ecarx/xsf/inputservice/key/ECarXRVolumeAdjustActionBase.java"
     ],
-    "mediaPlayPause": { "key": 85, "applicationAction": "CarPlay play/pause HID" },
+    "mediaPlayPause": {
+      "key": 85,
+      "applicationAction": "CarPlay play/pause HID"
+    },
     "voiceButton": {
       "physicalKey": 298,
       "adapterKey": 200231,
@@ -2637,7 +4443,15 @@
       "echoFixDocumentation": "docs/WHEEL_ECHO_FIXES_2026-10-16.md",
       "voiceActionSourceSha256": "d060a3daef9ebc319bf03a33f62380602122f023b1aaf8649e31a8d8e93a62b6"
     },
-    "volume": { "physicalKeys": [301, 302], "applicationAction": "Private observer volume writes withdrawn after build 57: preserve vehicle handling; consumable standard keys choose system media/navigation stream by iPhone playing state, including idle guidance preadjustment; shared routes share system volume", "thirdPartyVolumeInterception": "exclusive_handling_not_established", "hicarVolumeInterception": "not_requested_in_reference_sdk" },
+    "volume": {
+      "physicalKeys": [
+        301,
+        302
+      ],
+      "applicationAction": "Private observer volume writes withdrawn after build 57: preserve vehicle handling; consumable standard keys choose system media/navigation stream by iPhone playing state, including idle guidance preadjustment; shared routes share system volume",
+      "thirdPartyVolumeInterception": "exclusive_handling_not_established",
+      "hicarVolumeInterception": "not_requested_in_reference_sdk"
+    },
     "hotwordObserver": "SDK implementation empty; not ported",
     "phoneDpadSeekMute": "not intercepted; preserve original vehicle actions"
   },
@@ -3309,5 +5123,1730 @@
     "apkBuilt": true,
     "applicationVersion": "0.1.1",
     "versionCode": 67
+  },
+  "public95InstrumentRendererResearch20261030": {
+    "documentation": "docs/PREFACE_AMAP_PUBLIC95_INSTRUMENT_PORT_2026-10-30.md",
+    "scope": "Continuation selected by user: port E02 instrument to supplied public9.5 using only existing materials and stock327; static research, not a renderer implementation",
+    "noAdditionalPluginAvailablePerUser": true,
+    "inputApkSha256": {
+      "stockApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+      "public95ApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00"
+    },
+    "largeLibraryLoadWitness": {
+      "path": "agent_docs/instrument-navigation-amap-success-20261029/mobilelog/APLog_2026_1029_164734__24/main_log_2__2026_1029_175218",
+      "sha256": "69bc275d525b7a38f069e692fd8baf6258d9302457774b6de86aa1cd8500441b",
+      "lines": [
+        175194,
+        175206,
+        175208
+      ],
+      "loadedLibrary": "InstrumentPannelLarge",
+      "loadResult": 1,
+      "libraryLoadAloneIsNotReadiness": true
+    },
+    "stockE02Adapter": {
+      "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/business/devices/factory/preassemble/geely/beidou/BeidouFS11A1InteractionImpl.java",
+      "sha256": "9d5c6ba2e5a2017ad821e4d31c7f3a274b0141e38e6018c7588c399b88136e1b",
+      "channel": "C04010181178",
+      "startupMultiScreenConfigurationValue": 7
+    },
+    "largeWindowConfiguration": {
+      "stock327E02": {
+        "sha256": "eb67240c5cab97615b78efa2f411854626b74e3c12c4aa75b93fb38e9be86fe6",
+        "surface": {
+          "SurfaceWidth": 1920,
+          "SurfaceHeight": 720,
+          "IsSeparateRender": 1,
+          "SurfaceRenderType": 1,
+          "WindowId": 1001,
+          "EGLAlphaSize": 8,
+          "RemoveSurface": 0,
+          "CreateSurfaceWhenInit": 1,
+          "IsMainScreenForegroundStopRender": 0
+        },
+        "modes": [
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1920,
+              "MapHeight": 720,
+              "UiWidth": 0,
+              "UiHeight": 0,
+              "Fps": 6,
+              "Dpi": 166
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1920,
+              "MapHeight": 720,
+              "UiWidth": 0,
+              "UiHeight": 0,
+              "Fps": 6,
+              "Dpi": 166
+            }
+          }
+        ]
+      },
+      "public95Default": {
+        "sha256": "0d416566ee7d35545dfed95164a5ad2b0e35aa8ce043bbd6adb9edc39dbd1dd5",
+        "surface": {
+          "SurfaceWidth": 1024,
+          "SurfaceHeight": 524,
+          "IsSeparateRender": 0,
+          "SurfaceRenderType": 0,
+          "WindowId": 1001,
+          "EGLAlphaSize": 8
+        },
+        "modes": [
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": -1,
+              "MapHeight": -1,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": -1,
+              "MapHeight": -1,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Preview": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": -1,
+              "MapHeight": -1,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            }
+          },
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1020,
+              "MapHeight": 523,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1020,
+              "MapHeight": 523,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            }
+          },
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1920,
+              "MapHeight": 524,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 0,
+              "MapWidth": 1920,
+              "MapHeight": 524,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            }
+          },
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": 440,
+              "MapHeight": 410,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": 440,
+              "MapHeight": 410,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            }
+          },
+          {
+            "Cruise": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": 1452,
+              "MapHeight": 496,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            },
+            "Guide": {
+              "IsMapVisiable": 1,
+              "IsUiVisiable": 1,
+              "MapWidth": 1452,
+              "MapHeight": 496,
+              "UiWidth": -1,
+              "UiHeight": -1,
+              "Fps": 6,
+              "Dpi": 240
+            }
+          }
+        ]
+      },
+      "stock327ReferenceIsNotAnActual169ConfigurationReadback": true,
+      "configurationCopiedOrEnabled": false
+    },
+    "newNativeImportCheck": {
+      "publicNativeEntries": 63,
+      "parsedEntries": 59,
+      "unparsedEntries": [
+        {
+          "entry": "lib/arm64-v8a/libcmb_WechatBindPackage.so",
+          "sha256": "726134ecf4be0f3e088cb24dfbca45e20617cf064ccb7c18a77d6ff8a4b8e261",
+          "reason": "ELF range outside the input"
+        },
+        {
+          "entry": "lib/arm64-v8a/libsgmain.so",
+          "sha256": "396d9cda681f28ff2f92ae68c329f0967d27cb51dcdb3b3d33f38b0af1fe1921",
+          "reason": "Expected a little-endian ELF64 file"
+        },
+        {
+          "entry": "lib/arm64-v8a/libsgmainso-6.7.260202.so",
+          "sha256": "7d2ae8a83d8b0e567805079b68f876397341330d3efbd2b86c5d957863843400",
+          "reason": "ELF range outside the input"
+        },
+        {
+          "entry": "lib/arm64-v8a/libsgmainso.version.so",
+          "sha256": "ec25ccafe8896e3b55a4ccd014790a7b98f6c2274822035aaeb4222a8c252a71",
+          "reason": "Expected a little-endian ELF64 file"
+        }
+      ],
+      "strongCxxNamesAbsentFromParsedExportUnion": 55,
+      "previouslyListedNames": 54,
+      "additionalRttiImport": "_ZTIN9GNS_FRAME16CGUIRunnableBaseE",
+      "notARuntimeLinkerResult": true,
+      "exportsAreNotAbiProof": true
+    },
+    "tbtCandidate": {
+      "coreSha256": "4e4283da68f12e546508357dc6adefe6f275a9e62f795cff5e71acc8558143c4",
+      "coreGnuBuildIds": [
+        "d99d7b71c32fc84fc612dc58f9ccb3084320b101"
+      ],
+      "frameSha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466",
+      "frameGnuBuildIds": [
+        "4771f6aa70ef0f19413514db07cd726a20b03330"
+      ],
+      "startupExportPresent": true,
+      "exitExportPresent": true,
+      "matchingResourceLibraryPresent": true,
+      "dropInReplacementEstablished": false,
+      "missingWork": [
+        "external-frame map renderer and real render completion",
+        "E02 actual Display/Surface lifecycle and teardown",
+        "existing JSON preparation chain driven by real callbacks"
+      ]
+    },
+    "tbtStartupReturnNotAReadinessSignal": true,
+    "oldLargeOwnsRenderEndCallbackAndUnregistersOnExit": true,
+    "endCallbackUsesOldAsyncTaskAbi": true,
+    "nativeEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock-large-register-render-end.txt",
+        "sha256": "9a8073da3c8f3b9c37ec6c2fb07ceeac68a7734410e1604ae77cb338e00aab58",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "virtualStart": "0x3c3d4",
+        "virtualEndExclusive": "0x3c404"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock-large-unregister-render-end.txt",
+        "sha256": "645c3b69779899c4e97786ca24631b2557e71129e4f864d3d53105adf1a2582a",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "virtualStart": "0x428b4",
+        "virtualEndExclusive": "0x428d4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock-large-render-end-task.txt",
+        "sha256": "2d49255700dcc48362dd2e3662ea94b5448bed9f3f6172ab0fee154c79dc24a7",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "virtualStart": "0x3dfd8",
+        "virtualEndExclusive": "0x3e13c"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock-large-render-status-notify.txt",
+        "sha256": "413b629f881f1ff2c6f8706086afeaba0b859ec44b525d925c60e072e4567cba",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "virtualStart": "0x2c5e0",
+        "virtualEndExclusive": "0x2c6b4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-tbt-lifecycle.txt",
+        "sha256": "a69c9589b8212f635c690f69eceba11ea2d19ccecdfa88436229031aed94003a",
+        "inputSha256": "4e4283da68f12e546508357dc6adefe6f275a9e62f795cff5e71acc8558143c4",
+        "virtualStart": "0xd2514c",
+        "virtualEndExclusive": "0xd252b4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-plugin-start-call.txt",
+        "sha256": "3f82953e762ef525d4f12613cdb60802f7962689ee620bc60b5db9740e7414c3",
+        "inputSha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466",
+        "virtualStart": "0x4ea5ec",
+        "virtualEndExclusive": "0x4ea610"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-current-frame-tls.txt",
+        "sha256": "a902f34b6ee0c7f381cc4fedfa8d0826c5c37ff966a06f3ce0bf292ca3b6bd94",
+        "inputSha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466",
+        "virtualStart": "0x4deee0",
+        "virtualEndExclusive": "0x4def18"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-package-start-exit-ui.txt",
+        "sha256": "7e6e114b5c40c79338b85f14edf69095a9d813b234b3f474e590d694960df7e3",
+        "inputSha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466",
+        "virtualStart": "0x3fce80",
+        "virtualEndExclusive": "0x3fd3fc"
+      }
+    ],
+    "analysisTool": "scripts/amap95_instrument_analysis.py",
+    "localReport": "agent_docs/amap-public95-instrument-20261030/renderer-contract.json",
+    "focusedPythonTests": {
+      "file": "scripts/tests/test_amap95_instrument_analysis.py",
+      "passed": 6
+    },
+    "renderingBridgeImplemented": false,
+    "apkModifiedBuiltSignedOrInstalled": false,
+    "carplayCodeVersionOrSignatureChanged": false,
+    "realDisplaySurfaceRenderAndJsonLifecycleStillRequired": true,
+    "noFakeReadyFrameOrVehiclePropertyWrite": true,
+    "vehicleValidationPerformed": false
+  },
+  "public95InstrumentObserverBridge20261030": {
+    "documentation": "docs/PREFACE_AMAP_PUBLIC95_INSTRUMENT_PORT_2026-10-30.md",
+    "sourceDirectory": "amap95-instrument",
+    "scope": "Original observer bridge source only; supplied public9.5, Xingrui E02, no complete renderer or APK integration",
+    "public95ApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+    "stock327ApkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+    "consumerHslSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+    "consumerHslGnuBuildIds": [
+      "71b0534ad0e68635f46cd19c669e1ec6686f63c7"
+    ],
+    "consumerObserverCallbacks": [
+      {
+        "event": "DeviceCreated",
+        "virtualOffset": "0x10",
+        "callSiteLoadAddress": "0xc1b3b4",
+        "int32Arguments": [
+          "deviceId"
+        ]
+      },
+      {
+        "event": "DeviceDestroyed",
+        "virtualOffset": "0x18",
+        "callSiteLoadAddress": "0xc1b5c8",
+        "int32Arguments": [
+          "deviceId"
+        ]
+      },
+      {
+        "event": "SurfaceCreated",
+        "virtualOffset": "0x20",
+        "callSiteLoadAddress": "0xc1bb44",
+        "int32Arguments": [
+          "deviceId",
+          "width",
+          "height",
+          "colorBits"
+        ]
+      },
+      {
+        "event": "SurfaceDestroyed",
+        "virtualOffset": "0x28",
+        "callSiteLoadAddress": "0xc1beb4",
+        "int32Arguments": [
+          "deviceId",
+          "width",
+          "height",
+          "colorBits"
+        ]
+      },
+      {
+        "event": "SurfaceChanged",
+        "virtualOffset": "0x30",
+        "callSiteLoadAddress": "0xc1ce5c",
+        "int32Arguments": [
+          "deviceId",
+          "width",
+          "height",
+          "colorBits"
+        ]
+      },
+      {
+        "event": "DeviceRender",
+        "virtualOffset": "0x38",
+        "callSiteLoadAddress": "0xc1d3e8",
+        "int32Arguments": [
+          "deviceId",
+          "renderStatus"
+        ]
+      },
+      {
+        "event": "EglDoRender",
+        "virtualOffset": "0x40",
+        "callSiteLoadAddress": "0xc1d7ac",
+        "int32Arguments": [
+          "deviceId"
+        ]
+      }
+    ],
+    "vendorObjectLayoutOrMapParametersReproduced": false,
+    "implementation": {
+      "immutableSessionAndDevice": true,
+      "primaryDeviceRejected": true,
+      "rawStatusPreserved": true,
+      "deviceAndSurfaceDestructionRetireLease": true,
+      "waitForActiveCallbackOnDeactivate": true,
+      "reentrantDeactivation": true,
+      "sdkRegisterAndUnregisterNotYetIntegrated": true,
+      "noReadinessInferredOrPublished": true
+    },
+    "sourceFiles": [
+      {
+        "path": "amap95-instrument/native/MapServiceObserverBridge.h",
+        "sha256": "3bf76f72ab8fd4e8b76159caf2baa4dbe5813ee5eae675c89e6322fddbdab4e9"
+      },
+      {
+        "path": "amap95-instrument/native/MapServiceObserverBridge.cpp",
+        "sha256": "5310200b42baf48618fa9d14c79dda6fd516413e4a12d59667c3c79a53577b88"
+      },
+      {
+        "path": "amap95-instrument/native/MapServiceObserverBridgeTest.cpp",
+        "sha256": "0ee9fc993b85d33fd93c5fb5e9ca6b670760c5fdcfc82913aab013e62401c3be"
+      }
+    ],
+    "arm64Compilation": {
+      "ndk": "28.2.13676358",
+      "target": "aarch64-linux-android28",
+      "flags": [
+        "-std=c++17",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-O2"
+      ],
+      "passed": true,
+      "vtableBytes": 88,
+      "functionSlots": 9
+    },
+    "nativeUnitTest": {
+      "device": "emulator-5554",
+      "api": 34,
+      "executionArchitecture": "x86_64",
+      "groupsPassed": 5,
+      "usesIndependentCallbackDispatcherFixture": true,
+      "actualVendorSdkExecuted": false,
+      "actualMapCreated": false,
+      "temporaryRemoteExecutableRemoved": true,
+      "stdout": "Observer bridge: ABI fixture, identity, raw fields and teardown checks passed (no vendor SDK executed)"
+    },
+    "pythonChecksPassed": 9,
+    "localArtifacts": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/observer-bridge-test/MapServiceObserverBridge-arm64.o",
+        "sha256": "f6ce408a1fddd3a0c7e23c01f28f7a6ac50effd6a96aa11e9a5360b8ebdb9563"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/observer-bridge-test/observer-bridge-unit-x86_64",
+        "sha256": "98f45dd99d131c486559476eb491793e53d9569fefb86e2bb2ef37e38ac959bb"
+      }
+    ],
+    "entryPointReview": {
+      "isDeviceRendered": {
+        "functionSha256": "573003beab44c851683ae309809cdd76ecef40776c383ccca091daa2048d0288",
+        "instructionCount": 5,
+        "truthTable": [
+          {
+            "deviceArgument": 0,
+            "mainFlag": 0,
+            "returns": false
+          },
+          {
+            "deviceArgument": 0,
+            "mainFlag": 1,
+            "returns": true
+          },
+          {
+            "deviceArgument": 1,
+            "mainFlag": 0,
+            "returns": false
+          },
+          {
+            "deviceArgument": 1,
+            "mainFlag": 1,
+            "returns": false
+          },
+          {
+            "deviceArgument": 1001,
+            "mainFlag": 0,
+            "returns": false
+          },
+          {
+            "deviceArgument": 1001,
+            "mainFlag": 1,
+            "returns": false
+          }
+        ],
+        "secondaryDeviceFirstFrameCheckSupported": false
+      },
+      "getDisplay": {
+        "functionSha256": "5f2429192abcd965321d1bc0f2717b3cdd46b5c6f88e586fa241281972dd6ec8",
+        "returnsNullInPinnedBinaryByManualControlFlowReview": true,
+        "notAnAvailableDisplayFactory": true
+      },
+      "initMapView": {
+        "nullParameterPathReadsPrimarySurfaceSize": true,
+        "primarySurfaceSizeCallVirtualAddress": "0xc12bd0",
+        "externalMapViewParamConstructionRecovered": false,
+        "secondScalarArgumentSemanticsNotEstablished": true,
+        "notInvokedWithGuessedArguments": true
+      },
+      "noReadyPublishedByThisAnalysis": true
+    },
+    "nativeEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-get-display-stub.txt",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "sha256": "7b6ca2201593f040a29618063661a79ad88b3fdb4d36056efa47a74000106091",
+        "virtualStart": "0xc1f018",
+        "virtualEndExclusive": "0xc1f09c"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-is-device-rendered.txt",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "sha256": "3f5e31a738686f1764571560c3624a6b8d20e2698e7c67d4cfdc0be91b52c2b3",
+        "virtualStart": "0xc1d2a0",
+        "virtualEndExclusive": "0xc1d2b4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-null-map-parameter.txt",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "sha256": "7687a1ee54d7349c201aea083d9d592a6ff4292713799471f49fbcb88e1f5eab",
+        "virtualStart": "0xc12af4",
+        "virtualEndExclusive": "0xc12c54"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-device-observer-remove.txt",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "sha256": "32ad2cc170b3f63e9ad3424388bd5c6ac4b9ebee411f8bc0ed645420909590b2",
+        "virtualStart": "0xc186a0",
+        "virtualEndExclusive": "0xc187b0"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-device-render-observer.txt",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "sha256": "85f93a7d99e79f1678b9e34b7e0e7ec2f58b01fc3aa14abcf9707ed8ed6e5a78",
+        "virtualStart": "0xc1d2b4",
+        "virtualEndExclusive": "0xc1d70c"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock327-render-end-logo-task.txt",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "sha256": "bb95f52c267f95d566cc4c178a2980f6272a2ca566260b485c80eb28f6819ee5",
+        "virtualStart": "0x426f8",
+        "virtualEndExclusive": "0x428d4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock327-error-render-status.txt",
+        "inputSha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4",
+        "sha256": "2a3001a5eb1f15086542912c42b7e88672a74551cb8824d5edc0770b178f0447",
+        "virtualStart": "0x2c550",
+        "virtualEndExclusive": "0x2c6b4"
+      }
+    ],
+    "mapViewParameterBuilderImplemented": false,
+    "mapRendererImplemented": false,
+    "apkChangedBuiltSignedOrInstalled": false,
+    "carplayRuntimeChanged": false,
+    "vehicleDisplayVerified": false
+  },
+  "public95ObserverLifecycle20261030": {
+    "documentation": "docs/PREFACE_AMAP_PUBLIC95_INSTRUMENT_PORT_2026-10-30.md",
+    "implementationReadme": "amap95-instrument/README.md",
+    "scope": "Observer binding/registration/lifetime implementation only; not an instrument renderer or completed port",
+    "stockReference": {
+      "firmware": "IHU519G/FS11A1/327",
+      "otaSha256": "f61a7399d61a7f4502b9289ea6c49c661c39c459aae81e676722bcf9be913c01",
+      "apkSha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc",
+      "actual169NotAssumedEquivalent": true
+    },
+    "public95ApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+    "bindingContract": {
+      "moduleSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+      "gnuBuildId": "71b0534ad0e68635f46cd19c669e1ec6686f63c7",
+      "functionSha256": {
+        "_ZN3hsl3HSL19GetMapServiceHandleEv": "794e5c645bcf619882f8d9380913c9b3bcfaa5baa53a31468ce0c3a31d85c9f1",
+        "_ZN3hsl3HSL16GetMapViewHandleEN2bl11MapEngineIDE": "c40626366738deb3998238f89c37c55b1a5f5f1546590dda6abd2dfafe846a77",
+        "_ZN3hsl15MapViewBaseImpl11GetEngineIdEv": "851e70c9f060cfdecbdb5018177a656fa3f591b71d60633832995b6b9d4fa9e9",
+        "_ZN3hsl15MapViewBaseImpl11GetDeviceIdEv": "aa3a1df887edbf9ffba5be76adcffb174a050d4547d60470327c723f41723ee0",
+        "_ZN3hsl18MultiScreenService11GetWindowIdEN2bl11MapEngineIDE": "f7f1044b84cb9b8f6814ebc33d17f976b2b14be4b994a39833ef59ac3702b3a7",
+        "_ZN3hsl18MapViewServiceImpl17SetDeviceObserverEPNS_19IMapServiceObserverE": "7171b8687ded385b3be21884dfa4a2c9819545c76ee2af9a7244e7ca2452c999",
+        "_ZN3hsl18MapViewServiceImpl20RemoveDeviceObserverEPNS_19IMapServiceObserverE": "f39191db718f80d52ce99cc04f613449ce09f34f3b539932c9dc6c2772760b2c"
+      },
+      "borrowedSingletonSymbol": "_ZN3hsl18MultiScreenService10s_instanceE",
+      "noSdkStartupOrGetMapEngineIdCall": true,
+      "windowMustBe1001AndActualDeviceMustBeNonPrimary": true,
+      "registrationDoesNotPublishReady": true
+    },
+    "sourceSha256": {
+      "amap95-instrument\\native\\ForeignHslFixture.cpp": "cc26e90f68ee3eddd851290d399b9f3a023521b910a9f7046755ea152eb20769",
+      "amap95-instrument\\native\\MapServiceObserverBridge.cpp": "5cc6112811f01bf97d10b0532c34b247a626eefd75b94da82be30488695b2f3c",
+      "amap95-instrument\\native\\MapServiceObserverBridge.h": "2e48d280350f4431c156a9a8b68755fb7e6efb3e4682f4adf043bde2756e56d1",
+      "amap95-instrument\\native\\MapServiceObserverBridgeTest.cpp": "e8f52bb1e47b5ae8b2b4e68ef1b3de313d1942b40af8aa5eee37073e3a637c1b",
+      "amap95-instrument\\native\\ObserverSession.cpp": "223df58b81eaa4a19be29587d7841b4ac2b1f89dbffdc019c8414955dcf1db2d",
+      "amap95-instrument\\native\\ObserverSession.h": "8591cb5349fb331ceabecb16bceab1a7d78100763090e8432c8f81577242f841",
+      "amap95-instrument\\native\\ObserverSessionTest.cpp": "a6769965c933a288d3ab7faa128a1005070b491b2821b2208acffc105c28f15f",
+      "amap95-instrument\\native\\PinnedHslApi.cpp": "f9193b0a24f1c3108f602dad8153a80b75cea4e99c41fa5fb041c1b83c00c609",
+      "amap95-instrument\\native\\PinnedHslApi.h": "f4363c6b2fb57dbe2a7b3aacd5e6d6914c18d5ae65ed3d722855761156d8097e"
+    },
+    "toolSourceSha256": {
+      "scripts/amap95_instrument_analysis.py": "d35043bdf58cf4bcd1ccc7a9f42399bef0efe7e20216e311b7e4c87d66104344",
+      "scripts/verify_amap95_observer.py": "4bec5d2998134e740969acdf51a9142c8929f73482ee90756fefbe7b3772cb82",
+      "scripts/tests/test_amap95_instrument_analysis.py": "b37436a9065c56501c0e87b2e2b25f0a62338ce63c26cce415bcf5c8a6ba18e5"
+    },
+    "borrowedHandlePreconditions": {
+      "mapAlreadyCreated": true,
+      "mapAndServiceKeptAliveByWindowOwner": true,
+      "identityInspectionOnWindowLifecycleThread": true,
+      "engineFromCreationResultNotWindowNumber": true,
+      "nonPrimaryEglDevice": true,
+      "reverseLookupWindow": 1001
+    },
+    "lifetimeBehavior": [
+      "RTLD_NOLOAD and mapped image identity checks before binding",
+      "pending observer registration, identity recheck and owner handle publication before arming",
+      "pending destruction/stop retires lease without replaying past render events",
+      "deactivate and wait before SDK removal, then free bridge and library reference",
+      "SDK callback removal deferred; caller retains handle until callback-free close succeeds",
+      "remove only this observer, preserve others"
+    ],
+    "primaryBaseRtti": [
+      {
+        "typeInfoSymbol": "_ZTIN3hsl15MapViewBaseImplE",
+        "typeInfoVirtualAddress": "0xd48d30",
+        "firstBase": "N3hsl11MapViewBaseE",
+        "firstBaseOffset": 0,
+        "baseFlags": 2
+      },
+      {
+        "typeInfoSymbol": "_ZTIN3hsl18MapViewServiceImplE",
+        "typeInfoVirtualAddress": "0xd7e868",
+        "firstBase": "N3hsl15IMapViewServiceE",
+        "firstBaseOffset": 0,
+        "baseFlags": 2
+      }
+    ],
+    "newNativeEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-observer-binding-getters.txt",
+        "sha256": "61e4a6b9adf384cff89501ce7202d37da5710b0522463be8b692cc33d7f8da10",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xbce73c",
+        "virtualAddressEndExclusive": "0xbce874"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-identity-getters.txt",
+        "sha256": "56022efdb5242090a4c8da6abc344d9d8766f81cccb8be9bc71bd05c77b527d0",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0x574ce4",
+        "virtualAddressEndExclusive": "0x574cf4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-window-reverse-lookup.txt",
+        "sha256": "ecc3d4263a2136eb0312750a4c99d43c3aaba4e07762835d1bfef1e9e49a037a",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc97f70",
+        "virtualAddressEndExclusive": "0xc97fd8"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-window-engine-lookup.txt",
+        "sha256": "df0a633d2a671e37a29886cad5974648d27a77b8e9c14540f867c8a8d1260448",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc97e40",
+        "virtualAddressEndExclusive": "0xc97f70"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-module-init.txt",
+        "sha256": "b0495409cf4be524967a5e34bcfa7304c9a720f11b6170613689b25390bb6ec7",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xb7fb24",
+        "virtualAddressEndExclusive": "0xb7fdc4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-create-forward.txt",
+        "sha256": "efbac80fbac74b457f5709980db3dfbb1e2d6e7fb671ae1661fb983fc2e8ccc1",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc17f34",
+        "virtualAddressEndExclusive": "0xc180c4"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-default-surface-call.txt",
+        "sha256": "089262709f7720f719519aad82242b499a03e835ffae8670b4b313aa5d1c6f73",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc13004",
+        "virtualAddressEndExclusive": "0xc13028"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-android-surface.txt",
+        "sha256": "45540b21d5283525d2e8e600077cfd0f532317c62dcf3ff60b03d058e6e7351f",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc10a98",
+        "virtualAddressEndExclusive": "0xc10c38"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-map-render-cache.txt",
+        "sha256": "a32c1846f190f96b2e39bc46cf0d1da67f3c0ef678c8024ea6dca6fa00995ccd",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc9907c",
+        "virtualAddressEndExclusive": "0xc991d0"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-device-observer-add.txt",
+        "sha256": "c296a55d258323bd19338e4bad0a8429c270ac917955fbb49bfb746a38a1ca61",
+        "inputSha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83",
+        "virtualAddressStart": "0xc184a0",
+        "virtualAddressEndExclusive": "0xc186a0"
+      }
+    ],
+    "defaultCreationReview": {
+      "nullParameterPathReadsPrimarySurfaceSize": true,
+      "primarySurfaceSizeCallVirtualAddress": "0xc12bd0",
+      "externalMapViewParamConstructionRecovered": false,
+      "secondScalarArgumentSemanticsNotEstablished": true,
+      "notInvokedWithGuessedArguments": true,
+      "creationCallSha256": "b260a8ea33a01b5072b66dbe7c42f7f22e492230e54cc90cff2afd93c16bf3cc",
+      "firstScalarPassedToCreationVirtualSlot0x48": 0,
+      "creationCallVirtualAddress": "0xc13024"
+    },
+    "mapEngineLookupReview": {
+      "firstLookupRejectsMissingWindowInStableTable": true,
+      "insertionBranchStillPresent": true,
+      "notCalledByObserverSession": true
+    },
+    "arm64Compilation": {
+      "ndkVersion": "28.2.13676358",
+      "api": 28,
+      "productionObjectCount": 3,
+      "warningsAsErrors": true,
+      "testFactoryNotInProductionBuild": true
+    },
+    "nativeUnitTests": {
+      "device": "emulator-5554",
+      "androidApi": "34",
+      "architecture": "x86_64",
+      "bridgeOutput": "Observer bridge: ABI fixture, identity, raw fields and teardown checks passed (no vendor SDK executed)",
+      "sessionOutput": "Observer session: 8 lifecycle/identity/loaded-library fixture groups passed; no vendor SDK or map executed",
+      "bridgeGroups": 6,
+      "sessionGroups": 8,
+      "vendorSdkExecuted": false,
+      "mapCreated": false
+    },
+    "temporaryDeviceFilesRemoved": true,
+    "pythonFocusedChecks": {
+      "command": "python -m unittest discover -s scripts/tests -p test_amap95_instrument_analysis.py -v",
+      "testsPassed": 11,
+      "exitCode": 0,
+      "fullCarPlayCi": false
+    },
+    "verificationArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/lifecycle-test/verification.json",
+      "sha256": "feddefc00e2173d66e4a183a2306a2b680d094cb406251391f06191fb24d554f"
+    },
+    "assessmentArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/lifecycle-test/lifecycle-assessment.json",
+      "sha256": "4206934567242ac6edd07704097eb5e2ad63392ec930586158935aa847ced18a"
+    },
+    "matchedVendorBindingExecuted": false,
+    "vendorMapCreated": false,
+    "mapRendererImplemented": false,
+    "portReady": false,
+    "vehicleVerified": false,
+    "sourceScope": {
+      "carPlayBehaviorChanged": false,
+      "publicAmapApkChanged": false,
+      "additionalApkCreated": false,
+      "readyOr116Published": false,
+      "vehiclePropertyWritten": false
+    },
+    "remainingWork": [
+      "version-matched MapViewParam construction",
+      "real E02 window owner, Display/Surface and map renderer",
+      "real completion to existing JSON preparation chain",
+      "modified APK integration and vehicle display validation"
+    ]
+  },
+  "public95VendorRuntime20261030": {
+    "scope": "327 static reference and fixed public 9.5 native probes; not actual 169 instrument validation",
+    "inputApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+    "sourceFiles": [
+      {
+        "path": "amap95-instrument/native/VendorRuntimeProbe.cpp",
+        "sha256": "5c9265b3f35b3d16cf453b6c314e75312c26aeccf83a422b27d7c6745af57e27"
+      },
+      {
+        "path": "scripts/verify_amap95_vendor_runtime.py",
+        "sha256": "99f81bd9ebff6d99ed01d57ca8ec2c3e8b466f5be4270d4865ced7b2975496c9"
+      }
+    ],
+    "verificationArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/vendor-runtime-test/verification.json",
+      "sha256": "f60b46b2edf00a7a607231069d4cf58c8687b18378db75e3971aed48c13f75ce"
+    },
+    "runArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/vendor-runtime-test/run.json",
+      "sha256": "8872d296994e22f77ec008b4b71b78bff18f038bd7bcd808d812f8ca6d3d68a7"
+    },
+    "realLibraryCount": 26,
+    "runtime": {
+      "device": "emulator-5554",
+      "androidApi": 34,
+      "kernelArchitecture": "x86_64",
+      "runner": [
+        "/system/bin/houdini64"
+      ],
+      "probes": [
+        {
+          "probe": "hsl",
+          "exitCode": 0,
+          "stdout": "VENDOR_LOAD_BEGIN\nVENDOR_HSL_LOADED\nBIND_RESULT: HSL_EXPORTS_BOUND\nVENDOR_MAP_SERVICE_ABSENT\nBINDING_WRAPPER_RELEASED\nNO_ENGINE_INITIALIZATION_OR_RENDER_EXECUTED\n",
+          "stderr": ""
+        },
+        {
+          "probe": "tbt",
+          "exitCode": 0,
+          "stdout": "VENDOR_LOAD_BEGIN\nVENDOR_AUTONAVI_LOADED\nBIND_RESULT: HSL_EXPORTS_BOUND\nVENDOR_MAP_SERVICE_ABSENT\nTBT_ENTRYPOINTS_RESOLVED_NOT_INVOKED\nBINDING_WRAPPER_RELEASED\nNO_ENGINE_INITIALIZATION_OR_RENDER_EXECUTED\n",
+          "stderr": ""
+        }
+      ],
+      "realVendorLibrariesLoaded": true,
+      "matchedHslBindingExecuted": true,
+      "matchedHslServiceGetterExecuted": true,
+      "tbtStartupInvoked": false,
+      "sdkTeardownTested": false,
+      "processExitPolicy": "_exit after releasing the binding wrapper"
+    },
+    "staticEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/stock327-large-map-create.txt",
+        "sha256": "bf7fd78b1d7e0fedb5b1216cee2cfb813c8fd02699bf910b195540c1fd4783c1",
+        "input": {
+          "path": "agent_docs/instrument-navigation-amap-success-20261029/stock327-modules/lib/arm64-v8a/libInstrumentPannelLarge.so",
+          "sha256": "f7e9c3435ec893d0615674a72391a1ec7693679ae6dd52f7b8bf346560da67c4"
+        },
+        "virtualAddressStart": "0x3cd0c",
+        "virtualAddressEndExclusive": "0x3dad0"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-hsl-service-getter.txt",
+        "sha256": "f3727b9986b5de73f16c9035eb473175cf936296cf9fd892e660aff2a2a6cc01",
+        "input": {
+          "path": "agent_docs/amap-public95-instrument-20261030/native/libhsl.so",
+          "sha256": "cff6ed0c9c95ecc6b48502854ffcd65be1746c23a1e448a7f085542fb9926a83"
+        },
+        "virtualAddressStart": "0xbce73c",
+        "virtualAddressEndExclusive": "0xbce7d0"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-cg-mapview-init.txt",
+        "sha256": "8117c32c106faeb18be1452004d5ce821e712b60792051a5e87fec5916795321",
+        "input": {
+          "path": "agent_docs/amap-public95-instrument-20261030/native/libautonavi.so",
+          "sha256": "4e4283da68f12e546508357dc6adefe6f275a9e62f795cff5e71acc8558143c4"
+        },
+        "virtualAddressStart": "0xbb6900",
+        "virtualAddressEndExclusive": "0xbb7500"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-frame-render-notification.txt",
+        "sha256": "fe7494250ee0ccc235f1774d6f346454d901ff9d2afb2b4e2d9bf80977b92a45",
+        "input": {
+          "path": "agent_docs/amap-public95-instrument-20261030/native/libGFrame.so",
+          "sha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466"
+        },
+        "virtualAddressStart": "0x4e1958",
+        "virtualAddressEndExclusive": "0x4e1b00"
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/native/public95-ui-draw-frame.txt",
+        "sha256": "863c0380a1fc0929d080978bffe397414879c5d6eb7e460391c1a0c9fa076740",
+        "input": {
+          "path": "agent_docs/amap-public95-instrument-20261030/native/libGFrame.so",
+          "sha256": "e5cd2255b13de9d195e1a3599b7e370a09a824570533d097eae40e9f299e7466"
+        },
+        "virtualAddressStart": "0x2d8d58",
+        "virtualAddressEndExclusive": "0x2da5b0"
+      }
+    ],
+    "initialUnloadAttempt": {
+      "artifact": {
+        "path": "agent_docs/amap-public95-instrument-20261030/vendor-load-test/vendor-runtime.txt",
+        "sha256": "4e04bbc51d0c47a05b3e63be506474a6971221144cf522f89a43d42bf052dd50"
+      },
+      "exitCode": 139,
+      "bindingWrapperReleasedBeforeUnload": true,
+      "fullVendorSdkInitializationPerformed": false,
+      "crashOriginNotEstablished": true
+    },
+    "probeScope": {
+      "mapCreated": false,
+      "sdkInitialized": false,
+      "tbtStartupInvoked": false,
+      "tbtUiPackageLoaded": false,
+      "sdkTeardownVerified": false,
+      "readyOr116Published": false,
+      "apkChanged": false,
+      "vehicleVerified": false
+    },
+    "portReady": false,
+    "remainingWork": [
+      "version-matched secondary MapViewParam construction and map creation",
+      "real E02 Display/Surface and window owner",
+      "verified render completion to original JSON preparation path",
+      "APK integration, startup and vehicle display validation"
+    ],
+    "assessmentArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/vendor-runtime-test/assessment.json",
+      "sha256": "ac922144ce310c7bf97c95422d943e45430aaeac4eb796504f9a6395ef951e42"
+    }
+  },
+  "public95NativeHintsCandidate20261030": {
+    "scope": "User-authorized Android native navigation hints in the supplied working modified AMap9.5; 327 reference, actual169 instrument not validated",
+    "documentation": "docs/PREFACE_AMAP95_NATIVE_HINTS_TEST_2026-10-30.md",
+    "sourceApkSha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+    "userSelectedHintOnlyFirstVersion": true,
+    "userExplicitlyAuthorizedBuildAndInstall": true,
+    "sourceFiles": [
+      {
+        "path": "amap95-instrument/java/Preface95FrameGate.java",
+        "sha256": "86189cbfa0c89dc0a30594d16949c11e9c716ee192a2d124f5009137c42bcd5a"
+      },
+      {
+        "path": "amap95-instrument/java/Preface95Guidance.java",
+        "sha256": "1ddd2481225dcebe8eabe9e9f4b32d0163c3bc4b4dadec20dda58bb203ffc622"
+      },
+      {
+        "path": "amap95-instrument/java/Preface95HintScreen.java",
+        "sha256": "a0f986b934ea2f857ca4db7fa310f6d230e1c935d6d1a18a7beed91e619be011"
+      },
+      {
+        "path": "amap95-instrument/java/Preface95NativeHints.java",
+        "sha256": "76d5adc1888cb0ec439049c112e8828965dae30f90e30615c00558134d376d87"
+      },
+      {
+        "path": "amap95-instrument/java/Preface95StartupTrace.java",
+        "sha256": "16aa6981c31aef09c0de60fe25cce6edb48202b2eaf77e94a5ce1bfca210863c"
+      },
+      {
+        "path": "amap95-instrument/tests/Preface95ArtLinkTest.java",
+        "sha256": "ff25c474deffd4514a4421df6bbe929781ca2a07db7dd35f849d67279154681a"
+      },
+      {
+        "path": "amap95-instrument/tests/Preface95CertificatePinTest.java",
+        "sha256": "e5f44a48331452b2ead057abe953150494a5422881a6f88cbd3ce32a611adef6"
+      },
+      {
+        "path": "amap95-instrument/tests/Preface95FrameGateTest.java",
+        "sha256": "c0a0af65517a4d00e8014c1f4d236875d4e25f9887edb02eda9a244530cb31d0"
+      },
+      {
+        "path": "amap95-instrument/tools/PrepareHintDex.java",
+        "sha256": "8dd349cc8198c81e7fe954998307506d0dd5e6c0ff3b6ec3403089f1f7aa7f5a"
+      },
+      {
+        "path": "scripts/prepare_amap95_hint_dex.py",
+        "sha256": "9d8bfa6a091539ddc1e30a02dfe7b77c2859d04cde7b2b756d9b2d73ab8fddc5"
+      },
+      {
+        "path": "scripts/amap95_instrument_analysis.py",
+        "sha256": "7373c8979976f04676a6301fea858c42c73b78d743d4a00aa430da06bb873081"
+      }
+    ],
+    "builder": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/build-amap95-hint-apk-snapshot.py",
+      "sha256": "d84d2271e9220f8747b6fd86de89e389739f48c03964f8b9dd53edd496ce1c9e"
+    },
+    "fixedOriginalEvidence": [
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/oo.java",
+        "sha256": "aba6bf02ef5757a632474985a12e426298e832773afd6ff91a3c184a0f6aa756",
+        "lines": [
+          13,
+          15
+        ]
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/jni/protocol/AndroidProtocolExe.java",
+        "sha256": "2a66c092f7af5d5d8844ae9f9c6b45ff6a682769b94c6d45144eed87a7ab14d3",
+        "lines": [
+          204,
+          221
+        ]
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/amapauto/jni/protocol/AndroidProtocolExe.java",
+        "sha256": "2a66c092f7af5d5d8844ae9f9c6b45ff6a682769b94c6d45144eed87a7ab14d3",
+        "lines": [
+          1097,
+          1136
+        ]
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/defpackage/ob.java",
+        "sha256": "7abe95f20878147022916dddabeb7d8bd2c836f16d0f32366a67fbdbc69eed46",
+        "lines": [
+          227,
+          315
+        ]
+      },
+      {
+        "path": "agent_docs/amap-public95-instrument-20261030/decompiled/sources/com/autonavi/common/tool/sign/Sign.java",
+        "sha256": "440918c1ad493d13d7fe50342e7baf9b047a8bebd6aeba383aee2f12ed54789b",
+        "lines": [
+          21,
+          35
+        ]
+      }
+    ],
+    "candidateVerification": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/candidate-verification.json",
+      "sha256": "d94da43ed4ce9c581467a3f1c3370395cdcff5da26ec35a6401cb316dc6a83de"
+    },
+    "buildVerification": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/verification.json",
+      "sha256": "a160f305a1af5b2f6adb0946393191b7998cac026c3fc3fd50c8ca18876f22ff"
+    },
+    "startupVerification": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/startup-assessment.json",
+      "sha256": "7365f2a0fedec439f998ac79e5116b198b7032ff1cd39a07c0ed57c61d9bebde"
+    },
+    "artifact": {
+      "path": "agent_docs\\amap-public95-instrument-20261030\\test-apk-05\\AMap-9.5.0.600013-E02-native-hints-26000006-test.apk",
+      "sha256": "3190527f8fbbc1b0369b0c09e4ba667546a7eec615e864812f46efdf112d26f8"
+    },
+    "packageName": "com.autonavi.amapauto",
+    "versionName": "9.5.0.600013",
+    "versionCode": 26000006,
+    "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+    "all63NativeEntriesUnchanged": true,
+    "manifestOnlyIntegerVersionCodeChanged": true,
+    "originalMethodBodiesCompared": 45215,
+    "intentionalOriginalHookBodies": 3,
+    "originalWindowAndIdentityMethodBodiesRetained": true,
+    "compiledApiDeclarationsNotPackaged": true,
+    "arrowResourceCount": 50,
+    "realAndroidMainActivityEntered": true,
+    "surfaceGateUnitChecksPassed": true,
+    "exactSignerPositiveAndNegativeTestsPassed": true,
+    "artLinkagePassed": true,
+    "installations": [
+      {
+        "device": "emulator-5554",
+        "previousApkSha256": "80b2f792a5111e4e2a155674fa6bcde25d42c326cfdfe9469a3faef6b9966a14",
+        "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8",
+        "result": "Performing Incremental Install\nPerforming Streamed Install\nSuccess"
+      }
+    ],
+    "installedApkHashMatchesBuild": true,
+    "initialBuild26000002FailedLocalIdentityCheck": true,
+    "localPackageIdentityUsesExactCertificateUidAndPackageNotConstantTrue": false,
+    "onlineLicenseOrCredentialsChanged": false,
+    "carPlayOrAuthorizationComponentChanged": false,
+    "mainActivityBlackScreenObserved": false,
+    "blackScreenCauseEstablished": false,
+    "mainMapFirstFrameVerified": true,
+    "realNavigationDataVerified": true,
+    "instrumentPreparationPublished": false,
+    "instrumentDisplayVerified": false,
+    "portReady": false,
+    "functionalTestPassed": false,
+    "newHelperApkAdded": false,
+    "vehiclePropertyWritten": false,
+    "followUp": [
+      "verify actual E02 physical Display1 and Surface readback",
+      "verify original JSON preparation/stop and CarPlay instrument handoff"
+    ],
+    "assessmentArtifact": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/startup-assessment.json",
+      "sha256": "7365f2a0fedec439f998ac79e5116b198b7032ff1cd39a07c0ed57c61d9bebde"
+    },
+    "historicalCandidates": [
+      {
+        "sourceApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+        "candidateVerification": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-02/candidate-verification.json",
+          "sha256": "48b973c4fc6ff3b1bc8b843ae56764a7fc2d902ca09fe6a7cfda65b0cf061e17"
+        },
+        "buildVerification": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-02/verification.json",
+          "sha256": "0c12630d61010b5f5d41a4bc6d2ce92d8a7004acfb0af92ab59b23fa75719264"
+        },
+        "startupVerification": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-02/startup-assessment.json",
+          "sha256": "b7e482e19cbbf466c4f82eb523bec448f40c156f270a9006fed12a15566c79b0"
+        },
+        "artifact": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-02/AMap-9.5.0.600013-E02-native-hints-26000003-test.apk",
+          "sha256": "b0fad31915421f4e7264c2e37e83bfa3af89ac46417e73338d63f8c5f0e0907f"
+        },
+        "versionCode": 26000003,
+        "originalMethodBodiesCompared": 45139,
+        "mainActivityBlackScreenObserved": true,
+        "mainMapFirstFrameVerified": false,
+        "assessmentArtifact": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-02/assessment.json",
+          "sha256": "7010cec3bc36c3095461c1095c535661f8f5e33ef748e319d4f9f4b3997daccf"
+        }
+      },
+      {
+        "versionCode": 26000004,
+        "sourceApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+        "artifact": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-03/AMap-9.5.0.600013-E02-native-hints-26000004-test.apk",
+          "sha256": "50dcbc375bd472afadef60c7c0dd90bba90e15ae2a00b82773c68aebc7ef2476"
+        },
+        "mainMapFirstFrameVerified": false,
+        "boundedJavaStartupTraceAdded": true,
+        "blackScreenStillObserved": true
+      },
+      {
+        "versionCode": 26000005,
+        "sourceApkSha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+        "artifact": {
+          "path": "agent_docs\\amap-public95-instrument-20261030\\test-apk-04\\AMap-9.5.0.600013-E02-native-hints-26000005-test.apk",
+          "sha256": "80b2f792a5111e4e2a155674fa6bcde25d42c326cfdfe9469a3faef6b9966a14"
+        },
+        "startupVerification": {
+          "path": "agent_docs/amap-public95-instrument-20261030/test-apk-04/startup-assessment.json",
+          "sha256": "adc2db429e31142a69297a9725fbe7ba4e5adb89df79246bc2a8495c9b9fb704"
+        },
+        "blackScreenResolvedOnEmulator": true,
+        "realNavigationDataVerified": true,
+        "instrumentDisplayVerified": false
+      }
+    ],
+    "baseStartupAndSignatureHandlingPreserved": true,
+    "currentBuildOverridesSignCheck": false,
+    "legacyIdentityClassesNotPackaged": [
+      "Preface95PackageIdentity",
+      "Preface95CertificatePin"
+    ],
+    "blackScreenResolvedOnEmulator": true,
+    "exactPublicBaseRootCauseNotEstablished": true,
+    "coldStartMapAndFullUiVerified": true,
+    "localPackageIdentityUsesExactCertificateUidAndPackageNotConstantTrueHistoricalBuild": 26000003,
+    "workingBaseEvidence": {
+      "apk": {
+        "path": "agent_docs/amap-public95-instrument-20261030/working-base-20261030/amap95-working-user.apk",
+        "sha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92"
+      },
+      "baselineInstalledHashMatchesInput": true,
+      "baselineScreenshot": {
+        "path": "agent_docs/amap-public95-instrument-20261030/working-base-20261030/baseline-running-1920x720.png",
+        "sha256": "ba5c6f8e3252af7063e6039552573dbbe249b62ea6efee3ed5205e8e8134274f"
+      },
+      "originalDexSha256": "6cefe115952606624cc566c880d08069f0c9ed81a1a39f89178940f4433e2787",
+      "inputComparison": {
+        "path": "agent_docs/amap-public95-instrument-20261030/working-base-20261030/input-comparison.json",
+        "sha256": "2e05b25406e0937fd03d10687b2a50cc9d4bd13b187a7e58737fd503cf67f5d0"
+      },
+      "nativeEntriesIdenticalToPublicBase": true,
+      "userConfirmedPublicBaseCrashes": true,
+      "userConfirmedModifiedBaseRuns": true
+    },
+    "actualScreenshot": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/navigation-1920x720.png",
+      "sha256": "b21bcadd71aad943b0b1e7a5b13d3f6de2d9125d286abea9c0feb69f9246a8c7"
+    },
+    "displayMetadata": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/device-display-metadata.json",
+      "sha256": "962d11788767673186b0779e454bae21266540e4e7b40717f3ac3957e4f60538"
+    },
+    "guidanceEvidence": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/final-hints-logcat.txt",
+      "sha256": "8565e154fbf323c38c61bc4af60c73dd8c582639afe1d02df092ae940e75fc58"
+    },
+    "actualEngineNavigationType": 0,
+    "actualEngineFirstArrow": 8,
+    "actualDistanceFieldPresent": true,
+    "actualNextRoadFieldPresent": true,
+    "navigationFieldsInjected": false,
+    "waitingForDisplayLogDeduplicated": true,
+    "currentColdProcessFatalCount": 0,
+    "currentHintsFailureCount": 0
+  },
+  "amap95PublicRebuildAudit20261030": {
+    "documentation": "docs/PREFACE_AMAP95_PUBLIC_REBUILD_AUDIT_2026-10-30.md",
+    "scope": "Read-only reconstruction feasibility audit for user-supplied public9.5, working modified9.5 and delivered E02 instrument26000006; reference327, no new actual169 validation",
+    "inputs": {
+      "public": {
+        "path": "agent_docs/amap-public95-instrument-20261030/amap95-public-user.apk",
+        "sha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+        "bytes": 154947836,
+        "entryCount": 1733,
+        "dexSha256": "c6d622d6f67b36edaa5591987f981fa5c8ae3706cfe9b5b922b2a9115737ba43"
+      },
+      "working": {
+        "path": "agent_docs/amap-public95-instrument-20261030/working-base-20261030/amap95-working-user.apk",
+        "sha256": "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92",
+        "bytes": 171896158,
+        "entryCount": 1733,
+        "dexSha256": "6cefe115952606624cc566c880d08069f0c9ed81a1a39f89178940f4433e2787"
+      },
+      "current": {
+        "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/AMap-9.5.0.600013-E02-native-hints-26000006-test.apk",
+        "sha256": "3190527f8fbbc1b0369b0c09e4ba667546a7eec615e864812f46efdf112d26f8",
+        "bytes": 171830624,
+        "entryCount": 1733,
+        "dexSha256": "49194ea8fe7a738856d2a9d8d537223bb2fdad985838dd3084ebeba7a83b7f5a"
+      }
+    },
+    "report": {
+      "path": "agent_docs/amap-public95-instrument-20261030/public-rebuild-audit/verification.json",
+      "sha256": "b7a8a3e53172126a57e831abeb7f775a9d39485a734af489c2d9de0afa04b110"
+    },
+    "sourceFiles": [
+      {
+        "path": "amap95-instrument/tools/PrepareHintDex.java",
+        "sha256": "8dd349cc8198c81e7fe954998307506d0dd5e6c0ff3b6ec3403089f1f7aa7f5a"
+      },
+      {
+        "path": "amap95-instrument/tools/AuditApkDex.java",
+        "sha256": "4e33d5fd4b729e2b706cb5e9561744c098d59a1897ed863a162a0ec4525ff2d5"
+      },
+      {
+        "path": "scripts/analyze_amap95_public_rebuild.py",
+        "sha256": "f682f5e753d35fd84d5eabf1c6c65d74c17eee5e9b4251b230c9f837d1dd6ee4"
+      }
+    ],
+    "verifiedBoundaries": {
+      "all63NativeEntriesIdenticalAcrossThreeApks": true,
+      "publicAndWorkingManifestByteIdentical": true,
+      "currentManifestOnlyVersionCode26000001To26000006": true,
+      "resourceTableUnchanged": true,
+      "currentPreservesWorkingBaseNonDexNonManifestNonSignaturePayload": true,
+      "noApkBuiltSignedInstalledOrExecuted": true
+    },
+    "delta": {
+      "publicToWorking": {
+        "addedClasses": 18,
+        "changedCommonBodies": 2,
+        "removedMethods": 3,
+        "effectiveChangedOriginalClasses": 4
+      },
+      "workingToCurrent": {
+        "addedClasses": 20,
+        "changedCommonBodies": 6,
+        "addedOriginalBodyPreservationMethods": 3
+      },
+      "publicToCurrent": {
+        "addedClasses": 38,
+        "changedCommonBodies": 8,
+        "removedMethods": 3,
+        "nonSignatureChangedEntries": 7,
+        "resourceReplacements": 5
+      }
+    },
+    "baseChangedClasses": [
+      {
+        "class": "Lcom/alibaba/wireless/security/framework/e;",
+        "changedMethods": [
+          {
+            "method": "Lcom/alibaba/wireless/security/framework/e;->c[]Ljava/util/HashMap;",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "96b6232d570205ef8d272fd7d2975798c7f9a7a26f282378fbf257cb7d6885cd",
+            "bodyAfterSha256": "fbb877200e2b13f794d568dade58048c99394cded2abd4d04497f1548b80f91a"
+          }
+        ]
+      },
+      {
+        "class": "Lcom/autonavi/amapauto/app/MapApplicationProxy;",
+        "headerChanged": true,
+        "superclassBefore": "Landroid/app/Application;",
+        "superclassAfter": "Lbin/mt/signature/KillerApplication;",
+        "flagsBefore": 1,
+        "flagsAfter": 1,
+        "changedMethods": [
+          {
+            "method": "Lcom/autonavi/amapauto/app/MapApplicationProxy;->onCreate[]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "ac7f0b98e60ab6de11da19113d85b834c40ac1e095a44d3fd7f30e4d1203140d",
+            "bodyAfterSha256": "b166fe3f2b6260b618980fb9b94bcf0c3c59cfc42e9685e5213b66e02eec7e3f"
+          }
+        ]
+      },
+      {
+        "class": "Lcom/autonavi/auto/remote/fill/UsbFillActivity;",
+        "removedMethods": [
+          "Lcom/autonavi/auto/remote/fill/UsbFillActivity;->onStop[]V"
+        ]
+      },
+      {
+        "class": "Lkc;",
+        "removedMethods": [
+          "Lkc;->onPause[]V",
+          "Lkc;->onStop[]V"
+        ]
+      }
+    ],
+    "baseAddedClasses": [
+      "Lbin/mt/signature/KillerApplication$1;",
+      "Lbin/mt/signature/KillerApplication;",
+      "Lfloatapp/AMapViewManage;",
+      "Lfloatapp/ApplicationInitialization;",
+      "Lfloatapp/AutoamapPluginManage;",
+      "Lfloatapp/ControlReceiver;",
+      "Lfloatapp/FloatWindowsManage;",
+      "Lfloatapp/LifecycleCallbacks;",
+      "Lfloatapp/Utils;",
+      "Lorg/lsposed/hiddenapibypass/Helper$AccessibleObject;",
+      "Lorg/lsposed/hiddenapibypass/Helper$Class;",
+      "Lorg/lsposed/hiddenapibypass/Helper$Executable;",
+      "Lorg/lsposed/hiddenapibypass/Helper$HandleInfo;",
+      "Lorg/lsposed/hiddenapibypass/Helper$InvokeStub;",
+      "Lorg/lsposed/hiddenapibypass/Helper$MethodHandle;",
+      "Lorg/lsposed/hiddenapibypass/Helper$MethodHandleImpl;",
+      "Lorg/lsposed/hiddenapibypass/Helper$NeverCall;",
+      "Lorg/lsposed/hiddenapibypass/HiddenApiBypass;"
+    ],
+    "currentChangedClasses": [
+      {
+        "class": "La20;",
+        "addedMethods": [
+          "La20;->preface95OriginalCreate[Lcom/autonavi/extscreen/dto/PresentationConfig;]V",
+          "La20;->preface95OriginalStop[I]V"
+        ],
+        "changedMethods": [
+          {
+            "method": "La20;->i[Lcom/autonavi/extscreen/dto/PresentationConfig;]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "f0df6407c50587c529efbf0a3cdd3404a6906e526d88e3687a56b4f09687dd0b",
+            "bodyAfterSha256": "d95b115ef3929eed6e08941f95474e4b29477bc505dbe4d0cc449da63e843c28"
+          },
+          {
+            "method": "La20;->v[I]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "c52e7a817edc5e803a6d960e1fd25980f9a79c5ce3d0b568e0fb1864777b56fd",
+            "bodyAfterSha256": "33402347d021623c96305b16c8df2d3cbb413d2464ecf9ba0c376f12b7c5ed33"
+          }
+        ]
+      },
+      {
+        "class": "Lcom/autonavi/amapauto/jni/protocol/AndroidProtocolExe;",
+        "changedMethods": [
+          {
+            "method": "Lcom/autonavi/amapauto/jni/protocol/AndroidProtocolExe;->dispatchAutoStatus[I, I]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "72cfd4846e3f365295768d635ca99252684fa4d89cf8bdd0bf8bdc22f0afd704",
+            "bodyAfterSha256": "865f2d39faac5510026b01fe686e42859df695db095eed726ceb15db4842a39d"
+          },
+          {
+            "method": "Lcom/autonavi/amapauto/jni/protocol/AndroidProtocolExe;->sendAutoStatus[I, I]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "b037538653dad2e6dd04614e0ca05b53cda2ed7d4d5ad4bf9f788fe38d449491",
+            "bodyAfterSha256": "5aea53c18af07626f9df7ba3591f746cde4fbe4cc27d70b4e32c8658d7421f11"
+          }
+        ]
+      },
+      {
+        "class": "Lcz;",
+        "addedMethods": [
+          "Lcz;->preface95OriginalLog[Ljava/lang/String;, Ljava/lang/String;, [Ljava/lang/Object;]V"
+        ],
+        "changedMethods": [
+          {
+            "method": "Lcz;->l[Ljava/lang/String;, Ljava/lang/String;, [Ljava/lang/Object;]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "f666108373173fe4c2b51b2d67dd6b5f945862a6289beb4362d4d62a398bf43f",
+            "bodyAfterSha256": "f4173710beb90d1050e239ae0b817821e1e65ba5c7cc80fc7cd3ace6a5c86208"
+          }
+        ]
+      },
+      {
+        "class": "Loo;",
+        "changedMethods": [
+          {
+            "method": "Loo;-><init>[Lcom/autonavi/amapauto/jni/protocol/data/GuideInfoProtocolData;]V",
+            "bodyChanged": true,
+            "contractChanged": false,
+            "bodyBeforeSha256": "336760e0c1144233691e0ab98400abb7b5383a951dddd4c8b394f23acda04124",
+            "bodyAfterSha256": "818ee71c7404ced4a7a961a0de512dba2931af61c360f4138e4e0fee7ee1c85b"
+          }
+        ]
+      }
+    ],
+    "currentAddedClasses": [
+      "LPreface95FrameGate;",
+      "LPreface95Guidance;",
+      "LPreface95HintScreen$1;",
+      "LPreface95HintScreen$2;",
+      "LPreface95HintScreen$3;",
+      "LPreface95HintScreen$4;",
+      "LPreface95HintScreen$5;",
+      "LPreface95HintScreen$6;",
+      "LPreface95HintScreen$7;",
+      "LPreface95HintScreen$HintPresentation;",
+      "LPreface95HintScreen;",
+      "LPreface95NativeHints$1;",
+      "LPreface95NativeHints$2;",
+      "LPreface95NativeHints$3;",
+      "LPreface95NativeHints$4;",
+      "LPreface95NativeHints$5;",
+      "LPreface95NativeHints$6;",
+      "LPreface95NativeHints$7;",
+      "LPreface95NativeHints;",
+      "LPreface95StartupTrace;"
+    ],
+    "resources": [
+      {
+        "path": "assets/res/EngineRes/bl_data/DefaultTheme/libMapAsset.so",
+        "before": {
+          "bytes": 12701135,
+          "sha256": "1d7c5b54addd5e75a2045b25709bd819383b5a6970b8e2e3160ba306243eb816"
+        },
+        "after": {
+          "bytes": 12700858,
+          "sha256": "9f5fd8098b387982855df69615339a0faa8da97115a6fd2238c8c54acb30b20b"
+        }
+      },
+      {
+        "path": "assets/res/HmiRes/CarLogo_Style/2/carLogo.dat",
+        "before": {
+          "bytes": 169398,
+          "sha256": "84aaff94a49bba99aa09d75e48aa51e791d2b468891dbc2fa803bc5de87357eb"
+        },
+        "after": {
+          "bytes": 3428096,
+          "sha256": "07c97be9c4e060b261a323f63efe6342ace2bc06b247f981e13a700f8134f2d6"
+        }
+      },
+      {
+        "path": "assets/res/HmiRes/CarLogo_Style/2/carLogoLow.dat",
+        "before": {
+          "bytes": 157728,
+          "sha256": "90e0cac1971e9b91c7fd91725bca6572938b5898f23731ab9bed536291016a43"
+        },
+        "after": {
+          "bytes": 3350291,
+          "sha256": "6ea00402687b01d233b953d871e8c8e5eba4a5b8f2f7d1a67f3fd60f9a7a0821"
+        }
+      },
+      {
+        "path": "assets/res/HmiRes/FuncConfig.dat",
+        "before": {
+          "bytes": 26432,
+          "sha256": "714a26f975e7fff54e5b7cbe7b646861a83cb74b9f512dd6735fa28ab960346c"
+        },
+        "after": {
+          "bytes": 26464,
+          "sha256": "c5884ee5d823018463b26cee5c36ef4f095708ca144dfa5d532e17e3655440aa"
+        }
+      },
+      {
+        "path": "assets/res/HmiRes/voice_init/tts/voices/nvzhongyin",
+        "before": {
+          "bytes": 2702461,
+          "sha256": "1810793a5bd40b40652e76abb34870b18ef012e9bb2c510cac64f1a174e6653f"
+        },
+        "after": {
+          "bytes": 13109896,
+          "sha256": "37c3ffb20a9da134114bad70dd4c9513e37b6ca915f1b8bfbc0dcb15d7c57b9b"
+        }
+      }
+    ],
+    "reconstructionFromPublicAndSuppliedSupplementaryMaterialsStaticallyFeasible": true,
+    "exactStandalonePublicOnlyReproductionWithoutSupplementaryMaterialsEstablished": false,
+    "publicBaseRebuildPerformed": false,
+    "minimalPublicStartupFixEstablished": false,
+    "priorPublicAttempts26000003And26000004RemainHistoricalFailures": true,
+    "signatureProxyAlreadyPresentInUserBase": true,
+    "removedLifecycleMethods": [
+      "Lkc;->onPause()V",
+      "Lkc;->onStop()V",
+      "Lcom/autonavi/auto/remote/fill/UsbFillActivity;->onStop()V"
+    ],
+    "existingSecurityPluginNameConstructionChangeNotProvenNecessary": true,
+    "lock12ImplementationEstablished": false,
+    "nativeSignatureKillerLibraryAndOriginApkEntriesAbsent": true,
+    "defaultStaticInitializerEncodingDifferencesIgnored": true,
+    "jadxTextDifferenceCountNotUsedAsPatchCount": true,
+    "apkBuiltSignedInstalledOrExecutedThisAudit": false,
+    "instrumentDisplayVerifiedByThisAudit": false,
+    "carplaySourceOrVehicleBehaviorModifiedThisAudit": false,
+    "lock12MeaningUserConfirmed": "default audio channel 12",
+    "userScreenshotShowsAudioChannel12": true,
+    "stock327NavigationStream": 12,
+    "audioChannelDecision": "retain12; original AMap queries navigation policy first; no change to11 inferred from generic fallback",
+    "audioChannelReviewDocumentation": "docs/PREFACE_AMAP95_AUDIO_CHANNEL_2026-10-30.md"
+  },
+  "amap95AudioChannelReview20261030": {
+    "documentation": "docs/PREFACE_AMAP95_AUDIO_CHANNEL_2026-10-30.md",
+    "scope": "Stock327 static AMap stream-selection chain and user supplied modified9.5 audio settings screenshot; not actual169 original settings capture",
+    "stockApk": {
+      "path": "agent_docs/firmware/ihu519g-327/system/app/AutoMap/AutoMap.apk",
+      "sha256": "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc"
+    },
+    "stockGenericConfig": {
+      "evidence": {
+        "path": "agent_docs/amap-trafficlight-20261030/decoded/FuncConfig.dat.decoded",
+        "sha256": "da3a54fd7c907fb5ef863c0e7d5b6c1ff4fbdcb456c47a27b15022eab530c972"
+      },
+      "allowedAudioValuesOnly": {
+        "audioChannel": "11",
+        "audioAttrUsage": "12",
+        "isUserHighVersionAudioApi": "1"
+      }
+    },
+    "stockSources": [
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/jni/config/AudioConfigData.java",
+        "sha256": "a76b555aba7805b04fac0d580f79c29ae52aff710c0c2fb80cbc07a9bb033c15",
+        "locations": {
+          "public int getStreamType()": [
+            37
+          ],
+          "ChannelKeyConstant.GET_AUDIO_STREAM_TYPE": [
+            38
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/business/devices/factory/preassemble/geely/InstanceFactory.java",
+        "sha256": "4d2328426d4bbf5715f306d15899bbb23532084aaa98eb02d6f29fb55dd74daa",
+        "locations": {
+          "case \"C04010181178\"": [
+            123
+          ],
+          "return new BeidouFS11A1InteractionImpl()": [
+            320
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/business/devices/factory/preassemble/geely/beidou/BeidouFS11A1InteractionImpl.java",
+        "sha256": "9d5c6ba2e5a2017ad821e4d31c7f3a274b0141e38e6018c7588c399b88136e1b",
+        "locations": {
+          "extends BeidouDefaultInteractionImpl": [
+            6
+          ],
+          "C04010181178": [
+            53
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/com/autonavi/amapauto/business/devices/factory/preassemble/geely/gkuibase/JiliGkuiDefaultInteractionImpl.java",
+        "sha256": "dac1b03fbc02205b9545b0e002b5c3f16a2669fbf047642863b92a41c1fd359f",
+        "locations": {
+          "i == 30007": [
+            591
+          ],
+          "getAudioStreamTypeForFunction(IAudioPolicy.FUNCTION_NAVIGATION_GUIDE)": [
+            594
+          ]
+        }
+      },
+      {
+        "path": "agent_docs/instrument-independent-20261030/stock327-decompiled/sources/defpackage/ef.java",
+        "sha256": "6bb9af6230442d2917e8606d1d068eb954946cab1ee063feff7a344436c5d0d7",
+        "locations": {
+          "audioConfigDataA.getStreamType()": [
+            799
+          ],
+          "AndroidAudioControl.getStreamType()": [
+            298
+          ]
+        }
+      }
+    ],
+    "stock327Streams": {
+      "STREAM_NAVI": 12,
+      "STREAM_TTS_NOTICE": 11
+    },
+    "existingStaticStreamEvidenceKey": "audio",
+    "usageAndStreamAreDifferentParameters": true,
+    "stockAdapterSelectsRealNavigationPolicyResultBeforeConfigFallback": true,
+    "userClarifiedLock12Meaning": "default audio channel 12",
+    "userScreenshotConfirmsModified95DisplayedChannel": 12,
+    "selectedCurrentChannel": 12,
+    "channelChangeRequiredByCurrent327NavigationEvidence": false,
+    "actual169OriginalSettingsScreenRead": false,
+    "actualOriginalPolicyReturnValueIndependentlyCaptured": false,
+    "exactBinaryConfigPatchLocationEstablished": false,
+    "newApkBuiltSignedInstalled": false,
+    "runtimeSourceOrDeviceSettingsChanged": false,
+    "additionalPolicyRecovery": {
+      "report": {
+        "path": "agent_docs/amap-public95-instrument-20261030/audio-channel-review/policy-recovery.json",
+        "sha256": "77387dd234d294ab311eb622a44e3e89a982335a2d52121edea8ca2620314478"
+      },
+      "recoverySucceeded": true,
+      "jadxExitCode": 3,
+      "reportedJadxErrors": 11,
+      "finalNavigationStreamMapNotLocated": true,
+      "usedAsEvidenceOfPolicyReturn12": false
+    },
+    "userScreenshot": {
+      "path": "C:/Users/ADMINI~1/AppData/Local/Temp/codex-clipboard-bc04fad2-9b26-45b9-9886-551b6e69edc8.png",
+      "sha256": "e85c159d15c4b40d03bd055c9b5fc37b5e076896e300ec36288352942083536f"
+    },
+    "assessment": {
+      "path": "agent_docs/amap-public95-instrument-20261030/audio-channel-review/assessment.json",
+      "sha256": "7df0dc134fe714dfba5196e0ed815b69a58ccc4ee540b3e682788a7a9ba9b8da"
+    }
+  },
+  "amap95PublicDefaultVoiceReset20261030": {
+    "documentation": "docs/PREFACE_AMAP95_NATIVE_HINTS_TEST_2026-10-30.md",
+    "scope": "User-authorized build and same-certificate emulator update restoring bundled public-default voice; physical instrument and audible voice remain unverified",
+    "builder": {
+      "path": "scripts/build_amap95_hint_apk.py",
+      "sha256": "9620a9cbc34e06ca900a71c36e77ffe64cfc817bf748190da0c2ca83f0fa4bd8"
+    },
+    "verification": {
+      "path": "agent_docs/amap-public95-instrument-20261030/default-voice-reset/verification.json",
+      "sha256": "07cacc9245095d11edd65a550e0662c0b69c30071536e51831e3b7dbfc474f3c"
+    },
+    "sourcePublicApkSha256": "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00",
+    "entry": "assets/res/HmiRes/voice_init/tts/voices/nvzhongyin",
+    "publicDefaultSha256": "1810793a5bd40b40652e76abb34870b18ef012e9bb2c510cac64f1a174e6653f",
+    "publicDefaultBytes": 2702461,
+    "workingBaseVoiceBytes": 13109896,
+    "all33VoiceInitEntriesCompared": true,
+    "onlyChangedVoiceInitEntry": [
+      "assets/res/HmiRes/voice_init/tts/voices/nvzhongyin"
+    ],
+    "delivered26000006StillHasPreviousVoice": true,
+    "apkBuiltSignedInstalled": true,
+    "audioChannelRemains12": true,
+    "userSavedVoiceSettingsRewritten": false,
+    "delivered26000006BuilderSnapshot": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-05/build-amap95-hint-apk-snapshot.py",
+      "sha256": "d84d2271e9220f8747b6fd86de89e389739f48c03964f8b9dd53edd496ce1c9e"
+    },
+    "deliveredVersionCode": 26000007,
+    "outputDirectory": "agent_docs/amap-public95-instrument-20261030/test-apk-06",
+    "packagedVoiceBytesRecheckedAgainstPublic": true,
+    "deliveredApk": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/AMap-9.5.0.600013-E02-native-hints-26000007-test.apk",
+      "sha256": "7b139e2fb3b5815a28a535fa7d3739bc54629547df953f13afeb261dc4959e37",
+      "bytes": 161463648,
+      "certificateSha256": "c8a2e9bccf597c2fb6dc66bee293fc13f2fc47ec77bc6b2b0d52c11f51192ab8"
+    },
+    "buildVerification": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/verification.json",
+      "sha256": "5a844f3eade9c69ad99c107644fc271b42212e0aaef6f797a5b4be8ae6207d3f"
+    },
+    "startupAssessment": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/startup-assessment.json",
+      "sha256": "fb1899150dc64ff7f4abc4f6fc8a0f5058e1be6106b6b9e15ca322492f1908e6"
+    },
+    "displayMetadata": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/display-metadata.json",
+      "sha256": "d9054f00edb61c92e8e7ad4f05d95e316ee2b0adc17a6a8ce1dbe925f2001174"
+    },
+    "builderSnapshot": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/build-amap95-hint-apk-snapshot.py",
+      "sha256": "9620a9cbc34e06ca900a71c36e77ffe64cfc817bf748190da0c2ca83f0fa4bd8"
+    },
+    "candidateVerificationSnapshot": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/candidate-verification.json",
+      "sha256": "d94da43ed4ce9c581467a3f1c3370395cdcff5da26ec35a6401cb316dc6a83de"
+    },
+    "candidateDexSnapshot": {
+      "path": "agent_docs/amap-public95-instrument-20261030/test-apk-06/candidate.dex",
+      "sha256": "49194ea8fe7a738856d2a9d8d537223bb2fdad985838dd3084ebeba7a83b7f5a"
+    },
+    "installedDevices": [
+      "emulator-5554"
+    ],
+    "all33PackagedVoiceInitEntriesMatchPublic": true,
+    "dexByteIdenticalTo26000006": true,
+    "coldMainFirstFrameVerified": true,
+    "voiceAudibleOutputVerified": false,
+    "physicalInstrumentDisplayVerified": false,
+    "fullCiRun": false
+  },
+  "amap95VehicleLifecycle20261030": {
+    "documentation": "docs/PREFACE_AMAP95_VEHICLE_LOG_2026-10-30.md",
+    "scope": "User-supplied IHU353G Android9 build169 runtime logs; distinct from cached IHU519G build327 static reference",
+    "localEvidenceDirectory": "agent_docs/instrument-logs-20261030-171914",
+    "mobilelogZipSha256": "51cc292cf8ecf4f1bb46a4ff32572bd849fbf81034017e3b652df4e72ff512f6",
+    "diPlayDiagnosticSha256": "59b604325496aa968d6f30e611cb6cc9a32066a790ed745a339de5a5e4277ed4",
+    "amapVersionName": "9.5.0.600013",
+    "amapVersionCodeFromLog": 26000007,
+    "carplayBuildCodeFromDiagnostic": 1211,
+    "suppliedApkSha256": "7b139e2fb3b5815a28a535fa7d3739bc54629547df953f13afeb261dc4959e37",
+    "suppliedApkDexSha256": "49194ea8fe7a738856d2a9d8d537223bb2fdad985838dd3084ebeba7a83b7f5a",
+    "actualInstalledApkPulled": false,
+    "allFiveCurrentJavaSourceHashesMatchDeliveredCandidateVerification": true,
+    "realWindow1001ReadbackAndOemReady116Observed": [
+      "2026-10-30 17:13:50 before reboot",
+      "2026-10-30 17:15:13-14 after reboot"
+    ],
+    "userReportsInitiallyVisibleInstrumentSuccess": true,
+    "successExplainedOnlyByResidualStockProcess": false,
+    "oemReadyClearedAfterMainActivityExitAt": "2026-10-30 17:15:31",
+    "mainActivityAppRequestFinishAt": "2026-10-30 17:15:30.691693",
+    "carplayControllerStartAt": "2026-10-30 17:15:37.604",
+    "carplayFirstInstrumentAggregateAt": "2026-10-30 17:16:11.474414",
+    "readinessLossPrecedesCarplayConnectionAndInstrumentSubmission": true,
+    "carplayPid5375FirstFrameZeroCount": 14,
+    "carplayPid5375ActualGuidanceUpdates": 12,
+    "carplayPid5375ClearUpdates": 2,
+    "samePid2890MainActivityRecreatedAt": "2026-10-30 17:16:44",
+    "realAmapGuidanceContinuedWithoutReadinessRecovery": true,
+    "sourceDefect": "MainActivity finish marks owner closed and unregisters listeners; onGuide discards when closed; recreation callbacks empty; only subsequent internal first-main-frame status116 replaces closed owner",
+    "closedFlagRuntimeDirectlyLogged": false,
+    "sourceDefectMatchesObservedLifecycle": true,
+    "carplayGuidanceSharedIntoAmapCandidate": false,
+    "completeCarplayHandoffVerified": false,
+    "longTermStabilityVerified": false,
+    "runtimeSourceChangedThisAnalysis": false,
+    "apkBuiltSignedInstalledThisAnalysis": false
   }
 }

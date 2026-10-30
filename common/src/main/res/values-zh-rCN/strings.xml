@@ -4,7 +4,7 @@
     <string name="settings_github_repository_unavailable">无法打开链接，请在浏览器中访问上方仓库地址。</string>
     <string name="settings_instrument_navigation_section">仪表导航</string>
     <string name="settings_instrument_navigation">仪表导航提示</string>
-    <string name="settings_instrument_navigation_description">通过原厂仪表接口提交 CarPlay 转向箭头、距离和道路名。默认开启，保留已保存的选择，修改后下次连接生效。需要 iPhone 提供导航数据及车机服务允许访问；仪表和通话状态由原厂接口处理，未确认的箭头不显示。尚待实车验证。</string>
+    <string name="settings_instrument_navigation_description">必须保留支持仪表功能的原厂高德，并先由其完成仪表准备。CarPlay 通过车机原厂接口发送当前 iPhone 导航的转向、距离和道路名，不独立初始化仪表。默认开启，保留已保存的选择，修改后下次连接生效；未确认的转向不显示。</string>
     <string name="home_connection_hint">将 iPhone 连接车机蓝牙，或插入 USB。</string>
     <string name="settings_quick_dismiss_hint">点击空白处返回 CarPlay</string>
     <string name="settings_quick_volume">音量调节</string>

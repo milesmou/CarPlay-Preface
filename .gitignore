@@ -50,3 +50,6 @@ release-signing.properties
 
 # Owner-authorized public APK signing material.
 !/signing/carplay-release.p12
+
+# Local platform test signing inputs for the Android 9 authorization component.
+/signing/platform-test-key/

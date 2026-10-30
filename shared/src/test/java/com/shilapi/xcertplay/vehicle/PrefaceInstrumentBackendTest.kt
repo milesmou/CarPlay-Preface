@@ -56,6 +56,19 @@ class PrefaceInstrumentBackendTest {
 
     private fun connected(): PrefaceInstrumentSdkBackend = backend().also { it.connect(); assertTrue(it.ready()) }
 
+    @Test fun cancellingTheCurrentSessionInvalidatesReadyBeforeTheQueuedCleanup() {
+        val api = connected()
+        api.publish(guidance)
+        val submitted = Dim.events.toList()
+        currentSession = false
+        assertFalse(api.ready())
+        assertFalse(api.available())
+        assertThrows(IllegalStateException::class.java) { api.publish(guidance) }
+        assertEquals(submitted, Dim.events)
+        api.close()
+        assertEquals(listOf("update:0", "stop", "status:0"), Dim.events.takeLast(3))
+    }
+
     @Test fun followsNativeCreateConnectStartUpdateStopLifecycle() {
         val api = connected()
         api.publish(guidance)

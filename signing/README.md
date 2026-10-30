@@ -8,6 +8,8 @@
 - `carplay-release.cer`：公开的 DER 证书，可用于核对 APK 签名。
 - `key-info.json`：证书指纹、有效期及公开密钥库／配置的 SHA-256。
 
+`platform-test-key/` 存放 Android 9 授权组件独立使用的 AOSP 平台测试签名输入（`platform.pk8`、`platform.x509.pem`），由 `scripts/android9_authorization.py` 校验并使用。该目录仅保留本机，已由 Git 忽略；准备方式和固定哈希见[授权组件构建说明](../docs/ANDROID9_AUTHORIZATION_COMPONENTS.md#签名与构建)。
+
 密钥沿用已有发布证书，证书 SHA-256 为 `75f4eda0d13be105f578253381eadb5619c04548cc78f58faf2cc8f73a2660a8`。没有重新生成或替换密钥。签名材料公开后，任何人都可以构建同签名 APK；签名本身不再能区分发布者身份，下载时应核对发布页面提供的校验值。
 
 准备好文档要求的 JDK 和 Android SDK 后，可直接构建：

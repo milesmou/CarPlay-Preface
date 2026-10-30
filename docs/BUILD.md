@@ -22,7 +22,7 @@ JAVA_HOME 指向 JDK，ANDROID_HOME 指向 SDK；或在 Git 忽略的 local.prop
 CarPlay-Preface-<versionName>-<versionCode>-debug.apk
 ```
 
-当前源码及最近交付测试包为 0.2.2／1211（含上游 v0.2.22 选择性同步及仪表分项补齐），最近正式发布版本为 0.2.1／1204。mobile／automotive 统一版本和包名，避免同包名变体版本倒退；1211 仅构建了 mobile，Debug 保留详细日志，当前无在线设备可安装，核验见 [1211 构建记录](ANDROID9_AUTHORIZATION_COMPONENTS.md#0221211-测试包构建核验)。升级构建号必须递增。其他按需任务：
+当前源码及最近交付测试包为 0.2.2／1213，已按用户预先授权撤回仪表独立服务及原厂库导入，恢复直接 SDK 发送并明确依赖原厂高德准备；原因及边界见 [327 静态验证与撤回](PREFACE_INSTRUMENT_OEM_FALLBACK_2026-10-30.md)。最近正式发布版本为 0.2.1／1204。mobile／automotive 源码统一构建号，避免同包名变体版本倒退；本次仅构建 mobile Debug，原签名和内置组件 11 已核验，当前无在线 ADB 设备、未安装，详见 [1213 构建记录](ANDROID9_AUTHORIZATION_COMPONENTS.md#0221213-测试包构建核验)。历史 1212 包仍包含私有服务。升级构建号必须递增。其他按需任务：
 
 | 目的 | Gradle 任务 |
 | --- | --- |
@@ -79,6 +79,8 @@ adb -s <serial> install -r <本次命名后的APK>
 保留数据，无在线设备就交付路径，不自行启动模拟器。签名冲突、降级或安装失败时报告设备和错误，不卸载、清数据或强制降级。安装主应用不等于安装内置组件；组件仍由用户在设置中保存后手动安装。
 
 ## 常见问题
+
+仪表独立移植已撤回，原厂库导入脚本和 `verifyOriginalInstrumentAssets` 任务已移除；正常构建不要求或打包该本地缓存。保留本机历史输入与分析证据，详见 [撤回说明](PREFACE_INSTRUMENT_OEM_FALLBACK_2026-10-30.md)。
 
 | 问题 | 检查 |
 | --- | --- |

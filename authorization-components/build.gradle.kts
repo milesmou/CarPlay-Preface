@@ -43,8 +43,8 @@ val prepareDistributionAssets by tasks.registering(PrepareDistributionAssets::cl
     val metadata = layout.buildDirectory.file("outputs/apk/release/output-metadata.json")
     val script = rootProject.layout.projectDirectory.file("scripts/android9_authorization.py")
     inputs.files(unsigned, metadata, script,
-        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.pk8"),
-        rootProject.file("agent_docs/android9-authorization/platform-test-key/platform.x509.pem"))
+        rootProject.file("signing/platform-test-key/platform.pk8"),
+        rootProject.file("signing/platform-test-key/platform.x509.pem"))
     assetOutput.set(layout.buildDirectory.dir("generated/distributionAssets"))
     workingDir(rootProject.projectDir)
     commandLine("python", script.asFile.absolutePath, "--sign", "--asset-output", assetOutput.get().asFile.absolutePath)

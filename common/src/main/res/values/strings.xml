@@ -4,7 +4,7 @@
     <string name="settings_github_repository_unavailable">Unable to open the link. Visit the repository address in a browser.</string>
     <string name="settings_instrument_navigation_section">Instrument navigation</string>
     <string name="settings_instrument_navigation">Instrument navigation prompts</string>
-    <string name="settings_instrument_navigation_description">Submit CarPlay turn arrows, distance and road names through the native instrument interface. On by default; saved choices take priority. Changes apply to the next connection. Requires iPhone navigation data and car service access. The native interface handles instrument and call state. Unconfirmed arrows are hidden. Vehicle validation is pending.</string>
+    <string name="settings_instrument_navigation_description">Requires factory AMap with instrument support to remain installed and prepare the instrument first. CarPlay sends the current iPhone navigation arrows, distances and road names; it does not initialize the instrument independently. On by default; saved choices take priority. Changes apply to the next connection. Unconfirmed arrows are hidden.</string>
     <string name="home_connection_hint">Connect your iPhone to the car’s Bluetooth, or plug it into USB.</string>
     <string name="settings_quick_dismiss_hint">Tap a blank area to return to CarPlay</string>
     <string name="settings_quick_volume">Volume</string>

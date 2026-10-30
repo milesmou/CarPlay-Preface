@@ -106,7 +106,7 @@ def check_apk(paths, apk):
 
 
 def prepare_key(fetch_key):
-    key_dir = ROOT / 'agent_docs/android9-authorization/platform-test-key'
+    key_dir = ROOT / 'signing/platform-test-key'
     key_dir.mkdir(parents=True, exist_ok=True)
     for name, expected in KEY_HASHES.items():
         path = key_dir / name
