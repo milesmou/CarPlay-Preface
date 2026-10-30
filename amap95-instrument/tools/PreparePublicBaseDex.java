@@ -25,14 +25,17 @@ import java.util.Set;
  * reviewed floating additions/changes and nothing else. This tool only writes a
  * local DEX; it never touches an APK, signing input or device.
  *
- * Input: public.dex  working.dex  output.dex
+ * Input: public.dex  delta.dex  output.dex
  *
- * Reviewed deltas (public -> working), pinned by the read-only audit
- * agent_docs/amap-public95-instrument-20261030/public-rebuild-audit/:
- *   - 18 added classes copied verbatim from working.
+ * The "delta.dex" is a small frozen extraction of the reviewed floating
+ * changes (see ExtractFloatingDelta.java); the full floating APK is no longer a
+ * build input. It holds the 18 added classes plus the two donor classes
+ * (MapApplicationProxy, com.alibaba.wireless.security.framework.e). Reviewed
+ * deltas re-applied to public:
+ *   - 18 added classes copied verbatim from the delta.
  *   - MapApplicationProxy: superclass Application -> KillerApplication and
- *     onCreate() body replaced with the working implementation.
- *   - com.alibaba.wireless.security.framework.e.c(): body replaced.
+ *     onCreate() body replaced with the delta donor implementation.
+ *   - com.alibaba.wireless.security.framework.e.c(): body replaced from donor.
  *   - UsbFillActivity.onStop() removed.
  *   - kc.onPause() and kc.onStop() removed.
  * Every other public class is preserved unchanged.
@@ -109,14 +112,16 @@ public final class PreparePublicBaseDex {
         if (args.length != 3) throw new IllegalArgumentException("public.dex working.dex output.dex");
         Opcodes opcodes = Opcodes.forApi(28);
         DexBackedDexFile publicDex = new DexBackedDexFile(opcodes, Files.readAllBytes(Path.of(args[0])));
-        DexBackedDexFile workingDex = new DexBackedDexFile(opcodes, Files.readAllBytes(Path.of(args[1])));
+        DexBackedDexFile deltaDex = new DexBackedDexFile(opcodes, Files.readAllBytes(Path.of(args[1])));
         Map<String, ClassDef> pub = classes(publicDex);
-        Map<String, ClassDef> work = classes(workingDex);
+        Map<String, ClassDef> delta = classes(deltaDex);
         if (pub.size() != PUBLIC_CLASSES) throw new IllegalStateException("public class count " + pub.size());
-        if (work.size() != WORKING_CLASSES) throw new IllegalStateException("working class count " + work.size());
         for (String added : ADDED) {
             if (pub.containsKey(added)) throw new IllegalStateException("Added class already in public: " + added);
-            if (!work.containsKey(added)) throw new IllegalStateException("Added class missing in working: " + added);
+            if (!delta.containsKey(added)) throw new IllegalStateException("Added class missing in delta: " + added);
+        }
+        for (String donor : new String[]{MAP_PROXY, SECURITY}) {
+            if (!delta.containsKey(donor)) throw new IllegalStateException("Donor class missing in delta: " + donor);
         }
 
         List<ClassDef> output = new ArrayList<>();
@@ -126,14 +131,14 @@ public final class PreparePublicBaseDex {
             if (ADDED.contains(type)) throw new IllegalStateException("Public already has added class");
             String superclass = cls.getSuperclass();
             if (type.equals(MAP_PROXY)) {
-                ClassDef worked = work.get(type);
-                if (worked == null) throw new IllegalStateException("Working lacks MapApplicationProxy");
-                if (!worked.getSuperclass().equals(KILLER)) throw new IllegalStateException("Working superclass mismatch");
+                ClassDef worked = delta.get(type);
+                if (worked == null) throw new IllegalStateException("Delta lacks MapApplicationProxy");
+                if (!worked.getSuperclass().equals(KILLER)) throw new IllegalStateException("Delta superclass mismatch");
                 superclass = KILLER;
                 superChanged++;
             }
             List<Method> methods = new ArrayList<>();
-            ClassDef worked = work.get(type);
+            ClassDef worked = delta.get(type);
             for (Method m : cls.getMethods()) {
                 if (isRemoved(type, m)) { removed++; continue; }
                 if (isReplace(type, m)) {
@@ -152,7 +157,7 @@ public final class PreparePublicBaseDex {
         if (replaced != 2) throw new IllegalStateException("Expected 2 replaced bodies, got " + replaced);
         if (removed != 3) throw new IllegalStateException("Expected 3 removed methods, got " + removed);
         if (superChanged != 1) throw new IllegalStateException("Expected 1 superclass change, got " + superChanged);
-        for (String added : ADDED) output.add(copyClass(work.get(added)));
+        for (String added : ADDED) output.add(copyClass(delta.get(added)));
 
         if (output.size() != WORKING_CLASSES) throw new IllegalStateException("Output class count " + output.size());
         DexPool.writeTo(args[2], new ImmutableDexFile(opcodes, output));

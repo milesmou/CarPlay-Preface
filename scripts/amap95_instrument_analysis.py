@@ -15,6 +15,9 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 STOCK_SHA256 = "82272e4dc531c3ff1b1c6fff02d5fc0362f963319e435e0f5021d4b6dc5c67dc"
 PUBLIC_SHA256 = "f2855369c11b346756ff828fa453447c812563b0cda678fcc6a36326d385fa00"
+# Retained ONLY for the one-time frozen-delta regeneration (freeze_floating_delta.py).
+# The floating APK has been removed from the project; normal rebuild uses
+# agent_docs/.../floating-delta/delta.dex instead.
 HINT_BASE_APK = ROOT / "agent_docs/amap-public95-instrument-20261030/working-base-20261030/amap95-working-user.apk"
 HINT_BASE_SHA256 = "094e296ef0783a76d3c2a82a2b91a5eb3198cef2338db78549295617f523ed92"
 LIB_PREFIX = "lib/arm64-v8a/"

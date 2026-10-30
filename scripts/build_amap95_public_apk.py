@@ -3,7 +3,7 @@
 Requires --build (packaging is only done on explicit user authorization). Takes
 the clean PUBLIC APK as the base, replaces classes.dex with the candidate DEX
 produced by prepare_amap95_public_rebuild.py, transplants the four fixed
-resources from the verified working base, keeps the public default voice,
+resources from the frozen floating delta bundle, keeps the public default voice,
 bumps only the integer versionCode to 26000009, and re-signs with the reviewed
 327 platform test certificate. This is the user-selected AMap APK, not a
 CarPlay/authorization-component build.
@@ -25,7 +25,8 @@ import verify_amap95_observer as common
 ROOT = common.ROOT
 BASE = ROOT / "agent_docs/amap-public95-instrument-20261030"
 PUBLIC_APK = BASE / "amap95-public-user.apk"
-WORKING_APK = analysis.HINT_BASE_APK
+DELTA_DIR = BASE / "floating-delta"
+DELTA_META = DELTA_DIR / "metadata.json"
 REBUILD = BASE / "public-rebuild"
 CANDIDATE = REBUILD / "candidate.dex"
 REBUILD_REPORT = REBUILD / "verification.json"
@@ -33,9 +34,9 @@ OUTPUT = BASE / "public-rebuild-apk"
 VERSION_CODE = 26000009
 ORIGINAL_VERSION_CODE = 26000001
 NAME = f"AMap-9.5.0.600013-E02-public-rebuild-{VERSION_CODE}-test.apk"
-# Resources whose map/theme/config payload must come from the verified working
-# base; the built-in default voice intentionally stays the public original.
-RESOURCES_FROM_WORKING = [
+# Resources whose map/theme/config payload must come from the frozen floating
+# delta bundle; the built-in default voice intentionally stays the public original.
+RESOURCES_FROM_DELTA = [
     "assets/res/EngineRes/bl_data/DefaultTheme/libMapAsset.so",
     "assets/res/HmiRes/CarLogo_Style/2/carLogo.dat",
     "assets/res/HmiRes/CarLogo_Style/2/carLogoLow.dat",
@@ -128,19 +129,21 @@ def main():
         dex = CANDIDATE.read_bytes()
 
         analysis.verify_apk(PUBLIC_APK, analysis.PUBLIC_SHA256)
-        analysis.verify_apk(WORKING_APK, analysis.HINT_BASE_SHA256)
+        delta_meta = json.loads(DELTA_META.read_text(encoding="utf-8"))
         report["inputs"] = {"publicApkSha256": analysis.PUBLIC_SHA256,
-                            "workingApkSha256": analysis.HINT_BASE_SHA256,
+                            "floatingDeltaDexSha256": delta_meta["deltaDexSha256"],
                             "candidateDexSha256": common.digest(CANDIDATE)}
 
-        # Resource payloads come from the verified working base.
-        working_resources = {}
-        with zipfile.ZipFile(WORKING_APK) as working:
-            for path in RESOURCES_FROM_WORKING:
-                data = working.read(path)
-                working_resources[path] = data
-        report["resourcesFromWorking"] = {p: {"bytes": len(d), "sha256": hashlib.sha256(d).hexdigest()}
-                                          for p, d in working_resources.items()}
+        # Resource payloads come from the frozen floating delta bundle.
+        delta_resources = {}
+        for path in RESOURCES_FROM_DELTA:
+            data = (DELTA_DIR / "resources" / path).read_bytes()
+            expected = delta_meta["resources"][path]["sha256"]
+            if hashlib.sha256(data).hexdigest() != expected:
+                raise ValueError("Frozen delta resource hash mismatch: " + path)
+            delta_resources[path] = data
+        report["resourcesFromDelta"] = {p: {"bytes": len(d), "sha256": hashlib.sha256(d).hexdigest()}
+                                        for p, d in delta_resources.items()}
         # Voice is not replaced; confirm it stays the public original.
         with zipfile.ZipFile(PUBLIC_APK) as public_zip:
             voice_entry = "assets/res/HmiRes/voice_init/tts/voices/nvzhongyin"
@@ -161,8 +164,8 @@ def main():
                 elif name == "AndroidManifest.xml":
                     payload, manifest_offset = bump_manifest(source.read(entry))
                     report["manifestVersionCodeByteOffset"] = manifest_offset
-                elif name in working_resources:
-                    payload = working_resources[name]
+                elif name in delta_resources:
+                    payload = delta_resources[name]
                 else:
                     payload = source.read(entry)
                 target.writestr(entry, payload)
@@ -198,8 +201,8 @@ def main():
                     expected, _ = bump_manifest(before.read(name))
                     if data != expected:
                         raise ValueError("Manifest changed outside versionCode")
-                elif name in working_resources:
-                    if data != working_resources[name]:
+                elif name in delta_resources:
+                    if data != delta_resources[name]:
                         raise ValueError("Transplanted resource mismatch: " + name)
                 else:
                     if data != before.read(name):

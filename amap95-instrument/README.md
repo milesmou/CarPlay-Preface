@@ -1,5 +1,8 @@
 # 9.5 星瑞仪表移植源码
 
+> **口径（2026-10-30 更新）：已改为纯公众版流程，悬浮版底包已从工程移除。**
+> 悬浮版相对公众版的改动已冻结为本地小体积增量 `agent_docs/.../floating-delta/`（`delta.dex` 约 60KB + 4 资源 + 元数据，git 忽略、不入库）；此后重建只用**公众 APK + 冻结增量 + Preface95 payload**，不再依赖任何完整悬浮 APK/DEX。重建与打包脚本为 `scripts/prepare_amap95_public_rebuild.py`、`scripts/build_amap95_public_apk.py`；冻结命令 `scripts/freeze_floating_delta.py`（仅重做增量时需要）。流程、哈希与验证见 [公众版重建](../docs/PREFACE_AMAP95_PUBLIC_REBUILD_2026-10-30.md)。以下历史段落中“悬浮版底包/26000006/26000007”等属当时过程记录。
+
 按用户后续要求，[后台准备链路](../docs/PREFACE_AMAP95_BACKGROUND_PREPARATION_2026-10-30.md)已接入：现有 JSON 服务仅向已核对身份的 CarPlay 客户端提供准备租约，真实初始化／后台工作完成后，对真实副屏空闲画面进行绘制回读，再走原协议准备；退出、失联及本地导航优先时释放。无需手动打开地图，但仍依赖配套改版高德，不能将缓冲区确认当作仪表应答。19 组宿主场景、43 项主应用定向测试及 Android／DEX 核对通过，未构建或安装新 APK；历史 26000007 保留，后续获准打包的目标为 26000008。
 
 后续 [26000007 实车记录及源码修复](../docs/PREFACE_AMAP95_VEHICLE_LOG_2026-10-30.md)已更新：169 车机在升级后及车机重启后均完成提示回读和原车准备，用户反馈起初仪表正常；随后主界面退出导致准备清除。当前源码通过保留单个应用级生命周期观察器，在同进程重开地图时恢复窗口，并过滤旧 Activity 和旧代次回调；仍要求新字段、绘制及真实回读。七组宿主替身回归、Android／DEX 编译通过，未打包或实车复测修复，CarPlay 独立准备仍未实现。下文“尚未验收”保留为历史交付时的范围。
@@ -10,7 +13,7 @@
 
 用户后续要求恢复公众版默认语音并构建，已生成、同证书覆盖安装 `26000007`，冷启动实际显示地图。33 个语音初始化条目全部与公众原包一致，DEX 与 `26000006` 相同，保留音频通道 12；没有重置设备保存的语音选择。语音试听与实车仪表显示待验证，详情见[最新交付记录](../docs/PREFACE_AMAP95_NATIVE_HINTS_TEST_2026-10-30.md)。
 
-公众版重建的差异、已有悬浮／签名代理、生命周期移除及资源替换见[改动审计](../docs/PREFACE_AMAP95_PUBLIC_REBUILD_AUDIT_2026-10-30.md)。可运行 `python scripts/analyze_amap95_public_rebuild.py` 复核固定三份 APK 的 ZIP／DEX 元数据；该命令不构建、签名、安装或执行 APK。
+公众版重建的差异、既有悬浮／签名代理、生命周期移除及资源替换见[改动审计](../docs/PREFACE_AMAP95_PUBLIC_REBUILD_AUDIT_2026-10-30.md)。这些改动已冻结为 `floating-delta`，由 `scripts/prepare_amap95_public_rebuild.py`（合并到公众 DEX）与 `scripts/build_amap95_public_apk.py`（打包）使用；三份 APK 的旧审计脚本已随悬浮底包移除，复核改用重建脚本（不构建、签名、安装或执行 APK）。
 
 `native/MapServiceObserverBridge` 是自行编写的回调对象。依据固定公众版 9.5 的 `libhsl.so` 调用点，实现两项析构入口及七项设备／Surface／绘制通知的虚表顺序；没有复现厂商对象内部字段、构造地图参数或补造缺失的 SDK 函数。
 
